@@ -699,12 +699,12 @@ public class MetadataCacheManager {
     query.setQuery(buildGenericQuery(searchParameters));
 
     // Facets
+    query.addFacetField("HVDCategory");
     query.addFacetField("keywords");
     query.addFacetField("distributionFormats");
     query.addFacetField("distributionLicenses");
     query.addFacetField("nodeID");
     query.addFacetField("datasetThemes");
-    query.addFacetField("HVDCategory");
 
     // query.setFacetLimit(40);
     query.setFacetMinCount(1);

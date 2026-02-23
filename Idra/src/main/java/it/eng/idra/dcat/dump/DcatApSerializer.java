@@ -284,13 +284,13 @@ public class DcatApSerializer {
 
     List<DcatProperty> documentationList = dataset.getDocumentation();
     if (documentationList != null) {
-      documentationList.stream().filter(item -> !isValidUri(item.getValue()))
+      documentationList.stream().filter(item -> isValidUri(item.getValue()))
           .forEach(item -> addDcatPropertyAsResource(item, datasetResource, model, true));
     }
 
     List<DcatProperty> relatedResourceList = dataset.getRelatedResource();
     if (relatedResourceList != null) {
-      relatedResourceList.stream().filter(item -> !isValidUri(item.getValue()))
+      relatedResourceList.stream().filter(item -> isValidUri(item.getValue()))
           .forEach(item -> addDcatPropertyAsResource(item, datasetResource, model, true));
     }
 
@@ -298,13 +298,13 @@ public class DcatApSerializer {
 
     List<DcatProperty> hasVersion = dataset.getHasVersion();
     if (hasVersion != null) {
-      hasVersion.stream().filter(item -> !isValidUri(item.getValue()))
+      hasVersion.stream().filter(item -> isValidUri(item.getValue()))
           .forEach(item -> addDcatPropertyAsResource(item, datasetResource, model, true));
     }
 
     List<DcatProperty> isVersionOf = dataset.getIsVersionOf();
     if (isVersionOf != null) {
-      isVersionOf.stream().filter(item -> !isValidUri(item.getValue()))
+      isVersionOf.stream().filter(item -> isValidUri(item.getValue()))
           .forEach(item -> addDcatPropertyAsResource(item, datasetResource, model, true));
     }
 
@@ -378,8 +378,9 @@ public class DcatApSerializer {
       applicableLegislation.stream()
           .filter(item -> StringUtils.isNotBlank(item.getValue()))
           .forEach(item -> {
-            if (isValidUri(item.getValue())) {
-              Resource legalResource = model.createResource(item.getValue());
+            String safeUri = toSafeResourceUri(item.getValue());
+            if (StringUtils.isNotBlank(safeUri)) {
+              Resource legalResource = model.createResource(safeUri);
               legalResource.addProperty(RDF.type, ELI.LegalResource);
               datasetResource.addProperty(DCATAP.applicableLegislation, legalResource);
             } else {
@@ -943,8 +944,9 @@ public class DcatApSerializer {
       applicableLegislation.stream()
           .filter(item -> StringUtils.isNotBlank(item.getValue()))
           .forEach(item -> {
-            if (isValidUri(item.getValue())) {
-              Resource legalResource = model.createResource(item.getValue());
+            String safeUri = toSafeResourceUri(item.getValue());
+            if (StringUtils.isNotBlank(safeUri)) {
+              Resource legalResource = model.createResource(safeUri);
               legalResource.addProperty(RDF.type, ELI.LegalResource);
               distResource.addProperty(DCATAP.applicableLegislation, legalResource);
             } else {
@@ -1181,13 +1183,17 @@ public class DcatApSerializer {
       Model model, boolean useRange) {
 
     if (StringUtils.isNotBlank(property.getValue())) {
+      String normalizedUri = normalizeUri(property.getValue());
       try {
-        if (useRange) {
+        if (StringUtils.isNotBlank(normalizedUri) && isValidUri(normalizedUri) && useRange) {
           parentResource.addProperty(property.getProperty(), model.createResource(
-              iriFactory.construct(property.getValue()).toURI().toString(), property.getRange()));
+              iriFactory.construct(normalizedUri).toURI().toString(), property.getRange()));
+        } else if (StringUtils.isNotBlank(normalizedUri) && isValidUri(normalizedUri)) {
+          parentResource.addProperty(property.getProperty(),
+              model.createResource(iriFactory.construct(normalizedUri).toURI().toString()));
         } else {
           parentResource.addProperty(property.getProperty(),
-              model.createResource(iriFactory.construct(property.getValue()).toURI().toString()));
+              model.createLiteral(property.getValue()));
         }
       } catch (ResourceRequiredException | URISyntaxException e) {
 
@@ -1441,11 +1447,15 @@ public class DcatApSerializer {
    * @return true, if is valid uri
    */
   protected static boolean isValidUri(String uri) {
-    // return !iriFactory.create(uri).hasViolation(false);
-    if (uri == null || uri.trim().isEmpty())
+    if (uri == null || uri.trim().isEmpty()) {
       return false;
+    }
 
-    uri = uri.trim();
+    uri = normalizeUri(uri);
+    if (StringUtils.isBlank(uri)) {
+      return false;
+    }
+
     try {
       // Basic URI check
       URI parsedUri = new URI(uri);
@@ -1458,6 +1468,44 @@ public class DcatApSerializer {
       return isHttp && !hasIriViolations;
     } catch (Exception e) {
       return false;
+    }
+  }
+
+  /**
+   * Removes common wrappers and surrounding whitespace from URI candidates.
+   *
+   * @param uri raw uri value
+   * @return normalized uri candidate
+   */
+  protected static String normalizeUri(String uri) {
+    if (uri == null) {
+      return null;
+    }
+
+    String normalized = uri.trim();
+
+    if (normalized.startsWith("<") && normalized.endsWith(">") && normalized.length() > 2) {
+      normalized = normalized.substring(1, normalized.length() - 1).trim();
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Converts a URI candidate to a canonical string safe for Jena resource creation.
+   *
+   * @param uri raw uri value
+   * @return canonical uri or null when invalid
+   */
+  protected static String toSafeResourceUri(String uri) {
+    if (!isValidUri(uri)) {
+      return null;
+    }
+
+    try {
+      return iriFactory.construct(normalizeUri(uri)).toURI().toString();
+    } catch (Exception e) {
+      return null;
     }
   }
 

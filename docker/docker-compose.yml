@@ -34,6 +34,19 @@ services :
                 - my_secret_data 
 
             command: --lower_case_table_names=1
+
+    phpmyadmin:
+            image: phpmyadmin/phpmyadmin
+            restart: always
+            ports:
+                - 8082:80
+            environment:
+                - PMA_HOST=db
+                - PMA_PORT=3306
+            depends_on:
+                - db
+            networks:
+                idra_main:
     
     rdf4j:
             image: yyz1989/rdf4j
@@ -66,7 +79,7 @@ services :
     
     # Metadata Quality Validator Tool
     mqa-score:
-            image: mingo07/mqa-scoring:v1.3.5
+            image: idraopendata/mqa-scoring:v1.3.5
             container_name: mqa-score
             #    build:
             #      context: .

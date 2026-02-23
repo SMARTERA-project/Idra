@@ -137,8 +137,9 @@ public class DcatApItSerializer extends DcatApSerializer {
       applicableLegislation.stream()
           .filter(item -> StringUtils.isNotBlank(item.getValue()))
           .forEach(item -> {
-            if (isValidUri(item.getValue())) {
-              Resource legalResource = model.createResource(item.getValue());
+            String safeUri = toSafeResourceUri(item.getValue());
+            if (StringUtils.isNotBlank(safeUri)) {
+              Resource legalResource = model.createResource(safeUri);
               legalResource.addProperty(RDF.type, ELI.LegalResource);
               datasetResource.addProperty(DCATAP.applicableLegislation, legalResource);
             } else {
@@ -588,8 +589,9 @@ public class DcatApItSerializer extends DcatApSerializer {
       applicableLegislation.stream()
           .filter(item -> StringUtils.isNotBlank(item.getValue()))
           .forEach(item -> {
-            if (isValidUri(item.getValue())) {
-              Resource legalResource = model.createResource(item.getValue());
+            String safeUri = toSafeResourceUri(item.getValue());
+            if (StringUtils.isNotBlank(safeUri)) {
+              Resource legalResource = model.createResource(safeUri);
               legalResource.addProperty(RDF.type, ELI.LegalResource);
               distResource.addProperty(DCATAP.applicableLegislation, legalResource);
             } else {

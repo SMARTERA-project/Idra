@@ -68,6 +68,10 @@ public class SearchFacetsList {
     super();
     String category = f.getName();
     switch (category) {
+      case "HVDCategory":
+        this.searchParameter = category;
+        this.displayName = "HVD Categories";
+        break;
       case "keywords":
         this.searchParameter = "tags";
         this.displayName = "Tags";
@@ -87,10 +91,6 @@ public class SearchFacetsList {
       case "datasetThemes":
         this.searchParameter = category;
         this.displayName = "Categories";
-        break;
-      case "HVDCategory":
-        this.searchParameter = category;
-        this.displayName = "HVD Categories";
         break;
       default:
         this.searchParameter = category;
