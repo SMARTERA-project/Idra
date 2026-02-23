@@ -16,7 +16,6 @@
  package it.eng.idra.api;
 
  import it.eng.idra.authentication.AuthenticationManager;
- import it.eng.idra.authentication.BasicAuthenticationManager;
  import it.eng.idra.authentication.FiwareIdmAuthenticationManager;
  import it.eng.idra.authentication.KeycloakAuthenticationManager;
  import it.eng.idra.authentication.Secured;
@@ -29,10 +28,8 @@
  import it.eng.idra.beans.IdraProperty;
  import it.eng.idra.beans.Log;
  import it.eng.idra.beans.LogsRequest;
- import it.eng.idra.beans.PasswordChange;
  import it.eng.idra.beans.RdfPrefix;
  import it.eng.idra.beans.RemoteCatalogue;
- import it.eng.idra.beans.User;
  import it.eng.idra.beans.dcat.DcatDataset;
  import it.eng.idra.beans.odms.OdmsAlreadyPresentException;
  import it.eng.idra.beans.odms.OdmsCatalogue;
@@ -1392,12 +1389,11 @@
            } else {
              return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
            }
- 
+
          default:
-           String input = IOUtils.toString(httpRequest.getInputStream(), Charset.defaultCharset());
-           User user = GsonUtil.json2Obj(input, GsonUtil.userType);
-           token = (String) authInstance.login(user.getUsername(), user.getPassword(), null);
-           return Response.status(Response.Status.OK).entity(token).build();
+           return Response.status(Response.Status.BAD_REQUEST)
+               .entity("Unsupported authentication method")
+               .build();
        }
  
      } catch (GsonUtilException e) {
@@ -1423,7 +1419,6 @@
    public Response loginPost(@Context HttpServletRequest httpRequest) {
  
      try {
-       Object token = null;
        AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
  
        switch (IdraAuthenticationMethod.valueOf(
@@ -1435,12 +1430,11 @@
              return Response.status(Response.Status.BAD_REQUEST).build();
            }
  
-           Token t = (Token) authInstance.login(null, null, code);
-           UserInfo info = FiwareIdmAuthenticationManager.getInstance()
-               .getUserInfo(t.getAccessToken());
+         Token t = (Token) authInstance.login(null, null, code);
+         UserInfo info = FiwareIdmAuthenticationManager.getInstance()
+             .getUserInfo(t.getAccessToken());
  
-           token = t.getAccessToken();
-           token = (String) token;
+          String token = t.getAccessToken();
  
            String refreshToken = t.getRefreshToken();
  
@@ -1463,11 +1457,11 @@
              return Response.status(Response.Status.BAD_REQUEST).build();
            }
  
-           Token k = (Token) authInstance.login(null, null, code);
-           KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
-               .getUserInfo(k.getAccessToken());
+         Token k = (Token) authInstance.login(null, null, code);
+         KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
+             .getUserInfo(k.getAccessToken());
  
-           token = k.getAccessToken();
+          token = k.getAccessToken();
  
            refreshToken = k.getRefreshToken();
  
@@ -1481,16 +1475,12 @@
            } else {
              return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
            }
-       
+
          default:
-           String input = IOUtils.toString(httpRequest.getInputStream(), Charset.defaultCharset());
-           User user = GsonUtil.json2Obj(input, GsonUtil.userType);
-           token = (String) authInstance.login(user.getUsername(), user.getPassword(), null);
-           break;
+           return Response.status(Response.Status.BAD_REQUEST)
+               .entity("Unsupported authentication method")
+               .build();
        }
- 
-       return Response.status(Response.Status.OK).entity(token).build();
- 
      } catch (GsonUtilException e) {
        return handleBadRequestErrorResponse(e);
      } catch (NullPointerException e) {
@@ -1499,53 +1489,6 @@
        return handleErrorResponse500(e);
      }
  
-   }
- 
-   /**
-    * updatePassword.
-    *
-    * @param input parameter
-    * @return the response
-    */
-   @PUT
-   @Path("/updatePassword")
-   @Secured
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response updatePassword(final String input) {
- 
-     try {
- 
-       PasswordChange passChange = GsonUtil.json2Obj(input, PasswordChange.class);
- 
-       if (!passChange.getNewPassword().equals(passChange.getNewPasswordConfirm())) {
-         ErrorResponse error = new ErrorResponse(
-             String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
-             "Password and password confirm are not equal", "PasswordsNotEqual",
-             "Password and password confirm are not equal");
-         return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
-       }
- 
-       if (BasicAuthenticationManager.validatePassword(passChange.getUsername(),
-           passChange.getOldPassword())) {
- 
-         BasicAuthenticationManager.updateUserPassword(passChange.getUsername(),
-             passChange.getNewPassword());
- 
-         JSONObject out = new JSONObject();
-         out.append("message", "Password successfully updated!");
-         return Response.status(Response.Status.OK).entity(out.toString()).build();
- 
-       } else {
- 
-         ErrorResponse error = new ErrorResponse(
-             String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), "Wrong Old Password!",
-             "WrongOldPassword", "Wrong Old Password!");
-         return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
-       }
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
    }
  
    /**

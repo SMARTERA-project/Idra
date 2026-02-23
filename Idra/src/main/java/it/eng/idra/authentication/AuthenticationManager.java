@@ -81,15 +81,23 @@ public abstract class AuthenticationManager {
    */
   public static AuthenticationManager getActiveAuthenticationManager() {
 
-    switch (IdraAuthenticationMethod
-        .valueOf(PropertyManager.getProperty(IdraProperty.AUTHENTICATION_METHOD))) {
+    String authMethod = PropertyManager.getProperty(IdraProperty.AUTHENTICATION_METHOD);
+    IdraAuthenticationMethod configuredMethod;
+    try {
+      configuredMethod = IdraAuthenticationMethod.valueOf(authMethod);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException("Unsupported idra.authentication.method value: " + authMethod,
+          e);
+    }
+
+    switch (configuredMethod) {
 
       case FIWARE:
         return FiwareIdmAuthenticationManager.getInstance();
       case KEYCLOAK:
         return KeycloakAuthenticationManager.getInstance();
       default:
-        return BasicAuthenticationManager.getInstance();
+        throw new IllegalStateException("Unsupported idra.authentication.method value");
     }
 
   }

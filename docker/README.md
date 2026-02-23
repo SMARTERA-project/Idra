@@ -104,7 +104,7 @@ services :
                 - idra.lod.server.uri.query=http://rdf4j:8081/rdf4j-workbench/repositories/Idra/query
                 - idra.orion.orionDumpFilePath=/opt/idra/dump/
                 - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
-                - idra.authentication.method=BASIC
+                - idra.authentication.method=KEYCLOAK
                 - idm.fiware.version=7
                 - idm.protocol=https
                 - idm.host=
@@ -155,7 +155,7 @@ environment variables such as those shown below:
 -   `idra.lod.server.uri.query` - URL where to find the "query" endpoint of RDF4J
 -   `idra.orion.orionDumpFilePath` - The path where Orion dumps are stored
 -   `idra.orion.orionInternalAPI` - The internal endpoint used to wrap Orion's queries
--   `idra.authentication.method` - Allowed values are BASIC and FIWARE to select which Authorization mechanism to use 
+-   `idra.authentication.method` - Allowed values are KEYCLOAK and FIWARE to select which Authorization mechanism to use 
 -   `idm.fiware.version` - The version of the Fiware IdM, namely Keyrock. Allowed values are 6 and 7
 -   `idm.protocol` - Protocol of Fiware IdM instance (http or https)
 -   `idm.host` - Host of Fiware IdM instance (include also the port, if any)
@@ -173,6 +173,14 @@ environment variables such as those shown below:
 
 Additional information and instructions on how to install and launch the Idra platform using Docker can be found in 
 the "Install with Docker" section of the [Installation Guide](https://idra.readthedocs.io/en/latest/admin/install_docker/).
+
+### Migration from BASIC authentication
+
+If you are upgrading from a deployment that previously used BASIC authentication, run:
+
+- `docker/db-config/migrations/2026-02-23-remove-basic-auth.sql` on the Idra MySQL database.
+
+After deploying the new frontend, clear old browser storage keys (`username`) if still present.
 
 ## How to build an image
 

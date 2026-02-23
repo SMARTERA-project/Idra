@@ -21,8 +21,6 @@ package it.eng.idra.beans;
  */
 public enum IdraAuthenticationMethod {
 
-  /** The basic. */
-  BASIC("BASIC"),
   /** The fiware. */
   FIWARE("FIWARE"),
   /** The keycloak. */

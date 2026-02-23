@@ -760,22 +760,13 @@ paths:
             $ref: '#/definitions/ErrorResponse'
   /api/v1/administration/login:
     x-summary: Login
-    x-description: Performs the user login against the input credentials or through oauth2 authorization flow
+    x-description: Performs administrator login through OAuth2/OIDC authorization flow
     post:
       operationId: loginPost
       tags:
         - Administration Api
       consumes:
         - application/json
-      parameters:
-        - in: body
-          name: request
-          required: true
-          description: >-
-            Only 'username' and 'password' fields should be provided, additional
-            User fields will be ignored.
-          schema:
-            $ref: '#/definitions/User'
       responses:
         '200':
           description: 'If login succeded, the access token is returned.'
@@ -826,41 +817,6 @@ paths:
           description: >-
             If the logged user is the administrator or the user is not logged,
             HTTP Status Code 401 Unauthorized is returned.
-        '500':
-          description: >-
-            If an error occurs during the execution of the request, HTTP Status
-            Code 500 Internal Server Error is returned.
-          schema:
-            $ref: '#/definitions/ErrorResponse'
-  /api/v1/administration/updatePassword:
-    x-summary: Password Update
-    x-description: Updates password of a specific user
-    put:
-      operationId: updatePassword
-      tags:
-        - Administration Api
-      consumes:
-        - application/json
-      security:
-        - Bearer: []
-      parameters:
-        - in: body
-          name: request
-          required: true
-          description: >-
-            Only 'password' field should be provided, additional User fields
-            will be ignored.
-          schema:
-            $ref: '#/definitions/User'
-      responses:
-        '200':
-          description: If password update succeded.
-        '400':
-          description: >-
-            If the request is not a valid input, HTTP 400 Bad Request status
-            code is returned.
-          schema:
-            $ref: '#/definitions/ErrorResponse'
         '500':
           description: >-
             If an error occurs during the execution of the request, HTTP Status

@@ -56,7 +56,7 @@ services :
                 - idra.lod.enable=false
                 - idra.orion.orionDumpFilePath=/opt/idra/dump/
                 - idra.orion.orionInternalAPI=http://idra:8080/Idra/api/v1/client/executeOrionQuery
-                - idra.authentication.method=BASIC
+                - idra.authentication.method=KEYCLOAK
                 - idm.admin.role.name=Admin
                 - JAVA_OPTS=-Xms1024m -Xmx3g -XX:PermSize=1024m -XX:MaxPermSize=2048m
             secrets:
