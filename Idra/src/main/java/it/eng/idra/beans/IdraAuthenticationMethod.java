@@ -21,8 +21,6 @@ package it.eng.idra.beans;
  */
 public enum IdraAuthenticationMethod {
 
-  /** The fiware. */
-  FIWARE("FIWARE"),
   /** The keycloak. */
   KEYCLOAK("KEYCLOAK");
 

@@ -234,12 +234,11 @@ the deployed folders of Tomcat `webapps` folder.
 
 -   **`IdraPortal/WEB-INF/classes/configuration.properties`** :
 
-    -   **`idm.authentication.method`**: allowed values are **`BASIC`** and
-        **`FIWARE`**
+    -   **`idm.authentication.method`**: allowed value is **`KEYCLOAK`**
 
 -   **`Idra/WEB-INF/classes/configuration.properties`** :
 
-        	- **`idra.authentication.method`**: allowed values are **`BASIC`** and **`FIWARE`**
+        	- **`idra.authentication.method`**: allowed value is **`KEYCLOAK`**
 
 ##### Configuring Idra with Fiware IdM Authentication
 
@@ -289,8 +288,6 @@ deployed folders of Tomcat `webapps` folder.
     -   **`idm.client.id`**, **`idm.client.secret`**, **`idm.redirecturi`**,
         **`idm.logout.callback`**, **`idm.protocol`**, **`idm.host`** with the
         **same** values specified above for Idra Portal.
-    -   **`idm.fiware.version`**: The version of the Fiware IdM, namely Keyrock.
-        Allowed values are **6** and **7**.
     -   **`idm.admin.role.name`**: Role name that User must have in the IDM to
         be authenticated as Idra Administrator. (default: **ADMIN**).
 

@@ -105,7 +105,6 @@ services :
                 - idra.orion.orionDumpFilePath=/opt/idra/dump/
                 - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
                 - idra.authentication.method=KEYCLOAK
-                - idm.fiware.version=7
                 - idm.protocol=https
                 - idm.host=
                 - idm.path.base=
@@ -155,16 +154,15 @@ environment variables such as those shown below:
 -   `idra.lod.server.uri.query` - URL where to find the "query" endpoint of RDF4J
 -   `idra.orion.orionDumpFilePath` - The path where Orion dumps are stored
 -   `idra.orion.orionInternalAPI` - The internal endpoint used to wrap Orion's queries
--   `idra.authentication.method` - Allowed values are KEYCLOAK and FIWARE to select which Authorization mechanism to use 
--   `idm.fiware.version` - The version of the Fiware IdM, namely Keyrock. Allowed values are 6 and 7
--   `idm.protocol` - Protocol of Fiware IdM instance (http or https)
--   `idm.host` - Host of Fiware IdM instance (include also the port, if any)
--   `idm.path.base` - Base URL of the Idra Platform registered as an Application in the Fiware IdM
--   `idm.client.id` -  Client Id provided by the Fiware IdM
--   `idm.client.secret` - Client Secret provided by the Fiware IdM
--   `idm.redirecturi` - Callback login URL of the Idra Platform registered as an Application in the Fiware IdM
--   `idm.logout.callback` - URL of the Idra Platform registered as an Application in the Fiware IdM
--   `idm.admin.role.name` - Role name that User must have in the IDM to be authenticated as Idra Administrator (default: admin)
+-   `idra.authentication.method` - Allowed value is `KEYCLOAK`
+-   `idm.protocol` - Protocol of Keycloak instance (`http` or `https`)
+-   `idm.host` - Host of Keycloak instance (include also the port, if any)
+-   `idm.path.base` - Base URL of the Idra Platform registered as an Application in Keycloak
+-   `idm.client.id` - Client Id provided by Keycloak
+-   `idm.client.secret` - Client Secret provided by Keycloak
+-   `idm.redirecturi` - Callback login URL of the Idra Platform registered as an Application in Keycloak
+-   `idm.logout.callback` - URL of the Idra Platform registered as an Application in Keycloak
+-   `idm.admin.role.name` - Role name that user must have in Keycloak to be authenticated as Idra Administrator (default: admin)
 -   `DATALET_ENABLED` - If set to true, it allows to enable the possibility to create and manage the datalets 
 -   `DATALET_URL` - URL where to find the instance of the deep component to create and manage the datalets 
 -   `JAVA_OPTS` - Memory flags options for the Java Virtual Machine (JVM)

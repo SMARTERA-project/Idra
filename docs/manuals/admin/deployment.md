@@ -123,12 +123,10 @@ folders of Tomcat `webapps` folder.
 
 -   **`IdraPortal/WEB-INF/classes/`**
     -   in **`configuration.properties`** file, change the following property:
-        -   **`idm.authentication.method`**: allowed values are **`BASIC`** and
-            **`FIWARE`**
+        -   **`idm.authentication.method`**: allowed value is **`KEYCLOAK`**
 -   **`Idra/WEB-INF/classes/`**
     -   in **`configuration.properties`** file, change the following property:
-        -   **`idra.authentication.method`**: allowed values are **`BASIC`** and
-            **`FIWARE`**
+        -   **`idra.authentication.method`**: allowed value is **`KEYCLOAK`**
 
 ##### Configuring Idra with Fiware IdM Authentication
 
@@ -143,8 +141,8 @@ correctly execute the OAuth2 flow:
 **Note**. Replace **`IDRA_PORTAL_HOST`** and **`IDRA_HOST`** with the actual
 values, namely the Base URL where Idra Platform is deployed.
 
--   The User that wants to authenticate itself as Administrator in Idra, must be
-    authorized and have the **"Admin"** role for that application.
+-   The User that wants to authenticate itself as Administrator in Idra must be
+    authorized and have the role configured in **`idm.admin.role.name`**.
 
 **Note**. Please see the
 [Fiware Identity Manager](https://fiware-idm.readthedocs.io/en/latest/api/#def-apiOAuth)
@@ -178,8 +176,6 @@ deployed folders of Tomcat `webapps` folder.
         -   **`idm.client.id`**, **`idm.client.secret`**, **`idm.redirecturi`**,
             **`idm.logout.callback`**, **`idm.protocol`**, **`idm.host`** with
             the **same** values specified above for Idra Portal.
-        -   **`idm.fiware.version`**: The version of the Fiware IdM, namely
-            Keyrock. Allowed values are **6** and **7**.
         -   **`idm.admin.role.name`**: Role name that User must have in the IDM
             to be authenticated as Idra Administrator. (default: **ADMIN**).
 

@@ -48,34 +48,34 @@ services :
             networks:
                 idra_main:
     
-    # rdf4j:
-    #         image: yyz1989/rdf4j
-    #         ports:
-    #             - 8081:8080
-    #         volumes:
-    #             - ./opt/idra/rdf4j-data:/opt/rdf4j/data
-    #         environment:
-    #             - RDF4J_DATA=/opt/rdf4j/data
-    #         networks:
-    #             idra_main:
+    rdf4j:
+            image: yyz1989/rdf4j
+            ports:
+                - 8081:8080
+            volumes:
+                - ./opt/idra/rdf4j-data:/opt/rdf4j/data
+            environment:
+                - RDF4J_DATA=/opt/rdf4j/data
+            networks:
+                idra_main:
     
-    # deep:
-    #         image: idraopendata/deep:2.2.6
-    #         ports:
-    #             - 80:80
-    #         volumes:
-    #             - ./deep/configuration.js:/var/www/app/deep/deep-components/configuration.js
-    #         networks:
-    #             idra_main:
+    deep:
+            image: idraopendata/deep:2.2.6
+            ports:
+                - 80:80
+            volumes:
+                - ./deep/configuration.js:/var/www/app/deep/deep-components/configuration.js
+            networks:
+                idra_main:
     
-    # # NEW VERSION OF THE IDRA PORTAL - integrated with Metadata Quality Validator Tool
-    # idraNewPortal:
-    #         image: idraopendata/idra-portal:latest
-    #         ports:
-    #             - "4200:80"
-    #         volumes:
-    #             - ./idra-new-portal-config/config.json:/usr/share/nginx/html/assets/config.json
-    #             - ./idra-new-portal-config/nginx.conf:/etc/nginx/conf.d/default.conf
+    # NEW VERSION OF THE IDRA PORTAL - integrated with Metadata Quality Validator Tool
+    idraNewPortal:
+            image: idraopendata/idra-portal:latest
+            ports:
+                - "4200:80"
+            volumes:
+                - ./idra-new-portal-config/config.json:/usr/share/nginx/html/assets/config.json
+                - ./idra-new-portal-config/nginx.conf:/etc/nginx/conf.d/default.conf
     
     # Metadata Quality Validator Tool
     mqa-score:
@@ -146,7 +146,6 @@ services :
                 - idra.lod.server.uri.query=http://rdf4j:8080/rdf4j-workbench/repositories/Idra/query
                 - idra.orion.orionDumpFilePath=/opt/idra/dump/
                 - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
-                - idm.fiware.version=7
                 - DATALET_ENABLED=true
                 - DATALET_URL=https://your-domain.it/deep/deep-components/demo.html
                 - JAVA_OPTS=-Xms1024m -Xmx3g
@@ -154,14 +153,14 @@ services :
             # env variables for KEYCLOAK authentication
                 - idra.authentication.method=KEYCLOAK
                 - idm.protocol=https
-                - idm.host=your-keycloak-domain.it/auth/realms/master/protocol/openid-connect
+                - idm.host=dx-lab.it/auth/realms/master/protocol/openid-connect
                 - idm.path.base=
-                - idm.client.id=idra
+                - idm.client.id=beopen-dashboard
                 - idm.client.secret=
-                - idm.redirecturi=https://your-domain.it/Idra/api/v1/administration/login
-                - idm.logout.callback=https://your-domain.it/IdraPortal
-                - idra.server.baseurl=https://your-domain.it/
-                - idm.admin.role.name=""
+                - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
+                - idm.logout.callback=http://localhost:4200/pages
+                - idra.server.baseurl=http://localhost:8080/
+                - idm.admin.role.name=admin
             secrets:
                 - my_secret_data           
             volumes:

@@ -16,15 +16,12 @@
  package it.eng.idra.api;
 
  import it.eng.idra.authentication.AuthenticationManager;
- import it.eng.idra.authentication.FiwareIdmAuthenticationManager;
  import it.eng.idra.authentication.KeycloakAuthenticationManager;
  import it.eng.idra.authentication.Secured;
  import it.eng.idra.authentication.fiware.model.Token;
- import it.eng.idra.authentication.fiware.model.UserInfo;
  import it.eng.idra.authentication.keycloak.model.KeycloakUser;
  import it.eng.idra.beans.Datalet;
  import it.eng.idra.beans.ErrorResponse;
- import it.eng.idra.beans.IdraAuthenticationMethod;
  import it.eng.idra.beans.IdraProperty;
  import it.eng.idra.beans.Log;
  import it.eng.idra.beans.LogsRequest;
@@ -73,7 +70,6 @@
  import java.util.List;
  import java.util.Map;
  import javax.servlet.http.HttpServletRequest;
- import javax.servlet.http.HttpSession;
  import javax.ws.rs.Consumes;
  import javax.ws.rs.DELETE;
  import javax.ws.rs.DefaultValue;
@@ -1086,7 +1082,7 @@
    @Produces("text/plain")
    public Response authRemoteCatalogueIdm(@PathParam("id") String id) {
      try {
-       logger.debug(" -------------------------- Caso Login IDM FIWARE");
+      logger.debug(" -------------------------- Remote catalogue IDM login");
        RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
        String clientId = remCatalogue.getClientId();
        String clientSecret = remCatalogue.getClientSecret();
@@ -1329,75 +1325,36 @@
    @Path("/login")
    @Consumes({ MediaType.APPLICATION_JSON })
    @Produces("text/plain")
-   public Response loginGet(@DefaultValue("") @QueryParam("code") String code,
-       @Context HttpServletRequest httpRequest) {
- 
-     try {
-       Object token = null;
-       AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
- 
-       switch (IdraAuthenticationMethod.valueOf(
-           PropertyManager.getProperty(IdraProperty.AUTHENTICATION_METHOD))) {
- 
-         case FIWARE:
- 
-           if (StringUtils.isBlank(code)) {
-             return Response.status(Response.Status.BAD_REQUEST).build();
-           }
- 
-           Token t = (Token) authInstance.login(null, null, code);
-           UserInfo info = FiwareIdmAuthenticationManager.getInstance()
-               .getUserInfo(t.getAccessToken());
- 
-           token = t.getAccessToken();
- 
-           String refreshToken = t.getRefreshToken();
- 
-           if (token != null && ((String) token).trim().length() > 0) {
-             return Response.seeOther(URI.create(
-                   PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-                   .cookie(new NewCookie("loggedin", (String) token, "/", "", "comment", 100, true))
-                   .cookie(new NewCookie("refresh_token", refreshToken,
-                       "/", "", "comment", 100, true))
-                   .cookie(new NewCookie("username", info.getDisplayName(),
-                       "/", "", "comment", 100, true)).build();
-           } else {
-             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-           }
- 
-         case KEYCLOAK:
-           if (StringUtils.isBlank(code)) {
-             return Response.status(Response.Status.BAD_REQUEST).build();
-           }
- 
-           Token k = (Token) authInstance.login(null, null, code);
-           KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
-                 .getUserInfo(k.getAccessToken());
- 
-           token = k.getAccessToken();
- 
-           refreshToken = k.getRefreshToken();
- 
-           if (token != null && ((String) token).trim().length() > 0) {
-             return Response.seeOther(URI.create(
-                   PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-                   .cookie(new NewCookie("loggedin", (String) token, "/", "", "comment", 100, true))
-                   .cookie(new NewCookie("refresh_token", refreshToken,
-                       "/", "", "comment", 100, true))
-                   .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
-                       "/", "", "comment", 100, true)).build();
-           } else {
-             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-           }
+  public Response loginGet(@DefaultValue("") @QueryParam("code") String code,
+      @Context HttpServletRequest httpRequest) {
 
-         default:
-           return Response.status(Response.Status.BAD_REQUEST)
-               .entity("Unsupported authentication method")
-               .build();
-       }
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
+    try {
+      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+      if (StringUtils.isBlank(code)) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+
+      Token k = (Token) authInstance.login(null, null, code);
+      KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
+          .getUserInfo(k.getAccessToken());
+
+      String token = k.getAccessToken();
+      String refreshToken = k.getRefreshToken();
+
+      if (StringUtils.isNotBlank(token)) {
+        return Response.seeOther(URI.create(
+            PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
+            .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
+            .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
+            .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
+                "/", "", "comment", 100, true))
+            .build();
+      }
+
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+
+    } catch (GsonUtilException e) {
+      return handleBadRequestErrorResponse(e);
      } catch (NullPointerException e) {
        return handleErrorResponseLogin(e);
      } catch (Exception e) {
@@ -1416,73 +1373,36 @@
    @Path("/login")
    @Consumes({ MediaType.APPLICATION_JSON })
    @Produces("text/plain")
-   public Response loginPost(@Context HttpServletRequest httpRequest) {
- 
-     try {
-       AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
- 
-       switch (IdraAuthenticationMethod.valueOf(
-           PropertyManager.getProperty(IdraProperty.AUTHENTICATION_METHOD))) {
- 
-         case FIWARE:
-           String code = httpRequest.getParameter("code");
-           if (StringUtils.isBlank(code)) {
-             return Response.status(Response.Status.BAD_REQUEST).build();
-           }
- 
-         Token t = (Token) authInstance.login(null, null, code);
-         UserInfo info = FiwareIdmAuthenticationManager.getInstance()
-             .getUserInfo(t.getAccessToken());
- 
-          String token = t.getAccessToken();
- 
-           String refreshToken = t.getRefreshToken();
- 
-           if (token != null && ((String) token).trim().length() > 0) {
-             HttpSession session = httpRequest.getSession();
-             session.setAttribute("loggedin", token);
-             session.setAttribute("refresh_token", refreshToken);
-             session.setAttribute("username", info.getDisplayName());
-           }
- 
-           return Response
-             .temporaryRedirect(URI.create(
-                 httpRequest.getContextPath() 
-                 + PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-             .build();
- 
-         case KEYCLOAK:
-           code = httpRequest.getParameter("code");
-           if (StringUtils.isBlank(code)) {
-             return Response.status(Response.Status.BAD_REQUEST).build();
-           }
- 
-         Token k = (Token) authInstance.login(null, null, code);
-         KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
-             .getUserInfo(k.getAccessToken());
- 
-          token = k.getAccessToken();
- 
-           refreshToken = k.getRefreshToken();
- 
-           if (token != null && ((String) token).trim().length() > 0) {
-             return Response.seeOther(URI.create(
-                 PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-               .cookie(new NewCookie("loggedin", (String) token, "/", "", "comment", 100, true))
-               .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
-               .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
-                   "/", "", "comment", 100, true)).build();
-           } else {
-             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-           }
+  public Response loginPost(@Context HttpServletRequest httpRequest) {
 
-         default:
-           return Response.status(Response.Status.BAD_REQUEST)
-               .entity("Unsupported authentication method")
-               .build();
-       }
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
+    try {
+      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+      String code = httpRequest.getParameter("code");
+      if (StringUtils.isBlank(code)) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+
+      Token k = (Token) authInstance.login(null, null, code);
+      KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
+          .getUserInfo(k.getAccessToken());
+
+      String token = k.getAccessToken();
+      String refreshToken = k.getRefreshToken();
+
+      if (StringUtils.isNotBlank(token)) {
+        return Response.seeOther(URI.create(
+            PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
+            .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
+            .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
+            .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
+                "/", "", "comment", 100, true))
+            .build();
+      }
+
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+
+    } catch (GsonUtilException e) {
+      return handleBadRequestErrorResponse(e);
      } catch (NullPointerException e) {
        return handleErrorResponseLogin(e);
      } catch (Exception e) {
@@ -1506,20 +1426,9 @@
  
      try {
  
-       // switch
-       // (IdraAuthenticationMethod.valueOf(PropertyManager
-       // .getProperty(IdraProperty.AUTHENTICATION_METHOD)))
-       // {
- 
-       // case FIWARE:
-       // return authInstance.logout(httpRequest);
-       // default:
-       AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
- 
-       return authInstance.logout(httpRequest);
-       // }
- 
-       // return Response.status(Response.Status.OK).build();
+      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+
+      return authInstance.logout(httpRequest);
  
      } catch (GsonUtilException e) {
        return handleBadRequestErrorResponse(e);

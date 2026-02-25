@@ -90,15 +90,11 @@ public abstract class AuthenticationManager {
           e);
     }
 
-    switch (configuredMethod) {
-
-      case FIWARE:
-        return FiwareIdmAuthenticationManager.getInstance();
-      case KEYCLOAK:
-        return KeycloakAuthenticationManager.getInstance();
-      default:
-        throw new IllegalStateException("Unsupported idra.authentication.method value");
+    if (configuredMethod == IdraAuthenticationMethod.KEYCLOAK) {
+      return KeycloakAuthenticationManager.getInstance();
     }
+
+    throw new IllegalStateException("Unsupported idra.authentication.method value: " + authMethod);
 
   }
 }
