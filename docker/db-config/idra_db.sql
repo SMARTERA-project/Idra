@@ -2175,3 +2175,121 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2019-05-22 11:16:38
+
+--
+-- Multi-user RBAC tables (Keycloak-only authentication/registration)
+--
+
+DROP TABLE IF EXISTS `role_permission`;
+DROP TABLE IF EXISTS `user_role`;
+DROP TABLE IF EXISTS `permission`;
+DROP TABLE IF EXISTS `role`;
+DROP TABLE IF EXISTS `app_user`;
+
+CREATE TABLE `app_user` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `keycloak_sub` VARCHAR(255) NOT NULL,
+  `username` VARCHAR(255) DEFAULT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_app_user_keycloak_sub` (`keycloak_sub`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `role` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(128) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `permission` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(255) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_permission_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `user_role` (
+  `user_id` INT NOT NULL,
+  `role_id` INT NOT NULL,
+  PRIMARY KEY (`user_id`, `role_id`),
+  KEY `idx_user_role_role_id` (`role_id`),
+  CONSTRAINT `fk_user_role_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_user_role_role` FOREIGN KEY (`role_id`) REFERENCES `role` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `role_permission` (
+  `role_id` INT NOT NULL,
+  `permission_id` INT NOT NULL,
+  PRIMARY KEY (`role_id`, `permission_id`),
+  KEY `idx_role_permission_permission_id` (`permission_id`),
+  CONSTRAINT `fk_role_permission_role` FOREIGN KEY (`role_id`) REFERENCES `role` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_role_permission_permission` FOREIGN KEY (`permission_id`) REFERENCES `permission` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `role` (`code`, `description`) VALUES
+  ('ADMIN', 'Full access to Idra administration'),
+  ('EDITOR', 'Can modify federation resources within allowed domains'),
+  ('VIEWER', 'Read-only access to Idra administration'),
+  ('BASIC_USER', 'Authenticated user with no administration access');
+
+INSERT INTO `permission` (`code`, `description`) VALUES
+  ('admin.catalogue.read', 'Read federated catalogues (administration)'),
+  ('admin.catalogue.write', 'Create/update federated catalogues (administration)'),
+  ('admin.catalogue.delete', 'Delete federated catalogues (administration)'),
+  ('admin.catalogue.activate', 'Activate/deactivate/synchronize catalogues (administration)'),
+  ('admin.messages.read', 'Read catalogue messages (administration)'),
+  ('admin.messages.delete', 'Delete catalogue messages (administration)'),
+  ('admin.settings.read', 'Read platform configuration (administration)'),
+  ('admin.settings.write', 'Update platform configuration (administration)'),
+  ('admin.prefix.read', 'Read RDF prefixes (administration)'),
+  ('admin.prefix.write', 'Create/update/delete RDF prefixes (administration)'),
+  ('admin.stats.read', 'Read statistics (administration)'),
+  ('admin.logs.read', 'Read logs (administration)'),
+  ('admin.dump.read', 'Read/download DCAT-AP dumps (administration)'),
+  ('admin.datalet.read', 'Read datalets (administration)'),
+  ('admin.datalet.delete', 'Delete datalets (administration)'),
+  ('admin.users.manage', 'Manage Idra users/roles/permissions (administration)');
+
+INSERT INTO `role_permission` (`role_id`, `permission_id`)
+SELECT r.`id`, p.`id`
+FROM `role` r
+JOIN `permission` p
+WHERE r.`code` = 'ADMIN';
+
+INSERT INTO `role_permission` (`role_id`, `permission_id`)
+SELECT r.`id`, p.`id`
+FROM `role` r
+JOIN `permission` p
+WHERE r.`code` = 'EDITOR'
+  AND p.`code` IN (
+    'admin.catalogue.read','admin.catalogue.write','admin.catalogue.activate',
+    'admin.prefix.read','admin.prefix.write',
+    'admin.dump.read',
+    'admin.datalet.read'
+  );
+
+INSERT INTO `role_permission` (`role_id`, `permission_id`)
+SELECT r.`id`, p.`id`
+FROM `role` r
+JOIN `permission` p
+WHERE r.`code` = 'VIEWER'
+  AND p.`code` IN (
+    'admin.catalogue.read',
+    'admin.messages.read',
+    'admin.settings.read',
+    'admin.prefix.read',
+    'admin.stats.read',
+    'admin.logs.read',
+    'admin.dump.read',
+    'admin.datalet.read'
+  );

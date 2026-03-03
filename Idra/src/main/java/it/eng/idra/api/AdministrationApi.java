@@ -17,6 +17,7 @@
 
  import it.eng.idra.authentication.AuthenticationManager;
  import it.eng.idra.authentication.KeycloakAuthenticationManager;
+ import it.eng.idra.authentication.RequiresPermission;
  import it.eng.idra.authentication.Secured;
  import it.eng.idra.authentication.fiware.model.Token;
  import it.eng.idra.authentication.keycloak.model.KeycloakUser;
@@ -41,6 +42,7 @@
  import it.eng.idra.beans.orion.OrionCatalogueConfiguration;
  import it.eng.idra.beans.sparql.SparqlCatalogueConfiguration;
  import it.eng.idra.beans.statistics.StatisticsRequest;
+ import it.eng.idra.beans.security.AppUser;
  import it.eng.idra.cache.CachePersistenceManager;
  import it.eng.idra.cache.MetadataCacheManager;
  import it.eng.idra.dcat.dump.DcatApDumpManager;
@@ -52,6 +54,8 @@
  import it.eng.idra.utils.GsonUtil;
  import it.eng.idra.utils.GsonUtilException;
  import it.eng.idra.utils.PropertyManager;
+ import it.eng.idra.management.security.RbacService;
+ import it.eng.idra.management.security.SecurityPersistenceManager;
  import it.eng.idra.utils.restclient.RestClient;
  import it.eng.idra.utils.restclient.RestClientImpl;
  import java.io.ByteArrayInputStream;
@@ -86,6 +90,7 @@
  import javax.ws.rs.client.Entity;
  import javax.ws.rs.client.Invocation;
  import javax.ws.rs.client.WebTarget;
+ import javax.ws.rs.container.ContainerRequestContext;
  import javax.ws.rs.core.Context;
  import javax.ws.rs.core.MediaType;
  import javax.ws.rs.core.MultivaluedHashMap;
@@ -103,6 +108,7 @@
  import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
  import org.glassfish.jersey.media.multipart.FormDataParam;
  import org.json.JSONException;
+ import org.json.JSONArray;
  import org.json.JSONObject;
  
  // TODO: Auto-generated Javadoc
@@ -126,10 +132,11 @@
     *
     * @return the version
     */
-   @GET
-   @Path("/version")
-   @Produces("application/json")
-   public Response getVersion() {
+  @GET
+  @Secured
+  @Path("/version")
+  @Produces("application/json")
+  public Response getVersion() {
  
      JSONObject out = new JSONObject();
      out.put("idra_version", PropertyManager.getProperty(IdraProperty.IDRA_VERSION));
@@ -146,13 +153,14 @@
     * @param cdh             parameter
     * @param nodeString      parameter
     * @return the response
-    */
-   @POST
-   @Secured
-   @Path("/catalogues")
-   @Consumes({ MediaType.MULTIPART_FORM_DATA })
-   @Produces("application/json")
-   public Response registerOdmsCatalogue(@FormDataParam("dump") InputStream fileInputStream,
+   */
+  @POST
+  @Secured
+  @RequiresPermission("admin.catalogue.write")
+  @Path("/catalogues")
+  @Consumes({ MediaType.MULTIPART_FORM_DATA })
+  @Produces("application/json")
+  public Response registerOdmsCatalogue(@FormDataParam("dump") InputStream fileInputStream,
        @FormDataParam("file") FormDataContentDisposition cdh,
        @FormDataParam("node") String nodeString) {
      OdmsCatalogue node = null;
@@ -314,11 +322,12 @@
     * @param withImage parameter
     * @return the odms catalogues
     */
-   @GET
-   @Secured
-   @Path("/catalogues")
-   @Produces("application/json")
-   public Response getOdmsCatalogues(@QueryParam("withImage") boolean withImage) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/catalogues")
+  @Produces("application/json")
+  public Response getOdmsCatalogues(@QueryParam("withImage") boolean withImage) {
  
      try {
        List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(
@@ -350,11 +359,12 @@
     * @param id parameter
     * @return the response
     */
-   @PUT
-   @Secured
-   @Path("/catalogues/{id}/activate")
-   @Produces("application/json")
-   public Response activateOdmsCatalogue(@PathParam("id") String id) {
+  @PUT
+  @Secured
+  @RequiresPermission("admin.catalogue.activate")
+  @Path("/catalogues/{id}/activate")
+  @Produces("application/json")
+  public Response activateOdmsCatalogue(@PathParam("id") String id) {
      OdmsCatalogue node = null;
      try {
  
@@ -421,12 +431,13 @@
     * @param keepDatasets parameter
     * @return the response
     */
-   @PUT
-   @Secured
-   @Path("/catalogues/{id}/deactivate")
-   @Produces("application/json")
-   public Response deactivateOdmsCatalogue(@PathParam("id") String id,
-       @QueryParam("keepDatasets") @DefaultValue("false") Boolean keepDatasets) {
+  @PUT
+  @Secured
+  @RequiresPermission("admin.catalogue.activate")
+  @Path("/catalogues/{id}/deactivate")
+  @Produces("application/json")
+  public Response deactivateOdmsCatalogue(@PathParam("id") String id,
+      @QueryParam("keepDatasets") @DefaultValue("false") Boolean keepDatasets) {
      OdmsCatalogue node = null;
      try {
  
@@ -457,12 +468,13 @@
     * @param withImage parameter
     * @return the odms catalogue
     */
-   @GET
-   @Secured
-   @Path("/catalogues/{nodeId}")
-   @Produces("application/json")
-   public Response getOdmsCatalogue(@PathParam("nodeId") String nodeId,
-       @QueryParam("withImage") boolean withImage) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/catalogues/{nodeId}")
+  @Produces("application/json")
+  public Response getOdmsCatalogue(@PathParam("nodeId") String nodeId,
+      @QueryParam("withImage") boolean withImage) {
  
      try {
  
@@ -530,12 +542,13 @@
     * @throws JSONException  the JSON exception
     * @throws ParseException the parse exception
     */
-   @PUT
-   @Secured
-   @Path("/catalogues/{nodeId}")
-   @Consumes({ MediaType.MULTIPART_FORM_DATA })
-   @Produces("application/json")
-   public Response updateOdmsCatalogue(@PathParam("nodeId") String nodeId,
+  @PUT
+  @Secured
+  @RequiresPermission("admin.catalogue.write")
+  @Path("/catalogues/{nodeId}")
+  @Consumes({ MediaType.MULTIPART_FORM_DATA })
+  @Produces("application/json")
+  public Response updateOdmsCatalogue(@PathParam("nodeId") String nodeId,
        @FormDataParam("dump") InputStream fileInputStream,
        @FormDataParam("file") FormDataContentDisposition cdh,
        @FormDataParam("node") String nodeString) throws JSONException, ParseException {
@@ -642,11 +655,12 @@
     * @param nodeId parameter
     * @return the response
     */
-   @DELETE
-   @Secured
-   @Path("/catalogues/{nodeId}")
-   @Produces("application/json")
-   public Response unregisterOdmsCatalogue(@PathParam("nodeId") String nodeId) {
+  @DELETE
+  @Secured
+  @RequiresPermission("admin.catalogue.delete")
+  @Path("/catalogues/{nodeId}")
+  @Produces("application/json")
+  public Response unregisterOdmsCatalogue(@PathParam("nodeId") String nodeId) {
  
      OdmsCatalogue node = null;
      try {
@@ -754,11 +768,12 @@
     * @param nodeId parameter
     * @return the response
     */
-   @POST
-   @Secured
-   @Path("/catalogues/{nodeId}/synchronize")
-   @Produces("application/json")
-   public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.catalogue.activate")
+  @Path("/catalogues/{nodeId}/synchronize")
+  @Produces("application/json")
+  public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId) {
  
      int nodeIdentifier = Integer.parseInt(nodeId);
  
@@ -783,12 +798,13 @@
     * @param input parameter
     * @return the response
     */
-   @POST
-   @Secured
-   @Path("/configuration")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response setSettings(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.settings.write")
+  @Path("/configuration")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("application/json")
+  public Response setSettings(final String input) {
  
      HashMap<String, String> map = null;
  
@@ -811,10 +827,12 @@
     *
     * @return the settings
     */
-   @GET
-   @Path("/configuration")
-   @Produces("application/json")
-   public Response getSettings() {
+  @GET
+  @Secured
+  @RequiresPermission("admin.settings.read")
+  @Path("/configuration")
+  @Produces("application/json")
+  public Response getSettings() {
  
      try {
  
@@ -835,12 +853,13 @@
     * @param input parameter
     * @return the response
     */
-   @POST
-   @Secured
-   @Path("/remoteCatalogue")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response setRemoteCatalogues(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.catalogue.write")
+  @Path("/remoteCatalogue")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("application/json")
+  public Response setRemoteCatalogues(final String input) {
  
      try {
        RemoteCatalogue remCat = GsonUtil.json2Obj(input, GsonUtil.remCatType);
@@ -867,11 +886,12 @@
     *
     * @return the remote catalogue
     */
-   @GET
-   @Secured
-   @Path("/remoteCatalogue")
-   @Produces("application/json")
-   public Response getRemoteCatalogue() {
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/remoteCatalogue")
+  @Produces("application/json")
+  public Response getRemoteCatalogue() {
      try {
  
        List<RemoteCatalogue> conf = FederationCore.getAllRemCatalogues();
@@ -890,10 +910,11 @@
     * @param rmId parameter
     * @return the response
     */
-   @DELETE
-   @Secured
-   @Path("/remoteCatalogue/{rmId}")
-   public Response deleteRemCat(@PathParam("rmId") String rmId) {
+  @DELETE
+  @Secured
+  @RequiresPermission("admin.catalogue.write")
+  @Path("/remoteCatalogue/{rmId}")
+  public Response deleteRemCat(@PathParam("rmId") String rmId) {
  
      try {
  
@@ -921,12 +942,13 @@
     * @param input parameter
     * @return the response
     */
-   @PUT
-   @Secured
-   @Path("/remoteCatalogue/{rmId}")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response updateRemoteCat(@PathParam("rmId") String rmId, final String input) {
+  @PUT
+  @Secured
+  @RequiresPermission("admin.catalogue.write")
+  @Path("/remoteCatalogue/{rmId}")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("application/json")
+  public Response updateRemoteCat(@PathParam("rmId") String rmId, final String input) {
  
      try {
  
@@ -968,11 +990,13 @@
     * @param id parameter
     * @return the response
     */
-   @GET
-   @Path("/remoteCatalogue/auth/{id}")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("text/plain")
-   public Response authRemoteCatalogue(@PathParam("id") String id) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/remoteCatalogue/auth/{id}")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("text/plain")
+  public Response authRemoteCatalogue(@PathParam("id") String id) {
  
      try {
        // Utenze in Idra
@@ -1076,11 +1100,13 @@
     * @param id parameter
     * @return the response
     */
-   @GET
-   @Path("/remoteCatalogue/authIDM/{id}")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("text/plain")
-   public Response authRemoteCatalogueIdm(@PathParam("id") String id) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/remoteCatalogue/authIDM/{id}")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("text/plain")
+  public Response authRemoteCatalogueIdm(@PathParam("id") String id) {
      try {
       logger.debug(" -------------------------- Remote catalogue IDM login");
        RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
@@ -1174,10 +1200,12 @@
     *
     * @return the prefixes
     */
-   @GET
-   @Path("/prefixes")
-   @Produces("application/json")
-   public Response getPrefixes() {
+  @GET
+  @Secured
+  @RequiresPermission("admin.prefix.read")
+  @Path("/prefixes")
+  @Produces("application/json")
+  public Response getPrefixes() {
  
      try {
        List<RdfPrefix> prefixes = RdfPrefixManager.getAllPrefixes();
@@ -1194,11 +1222,12 @@
     * @param prefixId parameter
     * @return the prefix
     */
-   @GET
-   @Secured
-   @Path("/prefixes/{prefixId}")
-   @Produces("application/json")
-   public Response getPrefix(@PathParam("prefixId") String prefixId) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.prefix.read")
+  @Path("/prefixes/{prefixId}")
+  @Produces("application/json")
+  public Response getPrefix(@PathParam("prefixId") String prefixId) {
  
      try {
  
@@ -1224,11 +1253,12 @@
     * @param prefixId parameter
     * @return the response
     */
-   @DELETE
-   @Secured
-   @Path("/prefixes/{prefixId}")
-   // @Produces("application/json")
-   public Response deletePrefix(@PathParam("prefixId") String prefixId) {
+  @DELETE
+  @Secured
+  @RequiresPermission("admin.prefix.write")
+  @Path("/prefixes/{prefixId}")
+  // @Produces("application/json")
+  public Response deletePrefix(@PathParam("prefixId") String prefixId) {
  
      // logger.info("DELETE " + prefixId);
  
@@ -1258,12 +1288,13 @@
     * @param input    parameter
     * @return the response
     */
-   @PUT
-   @Secured
-   @Path("/prefixes/{prefixId}")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response updatePrefix(@PathParam("prefixId") String prefixId, final String input) {
+  @PUT
+  @Secured
+  @RequiresPermission("admin.prefix.write")
+  @Path("/prefixes/{prefixId}")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("application/json")
+  public Response updatePrefix(@PathParam("prefixId") String prefixId, final String input) {
  
      try {
  
@@ -1292,12 +1323,13 @@
     * @param input parameter
     * @return the response
     */
-   @POST
-   @Secured
-   @Path("/prefixes")
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces("application/json")
-   public Response addPrefix(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.prefix.write")
+  @Path("/prefixes")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces("application/json")
+  public Response addPrefix(final String input) {
  
      try {
  
@@ -1458,11 +1490,12 @@
     *
     * @return the all countries
     */
-   @GET
-   @Secured
-   @Path("/countries")
-   @Produces("application/json")
-   public Response getAllCountries() {
+  @GET
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/countries")
+  @Produces("application/json")
+  public Response getAllCountries() {
  
      // TODO Sostituire DateTime con ZonedDateTime e JsonObject di gson e non
      // JSONObject
@@ -1484,11 +1517,12 @@
     *
     * @return the min date catalogues stat
     */
-   @GET
-   @Secured
-   @Path("/cataloguesStatMinDate")
-   @Produces("application/json")
-   public Response getMinDateCataloguesStat() {
+  @GET
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/cataloguesStatMinDate")
+  @Produces("application/json")
+  public Response getMinDateCataloguesStat() {
  
      // TODO Sostituire DateTime con ZonedDateTime e JsonObject di gson e non
      // JSONObject
@@ -1509,11 +1543,12 @@
     * @param input parameter
     * @return the odms catalogues statistics
     */
-   @POST
-   @Secured
-   @Path("/statistics/catalogues")
-   @Produces("application/json")
-   public Response getOdmsCataloguesStatistics(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/statistics/catalogues")
+  @Produces("application/json")
+  public Response getOdmsCataloguesStatistics(final String input) {
  
      try {
  
@@ -1538,11 +1573,12 @@
     * @param input the input
     * @return the search statistics
     */
-   @POST
-   @Secured
-   @Path("/statistics/search")
-   @Produces("application/json")
-   public Response getSearchStatistics(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/statistics/search")
+  @Produces("application/json")
+  public Response getSearchStatistics(final String input) {
  
      try {
  
@@ -1568,11 +1604,12 @@
     * @param input the input
     * @return the keyword statistics
     */
-   @POST
-   @Secured
-   @Path("/statistics/keyword")
-   @Produces("application/json")
-   public Response getKeywordStatistics(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/statistics/keyword")
+  @Produces("application/json")
+  public Response getKeywordStatistics(final String input) {
  
      try {
  
@@ -1593,11 +1630,12 @@
     * @param input the input
     * @return the odms catalogues statistics details
     */
-   @POST
-   @Secured
-   @Path("/statistics/catalogues/details")
-   @Produces("application/json")
-   public Response getOdmsCataloguesStatisticsDetails(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/statistics/catalogues/details")
+  @Produces("application/json")
+  public Response getOdmsCataloguesStatisticsDetails(final String input) {
      try {
  
        StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
@@ -1621,11 +1659,12 @@
     * @param input the input
     * @return the statistics details
     */
-   @POST
-   @Secured
-   @Path("/statistics/search/details")
-   @Produces("application/json")
-   public Response getStatisticsDetails(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.stats.read")
+  @Path("/statistics/search/details")
+  @Produces("application/json")
+  public Response getStatisticsDetails(final String input) {
  
      try {
  
@@ -1649,11 +1688,12 @@
     * @param nodeId the node id
     * @return the odms catalogue messages
     */
-   @GET
-   @Secured
-   @Path("/catalogues/{nodeId}/messages")
-   @Produces("application/json")
-   public Response getOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.messages.read")
+  @Path("/catalogues/{nodeId}/messages")
+  @Produces("application/json")
+  public Response getOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
  
      int nodeIdentifier = Integer.parseInt(nodeId);
      try {
@@ -1676,12 +1716,13 @@
     * @param messageId the message id
     * @return the odms catalogue message
     */
-   @GET
-   @Secured
-   @Path("/catalogues/{nodeId}/messages/{messageID}")
-   @Produces("application/json")
-   public Response getOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
-       @PathParam("messageID") String messageId) {
+  @GET
+  @Secured
+  @RequiresPermission("admin.messages.read")
+  @Path("/catalogues/{nodeId}/messages/{messageID}")
+  @Produces("application/json")
+  public Response getOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
+      @PathParam("messageID") String messageId) {
  
      try {
        int nodeIdentifier = Integer.parseInt(nodeId);
@@ -1709,12 +1750,13 @@
     * @param messageId the message id
     * @return the response
     */
-   @DELETE
-   @Secured
-   @Path("/catalogues/{nodeId}/messages/{messageID}")
-   @Produces("application/json")
-   public Response deleteOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
-       @PathParam("messageID") String messageId) {
+  @DELETE
+  @Secured
+  @RequiresPermission("admin.messages.delete")
+  @Path("/catalogues/{nodeId}/messages/{messageID}")
+  @Produces("application/json")
+  public Response deleteOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
+      @PathParam("messageID") String messageId) {
  
      try {
        int nodeIdentifier = Integer.parseInt(nodeId);
@@ -1738,11 +1780,12 @@
     * @param nodeId the node id
     * @return the response
     */
-   @DELETE
-   @Secured
-   @Path("/catalogues/{nodeId}/messages")
-   @Produces("application/json")
-   public Response deleteOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
+  @DELETE
+  @Secured
+  @RequiresPermission("admin.messages.delete")
+  @Path("/catalogues/{nodeId}/messages")
+  @Produces("application/json")
+  public Response deleteOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
  
      int nodeIdentifier = Integer.parseInt(nodeId);
      try {
@@ -1764,11 +1807,12 @@
     * @param input the input
     * @return the logs
     */
-   @POST
-   @Secured
-   @Path("/logs")
-   @Produces("application/json")
-   public Response getLogs(final String input) {
+  @POST
+  @Secured
+  @RequiresPermission("admin.logs.read")
+  @Path("/logs")
+  @Produces("application/json")
+  public Response getLogs(final String input) {
  
      try {
  
@@ -1795,11 +1839,12 @@
     * @param returnZip   the return zip
     * @return the response
     */
-   @GET
-   @Secured
-   @Path("/dcat-ap/dump/download")
-   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-   public Response downloadGlobalDcatApDump(@Context HttpServletRequest httpRequest,
+  @GET
+  @Secured
+  @RequiresPermission("admin.dump.read")
+  @Path("/dcat-ap/dump/download")
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  public Response downloadGlobalDcatApDump(@Context HttpServletRequest httpRequest,
        @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
        @DefaultValue("false") @QueryParam("zip") Boolean returnZip) {
  
@@ -1825,11 +1870,12 @@
     * @param forceDump   the force dump
     * @return the global dcat ap dump
     */
-   @GET
-   @Secured
-   @Path("/dcat-ap/dump")
-   @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-   public Response getGlobalDcatApDump(@Context HttpServletRequest httpRequest,
+  @GET
+  @Secured
+  @RequiresPermission("admin.dump.read")
+  @Path("/dcat-ap/dump")
+  @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+  public Response getGlobalDcatApDump(@Context HttpServletRequest httpRequest,
        @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump) {
  
      try {
@@ -1851,11 +1897,12 @@
     * @param returnZip      the return zip
     * @return the response
     */
-   @GET
-   @Secured
-   @Path("/dcat-ap/dump/download/{nodeID}")
-   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-   public Response downloadCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
+  @GET
+  @Secured
+  @RequiresPermission("admin.dump.read")
+  @Path("/dcat-ap/dump/download/{nodeID}")
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  public Response downloadCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
        @PathParam("nodeID") String nodeIdentifier,
        @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
        @DefaultValue("false") @QueryParam("zip") Boolean returnZip) {
@@ -1885,11 +1932,12 @@
     * @param nodeIdentifier the node identifier
     * @return the catalogue dcat ap dump
     */
-   @GET
-   @Secured
-   @Path("/dcat-ap/dump/{nodeID}")
-   @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-   public Response getCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
+  @GET
+  @Secured
+  @RequiresPermission("admin.dump.read")
+  @Path("/dcat-ap/dump/{nodeID}")
+  @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+  public Response getCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
        @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
        @PathParam("nodeID") String nodeIdentifier) {
  
@@ -1914,13 +1962,14 @@
     * @param dataletIdentifier      the datalet identifier
     * @return the response
     */
-   @DELETE
-   @Path("/catalogues/{nodeID}/dataset/{datasetID}"
-       + "/distribution/{distributionID}/deleteDatalet/{dataletID}")
-   @Secured
-   @Consumes({ MediaType.APPLICATION_JSON })
-   @Produces(MediaType.APPLICATION_JSON)
-   public Response deleteDataletFromDistribution(@Context HttpServletRequest httpRequest,
+  @DELETE
+  @Path("/catalogues/{nodeID}/dataset/{datasetID}"
+      + "/distribution/{distributionID}/deleteDatalet/{dataletID}")
+  @Secured
+  @RequiresPermission("admin.datalet.delete")
+  @Consumes({ MediaType.APPLICATION_JSON })
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response deleteDataletFromDistribution(@Context HttpServletRequest httpRequest,
        @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
        @PathParam("distributionID") String distributionIdentifier,
        @PathParam("dataletID") String dataletIdentifier) {
@@ -1957,11 +2006,12 @@
     * @param httpRequest the http request
     * @return the all datalet
     */
-   @GET
-   @Path("/datalets")
-   @Secured
-   @Produces(MediaType.APPLICATION_JSON)
-   public Response getAllDatalet(@Context HttpServletRequest httpRequest) {
+  @GET
+  @Path("/datalets")
+  @Secured
+  @RequiresPermission("admin.datalet.read")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getAllDatalet(@Context HttpServletRequest httpRequest) {
  
      try {
        CachePersistenceManager jpa = new CachePersistenceManager();
@@ -1973,6 +2023,185 @@
      }
  
    }
+
+  /**
+   * Returns current authenticated user information (Idra RBAC).
+   */
+  @GET
+  @Path("/me")
+  @Secured
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getMe(@Context ContainerRequestContext requestContext) {
+    try {
+      String sub = (String) requestContext.getProperty(RbacService.CTX_SUB);
+      String email = (String) requestContext.getProperty(RbacService.CTX_EMAIL);
+      String username = (String) requestContext.getProperty(RbacService.CTX_USERNAME);
+
+      JSONObject out = new JSONObject();
+      out.put("sub", sub);
+      out.put("email", email);
+      out.put("username", username);
+
+      SecurityPersistenceManager pm = new SecurityPersistenceManager();
+      try {
+        AppUser u = pm.findUserBySub(sub);
+        if (u != null) {
+          out.put("id", u.getId());
+          out.put("enabled", u.getEnabled() != null ? u.getEnabled() : true);
+          out.put("roles", new JSONArray(pm.getUserRoleCodes(u.getId())));
+          out.put("permissions", new JSONArray(pm.getPermissionsBySub(sub)));
+        }
+      } finally {
+        pm.close();
+      }
+
+      return Response.ok(out.toString()).build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    }
+  }
+
+  /**
+   * List Idra users (RBAC).
+   */
+  @GET
+  @Path("/users")
+  @Secured
+  @RequiresPermission("admin.users.manage")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response listUsers(@Context ContainerRequestContext requestContext) {
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
+    try {
+      JSONArray arr = new JSONArray();
+      for (AppUser u : pm.listUsers()) {
+        JSONObject o = new JSONObject();
+        o.put("id", u.getId());
+        o.put("keycloak_sub", u.getKeycloakSub());
+        o.put("username", u.getUsername());
+        o.put("email", u.getEmail());
+        o.put("enabled", u.getEnabled() != null ? u.getEnabled() : true);
+        o.put("roles", new JSONArray(pm.getUserRoleCodes(u.getId())));
+        arr.put(o);
+      }
+      return Response.ok(arr.toString()).build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
+    }
+  }
+
+  /**
+   * List roles.
+   */
+  @GET
+  @Path("/roles")
+  @Secured
+  @RequiresPermission("admin.users.manage")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response listRoles() {
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
+    try {
+      JSONArray arr = new JSONArray();
+      pm.listRoles().forEach(r -> {
+        JSONObject o = new JSONObject();
+        o.put("id", r.getId());
+        o.put("code", r.getCode());
+        o.put("description", r.getDescription());
+        arr.put(o);
+      });
+      return Response.ok(arr.toString()).build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
+    }
+  }
+
+  /**
+   * List permissions.
+   */
+  @GET
+  @Path("/permissions")
+  @Secured
+  @RequiresPermission("admin.users.manage")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response listPermissions() {
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
+    try {
+      JSONArray arr = new JSONArray();
+      pm.listPermissions().forEach(p -> {
+        JSONObject o = new JSONObject();
+        o.put("id", p.getId());
+        o.put("code", p.getCode());
+        o.put("description", p.getDescription());
+        arr.put(o);
+      });
+      return Response.ok(arr.toString()).build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
+    }
+  }
+
+  /**
+   * Replace user roles (by role codes).
+   *
+   * Body: { "roles": ["ADMIN","EDITOR"] }
+   */
+  @PUT
+  @Path("/users/{id}/roles")
+  @Secured
+  @RequiresPermission("admin.users.manage")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response replaceUserRoles(@PathParam("id") String userId, final String input) {
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
+    try {
+      int id = Integer.parseInt(userId);
+      JSONObject body = new JSONObject(input);
+      JSONArray rolesJson = body.optJSONArray("roles");
+      List<String> roleCodes = new ArrayList<>();
+      if (rolesJson != null) {
+        for (int i = 0; i < rolesJson.length(); i++) {
+          roleCodes.add(rolesJson.getString(i));
+        }
+      }
+      pm.replaceUserRolesByCodes(id, roleCodes);
+      return Response.ok().build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
+    }
+  }
+
+  /**
+   * Enable/disable a user.
+   *
+   * Body: { "enabled": true }
+   */
+  @PUT
+  @Path("/users/{id}/enabled")
+  @Secured
+  @RequiresPermission("admin.users.manage")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response setUserEnabled(@PathParam("id") String userId, final String input) {
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
+    try {
+      int id = Integer.parseInt(userId);
+      JSONObject body = new JSONObject(input);
+      boolean enabled = body.optBoolean("enabled", true);
+      pm.setUserEnabled(id, enabled);
+      return Response.ok().build();
+    } catch (Exception e) {
+      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
+    }
+  }
  
    /**
     * Handle error response login.

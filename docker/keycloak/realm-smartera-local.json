@@ -1,0 +1,53 @@
+{
+  "realm": "smartera",
+  "displayName": "SmartEra (Local)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN" },
+      { "name": "MANAGER" },
+      { "name": "CITIZEN" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "urbanite",
+      "name": "Idra Portal (Local)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ]
+    },
+    {
+      "clientId": "idra",
+      "name": "Idra Backend (Local)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "idra-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:8080/Idra/api/v1/administration/login"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ]
+    }
+  ]
+}
+

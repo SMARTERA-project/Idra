@@ -15,10 +15,19 @@
 
 package it.eng.idra.authentication.filters;
 
+import com.google.gson.Gson;
 import it.eng.idra.authentication.KeycloakAuthenticationManager;
 import it.eng.idra.authentication.Secured;
 import it.eng.idra.authentication.fiware.model.Token;
+import it.eng.idra.authentication.keycloak.model.KeycloakUser;
+import it.eng.idra.management.security.RbacService;
+import it.eng.idra.management.security.SecurityPersistenceManager;
+import it.eng.idra.beans.security.AppUser;
+import it.eng.idra.utils.JwtUtil;
+import it.eng.idra.utils.PropertyManager;
+import it.eng.idra.authentication.fiware.configuration.IdmProperty;
 import java.io.IOException;
+import java.util.Set;
 import javax.annotation.Priority;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -54,13 +63,98 @@ public class KeycloakAuthenticationFilter implements ContainerRequestFilter {
     String token = authorizationHeader.substring("Bearer".length()).trim();
     try {
 
+      // Validate token and retrieve userinfo (also used as fallback for JWT payload parsing).
       if (!KeycloakAuthenticationManager.getInstance().validateToken((Object) new Token(token))) {
         throw new Exception("Token not valid");
       }
+      KeycloakUser userinfo = null;
+      try {
+        userinfo = KeycloakAuthenticationManager.getInstance().getUserInfo(token);
+      } catch (Exception e) {
+        // keep userinfo null; token is already validated, but provisioning may rely on claims fallback
+      }
 
+      // Extract key claims from the JWT payload after token validation.
+      String payloadJson = JwtUtil.decodeJwtPayloadJson(token);
+      KeycloakJwtClaims claims = null;
+      if (payloadJson != null) {
+        try {
+          claims = new Gson().fromJson(payloadJson, KeycloakJwtClaims.class);
+        } catch (Exception e) {
+          claims = null;
+        }
+      }
+
+      String sub = claims != null ? claims.sub : null;
+      String username = claims != null ? claims.preferred_username : null;
+      String email = claims != null ? claims.email : null;
+
+      // Fallback to userinfo endpoint if JWT decoding fails (or required claims are missing).
+      if ((sub == null || sub.isBlank()) && userinfo != null) {
+        sub = userinfo.getSub();
+      }
+      if ((username == null || username.isBlank()) && userinfo != null) {
+        username = userinfo.getPreferredUsername();
+      }
+      if ((email == null || email.isBlank()) && userinfo != null) {
+        email = userinfo.getEmail();
+      }
+
+      if (sub != null && !sub.isBlank()) {
+        requestContext.setProperty(RbacService.CTX_SUB, sub);
+        requestContext.setProperty(RbacService.CTX_USERNAME, username);
+        requestContext.setProperty(RbacService.CTX_EMAIL, email);
+
+        // Ensure the user exists in Idra DB and has at least one role assigned.
+        RbacService.ensureProvisionedUser(sub, username, email);
+
+        // Optional: if the user has the configured Keycloak admin realm role, bootstrap Idra ADMIN.
+        // This does not replace DB RBAC; it only assigns ADMIN if missing.
+        if (userinfo != null) {
+          String adminRoleName = PropertyManager.getProperty(IdmProperty.IDM_ADMIN_ROLE_NAME);
+          if (adminRoleName != null && !adminRoleName.isBlank()
+              && userinfo.getRealmAccess() != null) {
+            Set<String> roles = userinfo.getRealmAccess().getRoles();
+            if (roles != null) {
+              for (String r : roles) {
+                if (r != null && r.equalsIgnoreCase(adminRoleName)) {
+                  SecurityPersistenceManager pm = new SecurityPersistenceManager();
+                  try {
+                    AppUser u = pm.findUserBySub(sub);
+                    if (u != null && !pm.userHasRoleCode(u.getId(), "ADMIN")) {
+                      pm.addUserRoleByCode(u.getId(), "ADMIN");
+                    }
+                  } finally {
+                    pm.close();
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } else {
+        throw new Exception("Missing subject claim");
+      }
+
+    } catch (IllegalStateException e) {
+      // Authenticated but not allowed to use Idra administration.
+      requestContext.abortWith(Response.status(Response.Status.FORBIDDEN).build());
+    } catch (RuntimeException e) {
+      // DB / internal errors should not be masked as 401 (makes debugging impossible).
+      e.printStackTrace();
+      requestContext.abortWith(Response.status(Response.Status.INTERNAL_SERVER_ERROR).build());
     } catch (Exception e) {
+      e.printStackTrace();
       requestContext.abortWith(Response.status(Response.Status.UNAUTHORIZED).build());
     }
+  }
+
+  // Minimal JWT claims used by Idra RBAC bootstrap.
+  private static class KeycloakJwtClaims {
+    String sub;
+    String preferred_username;
+    String email;
   }
 
   // private void validateToken(String token) throws Exception {

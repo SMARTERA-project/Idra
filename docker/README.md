@@ -180,6 +180,18 @@ If you are upgrading from a deployment that previously used BASIC authentication
 
 After deploying the new frontend, clear old browser storage keys (`username`) if still present.
 
+### Migration to multi-user RBAC (Keycloak-only registration)
+
+If you are upgrading to a version that enables multi-user permissions (RBAC) while keeping Keycloak-only
+authentication/registration, run:
+
+- `docker/db-config/migrations/2026-02-26-rbac-multiuser.sql` on the Idra MySQL database.
+
+If you previously applied the RBAC migration and want to align roles to the simplified model
+(single admin role, read-only administration viewer, and a basic non-admin role), also run:
+
+- `docker/db-config/migrations/2026-02-27-rbac-role-simplify.sql` on the Idra MySQL database.
+
 ## How to build an image
 
 The [Dockerfile](https://github.com/OPSILab/Idra/blob/master/docker/Dockerfile) associated with this image can be used 

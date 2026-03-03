@@ -46,6 +46,9 @@
 		<class>it.eng.idra.beans.ODMSStatistics</class>
 		<class>it.eng.idra.beans.Log</class>
 		<class>it.eng.idra.beans.User</class>
+		<class>it.eng.idra.beans.security.AppUser</class>
+		<class>it.eng.idra.beans.security.Role</class>
+		<class>it.eng.idra.beans.security.Permission</class>
 		<properties>
 <!-- 			<property name="hibernate.hbm2ddl.auto" value="create" /> -->
 		</properties>

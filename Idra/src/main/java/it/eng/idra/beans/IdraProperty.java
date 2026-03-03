@@ -160,7 +160,16 @@ public enum IdraProperty {
   /** The preview max size. */
   PREVIEW_MAX_SIZE("idra.preview.fileSize"),
   /** The server base url. */
-  IDRA_SERVER_BASEURL("idra.server.baseurl");
+  IDRA_SERVER_BASEURL("idra.server.baseurl"),
+
+  /** Bootstrap admin emails (CSV). */
+  BOOTSTRAP_ADMIN_EMAILS("idra.bootstrap.admin.emails"),
+
+  /** Bootstrap admin subs (CSV). */
+  BOOTSTRAP_ADMIN_SUBS("idra.bootstrap.admin.subs"),
+
+  /** Default role for newly provisioned users. */
+  BOOTSTRAP_DEFAULT_ROLE("idra.bootstrap.default.role");
 
   /** The text. */
   private final String text;
