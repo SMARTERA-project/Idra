@@ -188,25 +188,40 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     // Iterate over keyword properties
     StmtIterator kit = datasetResource.listProperties(DCAT.keyword);
     while (kit.hasNext()) {
-      keywords.add(kit.next().getString());
+      Statement keywordStmt = kit.next();
+      String keyword = getStatementValue(keywordStmt);
+      if (StringUtils.isNotBlank(keyword)) {
+        keywords.add(keyword);
+      }
     }
     List<DctStandard> conformsTo = null;
     conformsTo = deserializeDctStandard(nodeId, datasetResource);
     String accessRights = null;
     if (datasetResource.hasProperty(DCTerms.accessRights)) {
-      accessRights = datasetResource.getProperty(DCTerms.accessRights).getString();
+      Statement accessRightsStmt = datasetResource.getProperty(DCTerms.accessRights);
+      try {
+        accessRights = accessRightsStmt.getString();
+      } catch (LiteralRequiredException e) {
+        accessRights = accessRightsStmt.getResource().getURI();
+      }
     }
 
     // Iterate over documentation properties
     StmtIterator dit = datasetResource.listProperties(FOAF.page);
     while (dit.hasNext()) {
-      documentation.add(dit.next().getString());
+      String documentationValue = getStatementValue(dit.next());
+      if (StringUtils.isNotBlank(documentationValue)) {
+        documentation.add(documentationValue);
+      }
     }
 
     // Iterate over related properties
     StmtIterator relIt = datasetResource.listProperties(DCTerms.relation);
     while (relIt.hasNext()) {
-      relatedResource.add(relIt.next().getString());
+      String related = getStatementValue(relIt.next());
+      if (StringUtils.isNotBlank(related)) {
+        relatedResource.add(related);
+      }
     }
     String frequency = null;
     frequency = deserializeFrequency(datasetResource);
@@ -215,7 +230,10 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     List<String> hasVersion = new ArrayList<String>();
     StmtIterator hasVit = datasetResource.listProperties(DCTerms.hasVersion);
     while (hasVit.hasNext()) {
-      hasVersion.add(hasVit.next().getString());
+      String hasVersionValue = getStatementValue(hasVit.next());
+      if (StringUtils.isNotBlank(hasVersionValue)) {
+        hasVersion.add(hasVersionValue);
+      }
     }
 
     // Iterate over isVersionOf properties
@@ -249,7 +267,10 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     List<String> provenance = new ArrayList<String>();
     StmtIterator provIt = datasetResource.listProperties(DCTerms.provenance);
     while (provIt.hasNext()) {
-      provenance.add(provIt.next().getString());
+      String provenanceValue = getStatementValue(provIt.next());
+      if (StringUtils.isNotBlank(provenanceValue)) {
+        provenance.add(provenanceValue);
+      }
     }
 
     if (datasetResource.hasProperty(DCTerms.issued)) {
@@ -262,7 +283,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
 
     String identifier = null;
     if (datasetResource.hasProperty(DCTerms.identifier)) {
-      identifier = datasetResource.getProperty(DCTerms.identifier).getString();
+      identifier = getStatementValue(datasetResource.getProperty(DCTerms.identifier));
     } else {
       identifier = landingPage;
     }
@@ -275,7 +296,10 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     StmtIterator sampleIt = datasetResource
         .listProperties(ResourceFactory.createProperty("http://www.w3.org/ns/adms#sample"));
     while (sampleIt.hasNext()) {
-      sample.add(sampleIt.next().getString());
+      String sampleValue = getStatementValue(sampleIt.next());
+      if (StringUtils.isNotBlank(sampleValue)) {
+        sample.add(sampleValue);
+      }
     }
 
     // Iterate over source properties
@@ -299,7 +323,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     temporalCoverage = deserializeTemporalCoverage(nodeId, datasetResource);
     String type = null;
     if (datasetResource.hasProperty(DCTerms.type)) {
-      type = datasetResource.getProperty(DCTerms.type).getString();
+      type = getStatementValue(datasetResource.getProperty(DCTerms.type));
     }
 
     if (datasetResource.hasProperty(OWL.versionInfo)) {
@@ -310,7 +334,10 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     StmtIterator vnotesIt = datasetResource
         .listProperties(ResourceFactory.createProperty("http://www.w3.org/ns/adms#versionNotes"));
     while (vnotesIt.hasNext()) {
-      versionNotes.add(vnotesIt.next().getString());
+      String versionNotesValue = getStatementValue(vnotesIt.next());
+      if (StringUtils.isNotBlank(versionNotesValue)) {
+        versionNotes.add(versionNotesValue);
+      }
     }
 
     // Handle distributions
@@ -498,6 +525,28 @@ public class DcatApDeserializer implements IdcatApDeserialize {
   }
 
   /**
+   * Gets statement value as literal string when available, otherwise as resource URI.
+   *
+   * @param statement the statement
+   * @return the statement value or null
+   */
+  protected String getStatementValue(Statement statement) {
+    if (statement == null) {
+      return null;
+    }
+    try {
+      return statement.getString();
+    } catch (LiteralRequiredException e) {
+      try {
+        Resource res = statement.getResource();
+        return res != null ? res.getURI() : null;
+      } catch (ResourceRequiredException ignore) {
+        return null;
+      }
+    }
+  }
+
+  /**
    * Deserialize concept.
    *
    * @param <T>            the generic type
@@ -572,13 +621,21 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     // Iterate over language properties
     StmtIterator it = datasetResource.listProperties(DCTerms.language);
     while (it.hasNext()) {
-      Resource languageR = it.next().getResource();
-      String languageUri = null;
-      if (languageR != null && StringUtils.isNotBlank(languageUri = languageR.getURI())) {
-        if (!IRIFactory.iriImplementation().create(languageUri).hasViolation(false)) {
-          language.add(extractLanguageFromUri(languageUri));
-        } else {
-          language.add(languageUri);
+      Statement langStmt = it.next();
+      try {
+        String langLiteral = langStmt.getString();
+        if (StringUtils.isNotBlank(langLiteral)) {
+          language.add(langLiteral);
+        }
+      } catch (LiteralRequiredException e) {
+        Resource languageR = langStmt.getResource();
+        String languageUri = null;
+        if (languageR != null && StringUtils.isNotBlank(languageUri = languageR.getURI())) {
+          if (!IRIFactory.iriImplementation().create(languageUri).hasViolation(false)) {
+            language.add(extractLanguageFromUri(languageUri));
+          } else {
+            language.add(languageUri);
+          }
         }
       }
     }
@@ -1012,7 +1069,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     }
 
     if (r.hasProperty(DCTerms.description)) {
-      description = r.getProperty(DCTerms.description).getString();
+      description = getStatementValue(r.getProperty(DCTerms.description));
     }
 
     if (r.hasProperty(DCTerms.format)) {
@@ -1047,8 +1104,10 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     }
 
     if (r.hasProperty(FOAF.page)) {
-      documentation = r.getProperty(FOAF.page).getString();
-      documentationList.add(documentation);
+      documentation = getStatementValue(r.getProperty(FOAF.page));
+      if (StringUtils.isNotBlank(documentation)) {
+        documentationList.add(documentation);
+      }
     }
     // Manage downloadURL property
     if (r.hasProperty(DCAT.downloadURL)) {
@@ -1082,7 +1141,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
 
     String rights = null;
     if (r.hasProperty(DCTerms.rights)) {
-      rights = r.getProperty(DCTerms.rights).getString();
+      rights = getStatementValue(r.getProperty(DCTerms.rights));
     }
 
     try {
@@ -1295,17 +1354,15 @@ public class DcatApDeserializer implements IdcatApDeserialize {
 
     Resource checksumR = r.getPropertyResourceValue(
         ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksum"));
-    if (checksumR
-        .hasProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#algorithm"))) {
-      checksumAlgorithm = checksumR
-          .getProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#algorithm"))
-          .getString();
+    if (checksumR != null
+        && checksumR.hasProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#algorithm"))) {
+      checksumAlgorithm = getStatementValue(
+          checksumR.getProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#algorithm")));
     }
-    if (checksumR
-        .hasProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksumValue"))) {
-      checksumValue = checksumR
-          .getProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksumValue"))
-          .getString();
+    if (checksumR != null
+        && checksumR.hasProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksumValue"))) {
+      checksumValue = getStatementValue(
+          checksumR.getProperty(ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksumValue")));
     }
 
     return new SpdxChecksum("http://spdx.org/rdf/terms#checksum", checksumAlgorithm, checksumValue,

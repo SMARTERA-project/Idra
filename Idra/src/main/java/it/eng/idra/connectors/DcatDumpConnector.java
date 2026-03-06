@@ -260,11 +260,12 @@ public class DcatDumpConnector implements IodmsConnector {
         //
         Statement s = sit.nextStatement();
         Resource datasetResource = m.getResource(s.getSubject().getURI());
+        datasetUri = datasetResource.getURI();
         datasetsList.add(deserializer.resourceToDataset(nodeId, datasetResource));
 
       } catch (Exception e) {
-        logger.info("Skipped dataset - There was an error: " + e.getMessage()
-            + " while deserializing dataset: " + datasetUri);
+        logger.warn("Skipped dataset - There was an error: " + e.getMessage()
+            + " while deserializing dataset: " + datasetUri, e);
 
       }
     }
