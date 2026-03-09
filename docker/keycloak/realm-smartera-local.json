@@ -10,9 +10,10 @@
   "resetPasswordAllowed": true,
   "roles": {
     "realm": [
-      { "name": "ADMIN" },
-      { "name": "MANAGER" },
-      { "name": "CITIZEN" }
+      { "name": "IDRA_ADMIN" },
+      { "name": "IDRA_EDITOR" },
+      { "name": "IDRA_VIEWER" },
+      { "name": "IDRA_USER" }
     ]
   },
   "clients": [
@@ -50,4 +51,3 @@
     }
   ]
 }
-

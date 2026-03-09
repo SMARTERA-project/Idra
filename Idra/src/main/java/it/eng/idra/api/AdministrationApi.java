@@ -2148,7 +2148,7 @@
   /**
    * Replace user roles (by role codes).
    *
-   * Body: { "roles": ["ADMIN","EDITOR"] }
+   * Body: { "roles": ["IDRA_ADMIN","IDRA_EDITOR"] }
    */
   @PUT
   @Path("/users/{id}/roles")

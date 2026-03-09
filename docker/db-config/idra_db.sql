@@ -2237,10 +2237,10 @@ CREATE TABLE `role_permission` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `role` (`code`, `description`) VALUES
-  ('ADMIN', 'Full access to Idra administration'),
-  ('EDITOR', 'Can modify federation resources within allowed domains'),
-  ('VIEWER', 'Read-only access to Idra administration'),
-  ('BASIC_USER', 'Authenticated user with no administration access');
+  ('IDRA_ADMIN', 'Full access to Idra administration'),
+  ('IDRA_EDITOR', 'Can modify federation resources within allowed domains'),
+  ('IDRA_VIEWER', 'Read-only access to Idra administration'),
+  ('IDRA_USER', 'Authenticated user with no administration access');
 
 INSERT INTO `permission` (`code`, `description`) VALUES
   ('admin.catalogue.read', 'Read federated catalogues (administration)'),
@@ -2264,13 +2264,13 @@ INSERT INTO `role_permission` (`role_id`, `permission_id`)
 SELECT r.`id`, p.`id`
 FROM `role` r
 JOIN `permission` p
-WHERE r.`code` = 'ADMIN';
+WHERE r.`code` = 'IDRA_ADMIN';
 
 INSERT INTO `role_permission` (`role_id`, `permission_id`)
 SELECT r.`id`, p.`id`
 FROM `role` r
 JOIN `permission` p
-WHERE r.`code` = 'EDITOR'
+WHERE r.`code` = 'IDRA_EDITOR'
   AND p.`code` IN (
     'admin.catalogue.read','admin.catalogue.write','admin.catalogue.activate',
     'admin.prefix.read','admin.prefix.write',
@@ -2282,7 +2282,7 @@ INSERT INTO `role_permission` (`role_id`, `permission_id`)
 SELECT r.`id`, p.`id`
 FROM `role` r
 JOIN `permission` p
-WHERE r.`code` = 'VIEWER'
+WHERE r.`code` = 'IDRA_VIEWER'
   AND p.`code` IN (
     'admin.catalogue.read',
     'admin.messages.read',

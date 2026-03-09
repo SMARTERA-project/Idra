@@ -55,10 +55,10 @@ CREATE TABLE IF NOT EXISTS `role_permission` (
 
 -- Seed roles.
 INSERT INTO `role` (`code`, `description`) VALUES
-  ('SUPER_ADMIN', 'Full access to Idra administration'),
-  ('ADMIN', 'Administrative access to Idra (no user/role management by default)'),
-  ('EDITOR', 'Can modify federation resources within allowed domains'),
-  ('VIEWER', 'Authenticated user with minimal/no administration access')
+  ('IDRA_ADMIN', 'Full access to Idra administration'),
+  ('IDRA_EDITOR', 'Can modify federation resources within allowed domains'),
+  ('IDRA_VIEWER', 'Read-only access to Idra administration'),
+  ('IDRA_USER', 'Authenticated user with no administration access')
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`);
 
 -- Seed permissions (domain-oriented, not per-endpoint).
@@ -81,27 +81,19 @@ INSERT INTO `permission` (`code`, `description`) VALUES
   ('admin.users.manage', 'Manage Idra users/roles/permissions (administration)')
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`);
 
--- Grant SUPER_ADMIN all permissions.
+-- Grant IDRA_ADMIN all permissions.
 INSERT IGNORE INTO `role_permission` (`role_id`, `permission_id`)
 SELECT r.`id`, p.`id`
 FROM `role` r
 JOIN `permission` p
-WHERE r.`code` = 'SUPER_ADMIN';
+WHERE r.`code` = 'IDRA_ADMIN';
 
--- Grant ADMIN all permissions except user management.
+-- Grant IDRA_EDITOR a restricted set (catalogue/prefix/dump/datalet read/write where reasonable).
 INSERT IGNORE INTO `role_permission` (`role_id`, `permission_id`)
 SELECT r.`id`, p.`id`
 FROM `role` r
 JOIN `permission` p
-WHERE r.`code` = 'ADMIN'
-  AND p.`code` <> 'admin.users.manage';
-
--- Grant EDITOR a restricted set (catalogue/prefix/dump/datalet read/write where reasonable).
-INSERT IGNORE INTO `role_permission` (`role_id`, `permission_id`)
-SELECT r.`id`, p.`id`
-FROM `role` r
-JOIN `permission` p
-WHERE r.`code` = 'EDITOR'
+WHERE r.`code` = 'IDRA_EDITOR'
   AND p.`code` IN (
     'admin.catalogue.read','admin.catalogue.write','admin.catalogue.activate',
     'admin.prefix.read','admin.prefix.write',
@@ -109,7 +101,21 @@ WHERE r.`code` = 'EDITOR'
     'admin.datalet.read'
   );
 
--- VIEWER has no administration permissions by default.
+-- IDRA_VIEWER read-only permissions on administration.
+INSERT IGNORE INTO `role_permission` (`role_id`, `permission_id`)
+SELECT r.`id`, p.`id`
+FROM `role` r
+JOIN `permission` p
+WHERE r.`code` = 'IDRA_VIEWER'
+  AND p.`code` IN (
+    'admin.catalogue.read',
+    'admin.messages.read',
+    'admin.settings.read',
+    'admin.prefix.read',
+    'admin.stats.read',
+    'admin.logs.read',
+    'admin.dump.read',
+    'admin.datalet.read'
+  );
 
 COMMIT;
-

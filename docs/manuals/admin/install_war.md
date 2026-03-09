@@ -289,7 +289,7 @@ deployed folders of Tomcat `webapps` folder.
         **`idm.logout.callback`**, **`idm.protocol`**, **`idm.host`** with the
         **same** values specified above for Idra Portal.
     -   **`idm.admin.role.name`**: Role name that User must have in the IDM to
-        be authenticated as Idra Administrator. (default: **ADMIN**).
+        be authenticated as Idra Administrator. (default: **IDRA_ADMIN**).
 
 **Note**. Replace **`IDRA_PORTAL_HOST`** and **`IDRA_HOST`** with the actual
 values, namely the **Base URL** where Idra Platform is deployed.

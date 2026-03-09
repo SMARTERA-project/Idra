@@ -21,12 +21,9 @@ import it.eng.idra.authentication.Secured;
 import it.eng.idra.authentication.fiware.model.Token;
 import it.eng.idra.authentication.keycloak.model.KeycloakUser;
 import it.eng.idra.management.security.RbacService;
-import it.eng.idra.management.security.SecurityPersistenceManager;
-import it.eng.idra.beans.security.AppUser;
 import it.eng.idra.utils.JwtUtil;
-import it.eng.idra.utils.PropertyManager;
-import it.eng.idra.authentication.fiware.configuration.IdmProperty;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Priority;
 import javax.ws.rs.NotAuthorizedException;
@@ -108,31 +105,26 @@ public class KeycloakAuthenticationFilter implements ContainerRequestFilter {
         // Ensure the user exists in Idra DB and has at least one role assigned.
         RbacService.ensureProvisionedUser(sub, username, email);
 
-        // Optional: if the user has the configured Keycloak admin realm role, bootstrap Idra ADMIN.
-        // This does not replace DB RBAC; it only assigns ADMIN if missing.
-        if (userinfo != null) {
-          String adminRoleName = PropertyManager.getProperty(IdmProperty.IDM_ADMIN_ROLE_NAME);
-          if (adminRoleName != null && !adminRoleName.isBlank()
-              && userinfo.getRealmAccess() != null) {
-            Set<String> roles = userinfo.getRealmAccess().getRoles();
-            if (roles != null) {
-              for (String r : roles) {
-                if (r != null && r.equalsIgnoreCase(adminRoleName)) {
-                  SecurityPersistenceManager pm = new SecurityPersistenceManager();
-                  try {
-                    AppUser u = pm.findUserBySub(sub);
-                    if (u != null && !pm.userHasRoleCode(u.getId(), "ADMIN")) {
-                      pm.addUserRoleByCode(u.getId(), "ADMIN");
-                    }
-                  } finally {
-                    pm.close();
-                  }
-                  break;
-                }
-              }
-            }
+        // Sync DB roles from Keycloak roles on each authenticated call.
+        // Prefer JWT access token claims (realm_access.roles) and enrich with userinfo roles when available.
+        Set<String> keycloakRoles = new HashSet<>();
+        if (claims != null) {
+          if (claims.realm_access != null && claims.realm_access.roles != null) {
+            keycloakRoles.addAll(claims.realm_access.roles);
+          }
+          if (claims.roles != null) {
+            keycloakRoles.addAll(claims.roles);
           }
         }
+        if (userinfo != null) {
+          if (userinfo.getRealmAccess() != null && userinfo.getRealmAccess().getRoles() != null) {
+            keycloakRoles.addAll(userinfo.getRealmAccess().getRoles());
+          }
+          if (userinfo.getRoles() != null) {
+            keycloakRoles.addAll(userinfo.getRoles());
+          }
+        }
+        RbacService.syncUserRolesFromKeycloak(sub, keycloakRoles);
       } else {
         throw new Exception("Missing subject claim");
       }
@@ -155,6 +147,12 @@ public class KeycloakAuthenticationFilter implements ContainerRequestFilter {
     String sub;
     String preferred_username;
     String email;
+    Set<String> roles;
+    RealmAccess realm_access;
+  }
+
+  private static class RealmAccess {
+    Set<String> roles;
   }
 
   // private void validateToken(String token) throws Exception {

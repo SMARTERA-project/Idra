@@ -34,42 +34,42 @@ services :
 
             command: --lower_case_table_names=1
 
-    keycloak-db:
-            image: postgres:16
-            restart: always
-            environment:
-                - POSTGRES_DB=keycloak
-                - POSTGRES_USER=keycloak
-                - POSTGRES_PASSWORD=keycloak
-            volumes:
-                - ./opt/keycloak/postgres-data:/var/lib/postgresql/data
-            networks:
-                idra_main:
+    # keycloak-db:
+    #         image: postgres:16
+    #         restart: always
+    #         environment:
+    #             - POSTGRES_DB=keycloak
+    #             - POSTGRES_USER=keycloak
+    #             - POSTGRES_PASSWORD=keycloak
+    #         volumes:
+    #             - ./opt/keycloak/postgres-data:/var/lib/postgresql/data
+    #         networks:
+    #             idra_main:
 
-    keycloak:
-            image: quay.io/keycloak/keycloak:24.0.5
-            restart: always
-            depends_on:
-                - keycloak-db
-            ports:
-                - 8180:8080
-            environment:
-                - KEYCLOAK_ADMIN=admin
-                - KEYCLOAK_ADMIN_PASSWORD=admin
-                - KC_DB=postgres
-                - KC_DB_URL_HOST=keycloak-db
-                - KC_DB_URL_DATABASE=keycloak
-                - KC_DB_USERNAME=keycloak
-                - KC_DB_PASSWORD=keycloak
-                # Keep the legacy "/auth" base path to match existing Portal config.
-                - KC_HTTP_RELATIVE_PATH=/auth
-                - KC_HOSTNAME_STRICT=false
-                - KC_HOSTNAME_STRICT_HTTPS=false
-            command: ["start-dev", "--import-realm", "--http-port=8080"]
-            volumes:
-                - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
-            networks:
-                idra_main:
+    # keycloak:
+    #         image: quay.io/keycloak/keycloak:24.0.5
+    #         restart: always
+    #         depends_on:
+    #             - keycloak-db
+    #         ports:
+    #             - 8180:8080
+    #         environment:
+    #             - KEYCLOAK_ADMIN=admin
+    #             - KEYCLOAK_ADMIN_PASSWORD=admin
+    #             - KC_DB=postgres
+    #             - KC_DB_URL_HOST=keycloak-db
+    #             - KC_DB_URL_DATABASE=keycloak
+    #             - KC_DB_USERNAME=keycloak
+    #             - KC_DB_PASSWORD=keycloak
+    #             # Keep the legacy "/auth" base path to match existing Portal config.
+    #             - KC_HTTP_RELATIVE_PATH=/auth
+    #             - KC_HOSTNAME_STRICT=false
+    #             - KC_HOSTNAME_STRICT_HTTPS=false
+    #         command: ["start-dev", "--import-realm", "--http-port=8080"]
+    #         volumes:
+    #             - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
+    #         networks:
+    #             idra_main:
 
     phpmyadmin:
             image: phpmyadmin/phpmyadmin
@@ -150,18 +150,18 @@ services :
     #             - ./data:/data/db  
     #         networks:
     #             idra_main:
-    ngsi-broker:
-        image: engineeringopsilab/ngsi-ldbrokermanager:v1.7
-        container_name: "ngsi-broker-SMARTERA"
-        ports:
-            - 8082:8082
-        environment:
-            - SERVER_DEBUG=true
-            - IDRA_BASE_PATH=http://idra:8080/
-            - HOST_ORION=http://localhost:1027
-            - PORT_ORION=
-        networks:
-            idra_main:
+    # ngsi-broker:
+    #     image: engineeringopsilab/ngsi-ldbrokermanager:v1.7
+    #     container_name: "ngsi-broker-SMARTERA"
+    #     ports:
+    #         - 8082:8082
+    #     environment:
+    #         - SERVER_DEBUG=true
+    #         - IDRA_BASE_PATH=http://idra:8080/
+    #         - HOST_ORION=http://localhost:1027
+    #         - PORT_ORION=
+    #     networks:
+    #         idra_main:
     # Idra back-end latest version
     idra:
             # build local
@@ -202,12 +202,12 @@ services :
                 - idm.protocol=http
                 - idm.host=keycloak:8080/auth/realms/smartera/protocol/openid-connect
                 - idm.path.base=
-                - idm.client.id=idra
-                - idm.client.secret=idra-secret
+                - idm.client.id=data-platform
+                - idm.client.secret=vzO1KrNTiEe70y55IIgAPCbrKdG4Ov9l
                 - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
-                - idm.logout.callback=http://localhost:4200/pages
+                - idm.logout.callback=http://localhost:4200
                 - idra.server.baseurl=http://localhost:8080/
-                - idm.admin.role.name=ADMIN
+                - idm.admin.role.name=IDRA_ADMIN
             secrets:
                 - my_secret_data           
             volumes:

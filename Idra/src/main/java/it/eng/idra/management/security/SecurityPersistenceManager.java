@@ -19,7 +19,9 @@ import it.eng.idra.beans.security.AppUser;
 import it.eng.idra.beans.security.Permission;
 import it.eng.idra.beans.security.Role;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
@@ -236,6 +238,13 @@ public class SecurityPersistenceManager {
   public List<Role> listRoles() {
     TypedQuery<Role> q = em.createQuery("SELECT r FROM Role r ORDER BY r.code", Role.class);
     return q.getResultList();
+  }
+
+  public Set<String> listRoleCodes() {
+    Query q = em.createNativeQuery("SELECT code FROM role");
+    @SuppressWarnings("unchecked")
+    List<String> res = q.getResultList();
+    return new HashSet<>(res);
   }
 
   public List<Permission> listPermissions() {
