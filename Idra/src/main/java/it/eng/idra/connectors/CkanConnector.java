@@ -44,6 +44,7 @@ import it.eng.idra.cache.MetadataCacheManager;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.management.StatisticsManager;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import java.io.IOException;
@@ -899,6 +900,7 @@ public class CkanConnector implements IodmsConnector {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, rightsHolder, creator, subjectList, relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
     distributionList = null;
     publisher = null;
@@ -1129,11 +1131,13 @@ public class CkanConnector implements IodmsConnector {
     // logger.info("temporalResolution: " + r.getTemporal_resolution());
     temporalResolution = r.getTemporal_resolution();
 
-    return new DcatDistribution(nodeId, accessUrl, description, format, datasetLicense, byteSize,
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, datasetLicense, byteSize,
         checksum, new ArrayList<String>(), downloadUrl, new ArrayList<String>(),
         new ArrayList<DctStandard>(), mediaType, releaseDate, updateDate, null, null, title, accessService,
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);
+    distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
+    return distribution;
   }
 
   /*

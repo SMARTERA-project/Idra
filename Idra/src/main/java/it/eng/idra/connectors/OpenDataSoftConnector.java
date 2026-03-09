@@ -42,6 +42,7 @@ import it.eng.idra.beans.opendatasoft.InnerDatasetMetaDefault;
 import it.eng.idra.beans.opendatasoft.Link;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.restclient.RestClient;
 import it.eng.idra.utils.restclient.RestClientImpl;
 import java.lang.reflect.InvocationTargetException;
@@ -156,6 +157,7 @@ public class OpenDataSoftConnector implements IodmsConnector {
     dcatDistrib.setTitle(format);
 
     dcatDistrib.setLicense_name(license);
+    dcatDistrib.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(format, null));
 
     return dcatDistrib;
   }
@@ -264,6 +266,7 @@ public class OpenDataSoftConnector implements IodmsConnector {
         releaseDate, updateDate, otherIdentifier, sample, source, spatialCoverage, temporalCoverage,
         type, version, versionNotes, rightsHolder, publisher, subjectList, relatedResources, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
     return mapped;
   }

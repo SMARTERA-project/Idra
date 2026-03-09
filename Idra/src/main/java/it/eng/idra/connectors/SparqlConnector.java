@@ -40,6 +40,7 @@ import it.eng.idra.beans.sparql.SparqlDistributionConfig;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.management.OdmsManager;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
@@ -573,12 +574,15 @@ public class SparqlConnector implements IodmsConnector {
       // HVDCategory = extractValueList(j.optString("HVDCategory"));
     }
 
-    return new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
+    DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
         publisher, contactPointList, keywords, accessRights, conformsTo, documentation, frequency,
         hasVersion, isVersionOf, landingPage, language, provenance, releaseDate, updateDate,
         otherIdentifier, sample, source, spatialCoverage, temporalCoverage, type, version,
         versionNotes, rightsHolder, creator, subjectList, relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+        j.opt("title"), j.opt("description"), title, description));
+    return mapped;
   }
 
   /**
@@ -631,6 +635,9 @@ public class SparqlConnector implements IodmsConnector {
 
     distro.setDescription(tmp.optString("description"));
     distro.setTitle(tmp.optString("title"));
+    distro.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
+        tmp.opt("title"), tmp.opt("description"),
+        tmp.optString("title", null), tmp.optString("description", null)));
     if (tmp.has("byteSize")) {
       distro.setByteSize(tmp.optString("byteSize"));
     }

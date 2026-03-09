@@ -50,6 +50,10 @@ public enum CacheContentType {
   /** The theme. */
   theme,
   /** The subject. */
-  subject;
+  subject,
+  /** Dataset multilingual details child docs. */
+  datasetDetails,
+  /** Distribution multilingual details child docs. */
+  distributionDetails;
 
 }

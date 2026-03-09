@@ -27,7 +27,9 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -46,6 +48,8 @@ import javax.persistence.JoinColumns;
 import javax.persistence.JoinTable;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import org.apache.commons.lang3.StringUtils;
@@ -112,6 +116,9 @@ public class DcatDataset implements Serializable {
 
   /** The description. */
   private DcatProperty description;
+
+  /** The multilingual dataset details (title/description per language). */
+  private List<DcatDetails> datasetDetails;
 
   /** The distributions. */
   // Recommended
@@ -646,6 +653,29 @@ public class DcatDataset implements Serializable {
    */
   protected void setDescription(DcatProperty description) {
     this.description = description;
+  }
+
+  /**
+   * Gets the multilingual dataset details.
+   *
+   * @return dataset details
+   */
+  @LazyCollection(LazyCollectionOption.FALSE)
+  @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
+  @JoinColumns({ @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
+      @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+  @Where(clause = "distribution_id IS NULL AND dataset_series_id IS NULL AND catalogue_record_id IS NULL")
+  public List<DcatDetails> getDatasetDetails() {
+    return datasetDetails;
+  }
+
+  /**
+   * Sets multilingual dataset details.
+   *
+   * @param datasetDetails dataset details
+   */
+  public void setDatasetDetails(List<DcatDetails> datasetDetails) {
+    this.datasetDetails = datasetDetails;
   }
 
   /**
@@ -1427,6 +1457,78 @@ public class DcatDataset implements Serializable {
     HVDCategory = hVDCategory;
   }
 
+  @PrePersist
+  @PreUpdate
+  protected void normalizeDatasetDetails() {
+    Map<String, DcatDetails> deduplicated = new LinkedHashMap<>();
+
+    if (datasetDetails != null) {
+      for (DcatDetails detail : datasetDetails) {
+        if (detail == null) {
+          continue;
+        }
+
+        detail.setDatasetId(getId());
+        detail.setNodeId(getNodeId());
+        detail.setDistributionId(null);
+        detail.setCatalogueRecordId(null);
+        detail.setDatasetSeriesId(null);
+
+        String language = normalizeLanguageValue(detail.getLanguage());
+        String titleValue = normalizeTextValue(detail.getTitle());
+        String descriptionValue = normalizeTextValue(detail.getDescription());
+
+        detail.setLanguage(language);
+        detail.setTitle(titleValue);
+        detail.setDescription(descriptionValue);
+
+        if (titleValue == null && descriptionValue == null) {
+          continue;
+        }
+
+        String key = (language == null ? "" : language) + "|" + (titleValue == null ? "" : titleValue)
+            + "|" + (descriptionValue == null ? "" : descriptionValue);
+        deduplicated.putIfAbsent(key, detail);
+      }
+    }
+
+    if (deduplicated.isEmpty()) {
+      String titleValue = title != null ? normalizeTextValue(title.getValue()) : null;
+      String descriptionValue = description != null ? normalizeTextValue(description.getValue()) : null;
+      if (titleValue != null || descriptionValue != null) {
+        DcatDetails fallback = new DcatDetails(null, null, null, getId(), getNodeId(),
+            descriptionValue, titleValue, null);
+        deduplicated.put("fallback", fallback);
+      }
+    }
+
+    datasetDetails = new ArrayList<>(deduplicated.values());
+  }
+
+  private static String normalizeTextValue(String value) {
+    return StringUtils.trimToNull(value);
+  }
+
+  private static String normalizeLanguageValue(String language) {
+    String normalized = StringUtils.trimToNull(language);
+    if (normalized == null) {
+      return null;
+    }
+    return normalized.replace('_', '-').toLowerCase();
+  }
+
+  private static String extractDocFieldString(SolrDocument doc, String fieldName) {
+    if (doc == null || StringUtils.isBlank(fieldName) || doc.getFieldValue(fieldName) == null) {
+      return null;
+    }
+    Object value = doc.getFieldValue(fieldName);
+    if (value instanceof List && !((List<?>) value).isEmpty()) {
+      Object first = ((List<?>) value).get(0);
+      return first != null ? first.toString() : null;
+    }
+    return value.toString();
+  }
+
   /*
    * Defines equality principle for a Dataset based on dcatIdentifier + its own
    * nodeID Alternatively is used otherIdentifier + nodeID
@@ -1485,6 +1587,37 @@ public class DcatDataset implements Serializable {
 
     if (title != null) {
       doc.addField("title", title.getValue());
+    }
+
+    if (datasetDetails != null && !datasetDetails.isEmpty()) {
+      int detailIndex = 0;
+      for (DcatDetails detail : datasetDetails) {
+        if (detail == null) {
+          continue;
+        }
+        String detailTitle = normalizeTextValue(detail.getTitle());
+        String detailDescription = normalizeTextValue(detail.getDescription());
+        String detailLanguage = normalizeLanguageValue(detail.getLanguage());
+        if (detailTitle == null && detailDescription == null) {
+          continue;
+        }
+
+        SolrInputDocument detailDoc = new SolrInputDocument();
+        detailDoc.addField("id", StringUtils.defaultIfBlank(detail.getId(), id + "#datasetDetail#" + detailIndex));
+        detailDoc.addField("content_type", CacheContentType.datasetDetails.toString());
+        detailDoc.addField("nodeID", nodeId);
+        if (detailTitle != null) {
+          detailDoc.addField("title", detailTitle);
+        }
+        if (detailDescription != null) {
+          detailDoc.addField("description", detailDescription);
+        }
+        if (detailLanguage != null) {
+          detailDoc.addField("language", detailLanguage);
+        }
+        doc.addChildDocument(detailDoc);
+        detailIndex++;
+      }
     }
 
     if (theme != null && !theme.isEmpty()) {
@@ -1749,10 +1882,24 @@ public class DcatDataset implements Serializable {
     List<DctStandard> conformsToList = new ArrayList<DctStandard>();
     List<DctLocation> spatialCoverage = new ArrayList<DctLocation>();
     List<DctPeriodOfTime> temporalCoverage = new ArrayList<DctPeriodOfTime>();
+    List<DcatDetails> datasetDetails = new ArrayList<DcatDetails>();
 
     if (null != childDocs) {
 
       for (SolrDocument child : childDocs) {
+
+        if (child.containsKey("content_type")
+            && child.getFieldValue("content_type").equals(CacheContentType.datasetDetails.toString())) {
+          DcatDetails detail = new DcatDetails();
+          detail.setDatasetId(datasetId);
+          detail.setNodeId(nodeIdentifier);
+          detail.setTitle(extractDocFieldString(child, "title"));
+          detail.setDescription(extractDocFieldString(child, "description"));
+          detail.setLanguage(normalizeLanguageValue(extractDocFieldString(child, "language")));
+          if (StringUtils.isNotBlank(detail.getTitle()) || StringUtils.isNotBlank(detail.getDescription())) {
+            datasetDetails.add(detail);
+          }
+        }
 
         if (child.containsKey("content_type")
             && child.getFieldValue("content_type").equals(CacheContentType.conformsTo.toString())) {
@@ -1951,6 +2098,19 @@ public class DcatDataset implements Serializable {
         temporalResolution,
         (ArrayList<String>) doc.getFieldValue("wasGeneratedBy"), // wasGeneratedBy,
         (ArrayList<String>) doc.getFieldValue("HVDCategory"));// HVDCategory);
+
+    if (!datasetDetails.isEmpty()) {
+      d.setDatasetDetails(datasetDetails);
+    } else {
+      String fallbackTitle = doc.getFieldValue("title") != null ? doc.getFieldValue("title").toString() : null;
+      String fallbackDescription = doc.getFieldValue("description") != null
+          ? doc.getFieldValue("description").toString()
+          : null;
+      if (StringUtils.isNotBlank(fallbackTitle) || StringUtils.isNotBlank(fallbackDescription)) {
+        d.setDatasetDetails(Arrays.asList(new DcatDetails(null, null, null, datasetId, nodeIdentifier,
+            fallbackDescription, fallbackTitle, null)));
+      }
+    }
 
     return d;
 

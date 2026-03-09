@@ -27,6 +27,7 @@ import it.eng.idra.beans.dcat.DcatApFormat;
 import it.eng.idra.beans.dcat.DcatApProfile;
 import it.eng.idra.beans.dcat.DcatApWriteType;
 import it.eng.idra.beans.dcat.DcatDataset;
+import it.eng.idra.beans.dcat.DcatDetails;
 import it.eng.idra.beans.dcat.DcatDistribution;
 import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DctStandard;
@@ -60,6 +61,7 @@ import it.eng.idra.scheduler.job.OdmsSynchJob;
 import it.eng.idra.search.FederatedSearch;
 import it.eng.idra.search.SparqlFederatedSearch;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.NgsiLdCbDcatDeserializer;
@@ -459,6 +461,15 @@ public class ClientApi {
               datasetToUpdateInIdra.getTemporalResolution().getValue(),
               wasgeneratedby,
               HVDCategory);
+          List<DcatDetails> preservedDetails =
+              DcatDetailsUtil.cloneDatasetDetails(datasetToUpdateInIdra.getDatasetDetails());
+          if (preservedDetails.isEmpty()) {
+            datasetUpdated.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+                datasetToUpdateInIdra.getTitle().getValue(),
+                datasetToUpdateInIdra.getDescription().getValue()));
+          } else {
+            datasetUpdated.setDatasetDetails(preservedDetails);
+          }
 
           logger.info("Updated Dataset, to be inserted in Idra: " + datasetUpdated
               .getTitle().getValue());

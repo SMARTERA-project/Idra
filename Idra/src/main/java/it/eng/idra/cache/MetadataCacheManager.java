@@ -1666,7 +1666,7 @@ public class MetadataCacheManager {
 
             } catch (RollbackException | IllegalStateException ex) {
               logger.info("Transaction Failed while committing " + "dataset with Id: "
-                  + dataset.getId() + " - " + e.getClass() + " - " + e.getMessage());
+                  + dataset.getId() + " - " + ex.getClass() + " - " + ex.getMessage());
               skipped++;
             } catch (Exception ex) {
 

@@ -40,6 +40,7 @@ import it.eng.idra.beans.odms.OdmsCatalogue;
 import it.eng.idra.beans.odms.OdmsSynchronizationResult;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
@@ -298,6 +299,9 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       distro.setTemporalResolution(
           new DcatProperty(DCAT.temporalResolution, XSD.duration, j.getString("temporalResolution")));
     }
+
+    distro.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
+        j.opt("title"), j.opt("description"), title, description));
 
     return distro;
   }
@@ -754,13 +758,16 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       // HVDCategory = extractValueList(j.optString("HVDCategory"));
     }
 
-    return new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
+    DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
         publisher, contactPointList, keywords, accessRights, conformsTo, documentation, frequency,
         hasVersion, isVersionOf, landingPage, language, provenance, releaseDate, updateDate,
         otherIdentifier, sample, source, spatialCoverage, temporalCoverage, type, version,
         versionNotes, rightsHolder, creator, subjectList, null,
         applicableLegislation, inSeries, qualifiedRelation, temporalResolution,
         wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+        j.opt("title"), j.opt("description"), title, description));
+    return mapped;
   }
 
   /**

@@ -712,7 +712,7 @@ DROP TABLE IF EXISTS `dcat_standard`;
  SET character_set_client = utf8mb4 ;
 CREATE TABLE `dcat_standard` (
   `standard_id` varchar(255) NOT NULL,
-  `description` varchar(255) DEFAULT NULL,
+  `description` longtext,
   `identifier` longtext,
   `nodeID` varchar(255) DEFAULT NULL,
   `referenceDocumentation` varchar(255) DEFAULT NULL,
@@ -1103,20 +1103,24 @@ CREATE TABLE `dcat_details` (
   `catalogue_record_id`  VARCHAR(255) DEFAULT NULL,
   `dataset_series_id`    VARCHAR(255) DEFAULT NULL,
   `dataset_id`           VARCHAR(255) DEFAULT NULL,
+  `distribution_id`      VARCHAR(255) DEFAULT NULL,
   `nodeID`               VARCHAR(255) DEFAULT NULL,
-  `description`          VARCHAR(255) DEFAULT NULL,
-  `title`                VARCHAR(255) DEFAULT NULL,
+  `description`          LONGTEXT DEFAULT NULL,
+  `title`                LONGTEXT DEFAULT NULL,
   `language`             VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (`details_id`),
   KEY `FK_det_dataset` (`dataset_id`,`nodeID`),
+  KEY `FK_det_distribution` (`distribution_id`),
   KEY `FK_det_dsrs` (`dataset_series_id`),
   KEY `FK_det_catrec` (`catalogue_record_id`),
   CONSTRAINT `FK_det_catrec` FOREIGN KEY (`catalogue_record_id`)
     REFERENCES `dcat_catalogue_record`(`catalogue_record_id`),
+  CONSTRAINT `FK_det_distribution` FOREIGN KEY (`distribution_id`)
+    REFERENCES `dcat_distribution`(`id`) ON DELETE CASCADE,
   CONSTRAINT `FK_det_dsrs` FOREIGN KEY (`dataset_series_id`)
     REFERENCES `dcat_dataset_series`(`dataset_series_id`),
   CONSTRAINT `FK_det_dataset` FOREIGN KEY (`dataset_id`,`nodeID`)
-    REFERENCES `dcat_dataset`(`dataset_id`,`nodeID`)
+    REFERENCES `dcat_dataset`(`dataset_id`,`nodeID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 LOCK TABLES `dcat_details` WRITE; UNLOCK TABLES;
 

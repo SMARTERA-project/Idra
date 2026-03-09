@@ -43,6 +43,7 @@ import it.eng.idra.beans.odms.OdmsCatalogueOfflineException;
 import it.eng.idra.beans.odms.OdmsSynchronizationResult;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
@@ -389,11 +390,14 @@ public class SocrataConnector implements IodmsConnector {
       // HVDCategory = extractValueList(j.optString("HVDCategory"));
     }
 
-    return new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
+    DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
         publisher, contactPointList, keywords, null, null, null, null, null, null, landingPage,
         null, null, issued, modified, null, null, null, null, null, null, null, null, null, null,
         null, null, applicableLegislation, inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy,
         HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+        dataset.opt("title"), dataset.opt("description"), title, description));
+    return mapped;
   }
 
   /**
@@ -485,11 +489,20 @@ public class SocrataConnector implements IodmsConnector {
 
     mediaType = obj.optString("mediaType");
     accessUrl = downloadUrl = obj.getString("downloadURL");
+    if (obj.has("description")) {
+      description = obj.optString("description");
+    }
+    if (obj.has("title")) {
+      title = obj.optString("title");
+    }
 
-    return new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize, checksum,
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize, checksum,
         documentation, downloadUrl, language, linkedSchemas, mediaType, releaseDate, updateDate,
         rights, status, title, accessService, applicableLegislation, availability, compressionFormat,
         hasPolicy, packagingFormat, spatialResolution, temporalResolution);
+    distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
+        obj.opt("title"), obj.opt("description"), title, description));
+    return distribution;
 
   }
 

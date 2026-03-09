@@ -574,13 +574,16 @@ public class NgsiLdCbDcatDeserializer {
        */
     }
 
-    return new DcatDataset(String.valueOf(node.getId()), identifier, title, description,
+    DcatDataset mapped = new DcatDataset(String.valueOf(node.getId()), identifier, title, description,
         distributionList, themeList,
         publisher, contactPointList, keywords, accessRights, conformsTo, documentation, frequency,
         hasVersion, isVersionOf, landingPage, language, provenance, releaseDate, updateDate,
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, rightsHolder, creator, subjectList, null, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+        j.opt("title"), j.opt("description"), title, description));
+    return mapped;
   }
 
   /**
@@ -641,11 +644,10 @@ public class NgsiLdCbDcatDeserializer {
     distro.setNodeId(String.valueOf(node.getId()));
     logger.info("id distribution settato");
     String title = null;
+    String description = null;
     JSONObject titleObject = j.getJSONObject("title");
     title = titleObject.getString("value");
     distro.setTitle(title);
-
-    distro.setDescription("description");
 
     logger.info("title settato");
 
@@ -688,7 +690,8 @@ public class NgsiLdCbDcatDeserializer {
     }
     if (j.has("description")) {
       attributeObject = j.getJSONObject("description");
-      distro.setDescription(attributeObject.getString("value"));
+      description = attributeObject.getString("value");
+      distro.setDescription(description);
     }
     if (j.has("license")) {
       attributeObject = j.getJSONObject("license");
@@ -762,6 +765,8 @@ public class NgsiLdCbDcatDeserializer {
     // if (j.has("documentation")) {
     // logger.info("Distribution documentation skipped");
     // }
+    distro.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
+        j.opt("title"), j.opt("description"), title, description));
     logger.info(distro);
     return distro;
   }

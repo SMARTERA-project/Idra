@@ -25,7 +25,10 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
@@ -41,6 +44,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.JoinColumns;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import org.apache.commons.lang3.StringUtils;
@@ -171,6 +176,9 @@ public class DcatDistribution implements Serializable {
 
   /** The title. */
   private DcatProperty title;
+
+  /** The multilingual distribution details (title/description per language). */
+  private List<DcatDetails> distributionDetails;
 
   /** The has datalets. */
   // private List<Datalet> datalets;
@@ -531,6 +539,28 @@ public class DcatDistribution implements Serializable {
    */
   public void setDescription(String description) {
     setDescription(new DcatProperty(DCTerms.description, RDFS.Literal, description));
+  }
+
+  /**
+   * Gets the multilingual distribution details.
+   *
+   * @return distribution details
+   */
+  @LazyCollection(LazyCollectionOption.FALSE)
+  @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
+  @JoinColumn(name = "distribution_id", referencedColumnName = "id")
+  @Where(clause = "dataset_id IS NULL AND dataset_series_id IS NULL AND catalogue_record_id IS NULL")
+  public List<DcatDetails> getDistributionDetails() {
+    return distributionDetails;
+  }
+
+  /**
+   * Sets multilingual distribution details.
+   *
+   * @param distributionDetails distribution details
+   */
+  public void setDistributionDetails(List<DcatDetails> distributionDetails) {
+    this.distributionDetails = distributionDetails;
   }
 
   /**
@@ -1150,6 +1180,83 @@ public class DcatDistribution implements Serializable {
     this.temporalResolution = temporalResolution;
   }
 
+  @PrePersist
+  @PreUpdate
+  protected void normalizeDistributionDetails() {
+    Map<String, DcatDetails> deduplicated = new LinkedHashMap<>();
+
+    if (distributionDetails != null) {
+      for (DcatDetails detail : distributionDetails) {
+        if (detail == null) {
+          continue;
+        }
+
+        if (StringUtils.isNotBlank(getId())) {
+          detail.setDistributionId(getId());
+        }
+        detail.setNodeId(getNodeId());
+        detail.setDatasetId(null);
+        detail.setCatalogueRecordId(null);
+        detail.setDatasetSeriesId(null);
+
+        String language = normalizeLanguageValue(detail.getLanguage());
+        String titleValue = normalizeTextValue(detail.getTitle());
+        String descriptionValue = normalizeTextValue(detail.getDescription());
+
+        detail.setLanguage(language);
+        detail.setTitle(titleValue);
+        detail.setDescription(descriptionValue);
+
+        if (titleValue == null && descriptionValue == null) {
+          continue;
+        }
+
+        String key = (language == null ? "" : language) + "|" + (titleValue == null ? "" : titleValue)
+            + "|" + (descriptionValue == null ? "" : descriptionValue);
+        deduplicated.putIfAbsent(key, detail);
+      }
+    }
+
+    if (deduplicated.isEmpty()) {
+      String titleValue = title != null ? normalizeTextValue(title.getValue()) : null;
+      String descriptionValue = description != null ? normalizeTextValue(description.getValue()) : null;
+      if (titleValue != null || descriptionValue != null) {
+        DcatDetails fallback = new DcatDetails(null, null, null, null, getNodeId(),
+            descriptionValue, titleValue, null);
+        if (StringUtils.isNotBlank(getId())) {
+          fallback.setDistributionId(getId());
+        }
+        deduplicated.put("fallback", fallback);
+      }
+    }
+
+    distributionDetails = new ArrayList<>(deduplicated.values());
+  }
+
+  private static String normalizeTextValue(String value) {
+    return StringUtils.trimToNull(value);
+  }
+
+  private static String normalizeLanguageValue(String language) {
+    String normalized = StringUtils.trimToNull(language);
+    if (normalized == null) {
+      return null;
+    }
+    return normalized.replace('_', '-').toLowerCase();
+  }
+
+  private static String extractDocFieldString(SolrDocument doc, String fieldName) {
+    if (doc == null || StringUtils.isBlank(fieldName) || doc.getFieldValue(fieldName) == null) {
+      return null;
+    }
+    Object value = doc.getFieldValue(fieldName);
+    if (value instanceof List && !((List<?>) value).isEmpty()) {
+      Object first = ((List<?>) value).get(0);
+      return first != null ? first.toString() : null;
+    }
+    return value.toString();
+  }
+
   /**
    * Checks if is rdf.
    *
@@ -1325,6 +1432,49 @@ public class DcatDistribution implements Serializable {
       doc.addField("temporalResolution", temporalResolution.getValue());
     }
 
+    if (distributionDetails != null && !distributionDetails.isEmpty()) {
+      List<String> serializedDistributionDetails = new ArrayList<>();
+      int detailIndex = 0;
+      for (DcatDetails detail : distributionDetails) {
+        if (detail == null) {
+          continue;
+        }
+        String detailTitle = normalizeTextValue(detail.getTitle());
+        String detailDescription = normalizeTextValue(detail.getDescription());
+        String detailLanguage = normalizeLanguageValue(detail.getLanguage());
+        if (detailTitle == null && detailDescription == null) {
+          continue;
+        }
+
+        SolrInputDocument detailDoc = new SolrInputDocument();
+        detailDoc.addField("id", StringUtils.defaultIfBlank(detail.getId(), id + "#distributionDetail#" + detailIndex));
+        detailDoc.addField("content_type", CacheContentType.distributionDetails.toString());
+        detailDoc.addField("nodeID", nodeId);
+        if (detailTitle != null) {
+          detailDoc.addField("title", detailTitle);
+        }
+        if (detailDescription != null) {
+          detailDoc.addField("description", detailDescription);
+        }
+        if (detailLanguage != null) {
+          detailDoc.addField("language", detailLanguage);
+        }
+        doc.addChildDocument(detailDoc);
+        try {
+          DcatDetails serializedDetail = new DcatDetails(
+              null, null, null, null, null, detailDescription, detailTitle, detailLanguage);
+          serializedDistributionDetails.add(
+              GsonUtil.obj2Json(serializedDetail, DcatDetails.class));
+        } catch (GsonUtilException e) {
+          logger.debug("Unable to serialize distribution detail for Solr fallback field", e);
+        }
+        detailIndex++;
+      }
+      if (!serializedDistributionDetails.isEmpty()) {
+        doc.addField("distributionDetails_ss", serializedDistributionDetails);
+      }
+    }
+
     return doc;
 
   }
@@ -1352,10 +1502,24 @@ public class DcatDistribution implements Serializable {
     SpdxChecksum checksum = null;
     List<DctStandard> linkedSchemas = new ArrayList<DctStandard>();
     SkosConceptStatus status = null;
+    List<DcatDetails> distributionDetails = new ArrayList<DcatDetails>();
     // List<Datalet> datalets = new ArrayList<Datalet>();
     if (null != childDocs) {
 
       for (SolrDocument child : childDocs) {
+
+        if (child.containsKey("content_type")
+            && child.getFieldValue("content_type").equals(CacheContentType.distributionDetails.toString())) {
+          DcatDetails detail = new DcatDetails();
+          detail.setDistributionId(doc.getFieldValue("id").toString());
+          detail.setNodeId(nodeIdentifier);
+          detail.setTitle(extractDocFieldString(child, "title"));
+          detail.setDescription(extractDocFieldString(child, "description"));
+          detail.setLanguage(normalizeLanguageValue(extractDocFieldString(child, "language")));
+          if (StringUtils.isNotBlank(detail.getTitle()) || StringUtils.isNotBlank(detail.getDescription())) {
+            distributionDetails.add(detail);
+          }
+        }
 
         if (child.containsKey("content_type") && child.getFieldValue("content_type")
             .equals(CacheContentType.licenseDocument.toString())) {
@@ -1512,6 +1676,64 @@ public class DcatDistribution implements Serializable {
     if (doc.getFieldValue("identifier") != null) {
       distr.setIdentifier((String) doc.getFieldValue("identifier").toString());
     }
+    Collection<Object> serializedDistributionDetails = doc.getFieldValues("distributionDetails_ss");
+    if (serializedDistributionDetails != null) {
+      for (Object serializedDetail : serializedDistributionDetails) {
+        if (serializedDetail == null) {
+          continue;
+        }
+        try {
+          DcatDetails detail = GsonUtil.json2Obj(serializedDetail.toString(), DcatDetails.class);
+          if (detail == null) {
+            continue;
+          }
+          detail.setDistributionId(doc.getFieldValue("id") != null ? doc.getFieldValue("id").toString() : null);
+          detail.setNodeId(nodeIdentifier);
+          detail.setTitle(normalizeTextValue(detail.getTitle()));
+          detail.setDescription(normalizeTextValue(detail.getDescription()));
+          detail.setLanguage(normalizeLanguageValue(detail.getLanguage()));
+          if (StringUtils.isNotBlank(detail.getTitle()) || StringUtils.isNotBlank(detail.getDescription())) {
+            distributionDetails.add(detail);
+          }
+        } catch (GsonUtilException e) {
+          logger.debug("Unable to parse serialized distribution detail from Solr field", e);
+        }
+      }
+    }
+
+    if (!distributionDetails.isEmpty()) {
+      Map<String, DcatDetails> deduplicated = new LinkedHashMap<>();
+      for (DcatDetails detail : distributionDetails) {
+        if (detail == null) {
+          continue;
+        }
+        String detailLanguage = normalizeLanguageValue(detail.getLanguage());
+        String detailTitle = normalizeTextValue(detail.getTitle());
+        String detailDescription = normalizeTextValue(detail.getDescription());
+        if (detailTitle == null && detailDescription == null) {
+          continue;
+        }
+        detail.setLanguage(detailLanguage);
+        detail.setTitle(detailTitle);
+        detail.setDescription(detailDescription);
+        String key = (detailLanguage == null ? "" : detailLanguage) + "|" + (detailTitle == null ? "" : detailTitle)
+            + "|" + (detailDescription == null ? "" : detailDescription);
+        deduplicated.putIfAbsent(key, detail);
+      }
+      distr.setDistributionDetails(new ArrayList<>(deduplicated.values()));
+    } else {
+      String fallbackTitle = doc.getFieldValue("title") != null ? doc.getFieldValue("title").toString() : null;
+      String fallbackDescription = doc.getFieldValue("description") != null
+          ? doc.getFieldValue("description").toString()
+          : null;
+      if (StringUtils.isNotBlank(fallbackTitle) || StringUtils.isNotBlank(fallbackDescription)) {
+        DcatDetails fallback = new DcatDetails(null, null, null, null, nodeIdentifier,
+            fallbackDescription, fallbackTitle, null);
+        fallback.setDistributionId(doc.getFieldValue("id") != null ? doc.getFieldValue("id").toString() : null);
+        distr.setDistributionDetails(Arrays.asList(fallback));
+      }
+    }
+
     return distr;
   }
 

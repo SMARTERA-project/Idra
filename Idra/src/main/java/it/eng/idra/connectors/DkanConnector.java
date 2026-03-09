@@ -40,6 +40,7 @@ import it.eng.idra.beans.odms.OdmsCatalogueOfflineException;
 import it.eng.idra.beans.odms.OdmsSynchronizationResult;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
@@ -391,11 +392,14 @@ public class DkanConnector implements IodmsConnector {
       // HVDCategory = extractValueList(j.optString("HVDCategory"));
     }
 
-    return new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
+    DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
         publisher, contactPointList, keywords, null, null, null, null, null, null, landingPage,
         null, null, issued, modified, null, null, null, null, null, null, null, null, null, null,
         null, null, applicableLegislation, inSeries, qualifiedRelation,
         temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
+        dataset.opt("title"), dataset.opt("description"), title, description));
+    return mapped;
   }
 
   /**
@@ -501,11 +505,14 @@ public class DkanConnector implements IodmsConnector {
       temporalResolution = obj.getString("temporalResolution");
     }
 
-    return new DcatDistribution(nodeId, accessUrl, null, format, license, null, null,
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, null, format, license, null, null,
         new ArrayList<String>(), downloadUrl, new ArrayList<String>(), null, mediaType, null, null,
         null, null, title, accessService,
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);
+    distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
+        obj.opt("title"), obj.opt("description"), title, null));
+    return distribution;
 
   }
 

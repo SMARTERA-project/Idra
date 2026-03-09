@@ -21,6 +21,8 @@
 		<value>checksum</value>
 		<value>theme</value>
 		<value>subject</value>
+		<value>datasetDetails</value>
+		<value>distributionDetails</value>
 	</enum>
 
 </enumsConfig>

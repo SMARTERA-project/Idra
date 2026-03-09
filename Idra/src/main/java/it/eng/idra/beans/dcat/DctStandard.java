@@ -213,7 +213,8 @@ public class DctStandard implements Serializable {
    */
   @Embedded
   @AttributeOverrides({
-      @AttributeOverride(name = "value", column = @Column(name = "description")) })
+      @AttributeOverride(name = "value",
+          column = @Column(name = "description", columnDefinition = "LONGTEXT")) })
   public DcatProperty getDescription() {
     return description;
   }

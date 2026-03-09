@@ -39,6 +39,7 @@ import it.eng.idra.beans.dcat.VcardOrganization;
 import it.eng.idra.beans.odms.OdmsCatalogue;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
@@ -478,6 +479,8 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, null, null, new ArrayList<SkosConceptSubject>(), relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(
+        DcatDetailsUtil.extractDatasetDetails(datasetResource, DCTerms.title, DCTerms.description));
 
     distributionList = null;
     contactPointList = null;
@@ -1334,10 +1337,13 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       }
     }
 
-    return new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize, checksum,
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize, checksum,
         Arrays.asList(documentation), downloadUrl, Arrays.asList(language), linkedSchemas,
         mediaType, releaseDate, updateDate, rights, status, title, accessService, applicableLegislation,
         availability, compressionFormat, hasPolicy, packagingFormat, spatialResolution, temporalResolution);
+    distribution.setDistributionDetails(
+        DcatDetailsUtil.extractDatasetDetails(r, DCTerms.title, DCTerms.description));
+    return distribution;
 
   }
 

@@ -828,10 +828,20 @@ public class CachePersistenceManager {
     q = em.createQuery("DELETE FROM Datalet where nodeID = " + nodeId);
     q.executeUpdate();
 
+    q = em.createNativeQuery(
+        "DELETE FROM dcat_details where distribution_id in "
+            + "(SELECT id FROM dcat_distribution where nodeID= " + nodeId + ")");
+    q.executeUpdate();
+
     q = em.createQuery("DELETE FROM DcatDistribution where nodeID = " + nodeId);
     q.executeUpdate();
 
     q = em.createNativeQuery("DELETE FROM dcat_checksum where nodeID= " + nodeId);
+    q.executeUpdate();
+
+    // Bulk HQL delete on DcatDataset does not trigger ORM cascades.
+    // Remove dependent dataset-level details first to avoid FK_det_dataset violations.
+    q = em.createNativeQuery("DELETE FROM dcat_details where nodeID= " + nodeId + " and dataset_id is not null");
     q.executeUpdate();
 
     q = em.createQuery("DELETE FROM DcatDataset where nodeID = " + nodeId);

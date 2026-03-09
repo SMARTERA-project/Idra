@@ -1,0 +1,3 @@
+ALTER TABLE dcat_details
+  MODIFY title LONGTEXT NULL,
+  MODIFY description LONGTEXT NULL;

@@ -41,6 +41,7 @@ import it.eng.idra.beans.zenodo.ZenodoConnection;
 import it.eng.idra.beans.zenodo.ZenodoException;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.beans.zenodo.ZenodoDataset;
@@ -487,6 +488,7 @@ public class ZenodoConnector implements IodmsConnector {
         releaseDate, updateDate, otherIdentifier, sample, source, spatialCoverage, temporalCoverage,
         type, version, versionNotes, rightsHolder, creator, subjectList, relatedResources, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
     return mapped;
   }
@@ -894,12 +896,14 @@ public class ZenodoConnector implements IodmsConnector {
     String spatialResolution = null;
     String temporalResolution = null;
 
-    return new DcatDistribution(nodeId, accessUrl, null, format, datasetLicense, byteSize,
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, null, format, datasetLicense, byteSize,
         checksum, new ArrayList<String>(), downloadUrl, new ArrayList<String>(),
         new ArrayList<DctStandard>(), mimeType, "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z", null, null, title,
         accessService,
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);
+    distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(title, null));
+    return distribution;
   }
 
   /**

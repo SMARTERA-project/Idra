@@ -43,6 +43,7 @@ import it.eng.idra.beans.webscraper.WebScraperSelectorType;
 import it.eng.idra.connectors.webscraper.WebScraper;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import java.lang.reflect.InvocationTargetException;
@@ -716,6 +717,7 @@ public class WebConnector implements IodmsConnector {
         temporalCoverageList, type, version, versionNotes, rightsHolder, creator, null,
         new ArrayList<String>(), applicableLegislation, inSeries, qualifiedRelation, temporalResolution,
         wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
     distributionList = null;
     publisher = null;

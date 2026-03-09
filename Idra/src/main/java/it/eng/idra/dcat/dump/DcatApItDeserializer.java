@@ -30,6 +30,7 @@ import it.eng.idra.beans.dcat.Relationship;
 import it.eng.idra.beans.dcat.SkosConceptSubject;
 import it.eng.idra.beans.dcat.SkosConceptTheme;
 import it.eng.idra.beans.dcat.VcardOrganization;
+import it.eng.idra.utils.DcatDetailsUtil;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -415,6 +416,8 @@ public class DcatApItDeserializer extends DcatApDeserializer {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, rightsHolder, creator, subject, relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setDatasetDetails(
+        DcatDetailsUtil.extractDatasetDetails(datasetResource, DCTerms.title, DCTerms.description));
 
     distributionList = null;
     contactPointList = null;

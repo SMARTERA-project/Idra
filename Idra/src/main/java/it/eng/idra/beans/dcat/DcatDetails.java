@@ -26,6 +26,9 @@ public class DcatDetails {
     /** The dataset id. */
     private String datasetId;
 
+    /** The distribution id. */
+    private String distributionId;
+
     /** The node id. */
     private String nodeId;
 
@@ -137,6 +140,15 @@ public class DcatDetails {
         this.datasetId = datasetId;
     }
 
+    @Column(name = "distribution_id")
+    public String getDistributionId() {
+        return distributionId;
+    }
+
+    public void setDistributionId(String distributionId) {
+        this.distributionId = distributionId;
+    }
+
     @Column(name = "nodeID")
     public String getNodeId() {
         return nodeId;
@@ -146,7 +158,7 @@ public class DcatDetails {
         this.nodeId = nodeId;
     }
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "LONGTEXT")
     public String getDescription() {
         return description;
     }
@@ -155,7 +167,7 @@ public class DcatDetails {
         this.description = description;
     }
 
-    @Column(name = "title")
+    @Column(name = "title", columnDefinition = "LONGTEXT")
     public String getTitle() {
         return title;
     }
@@ -187,6 +199,9 @@ public class DcatDetails {
         if (datasetId != null) {
             doc.addField("datasetIdentifier", this.datasetId);
         }
+        if (distributionId != null) {
+            doc.addField("distributionIdentifier", this.distributionId);
+        }
         if (nodeId != null) {
             doc.addField("nodeID", this.nodeId);
         }
@@ -213,13 +228,16 @@ public class DcatDetails {
         String datasetId = doc.getFieldValue("datasetIdentifier") != null
                 ? doc.getFieldValue("datasetIdentifier").toString()
                 : null;
+        String distributionId = doc.getFieldValue("distributionIdentifier") != null
+                ? doc.getFieldValue("distributionIdentifier").toString()
+                : null;
         String nodeId = doc.getFieldValue("nodeID") != null ? doc.getFieldValue("nodeID").toString() : null;
         String description = doc.getFieldValue("description") != null ? doc.getFieldValue("description").toString()
                 : null;
         String title = doc.getFieldValue("title") != null ? doc.getFieldValue("title").toString() : null;
         String language = doc.getFieldValue("language") != null ? doc.getFieldValue("language").toString() : null;
 
-        return new DcatDetails(
+        DcatDetails details = new DcatDetails(
                 id,
                 catalogueRecordId,
                 datasetSeriesId,
@@ -228,13 +246,16 @@ public class DcatDetails {
                 description,
                 title,
                 language);
+        details.setDistributionId(distributionId);
+        return details;
     }
 
     @Override
     public String toString() {
         return "DcatDetails [id=" + id + ", catalogueRecordIdentifier=" + catalogueRecordId
                 + ", datasetSeriesIdentifier="
-                + datasetSeriesId + ", datasetIdentifier=" + datasetId + ", nodeId=" + nodeId + ", description="
+                + datasetSeriesId + ", datasetIdentifier=" + datasetId + ", distributionIdentifier="
+                + distributionId + ", nodeId=" + nodeId + ", description="
                 + description
                 + ", title=" + title + ", language=" + language + "]";
     }
