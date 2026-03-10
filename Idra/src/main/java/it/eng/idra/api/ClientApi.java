@@ -1049,7 +1049,8 @@ public class ClientApi {
       @QueryParam("url") String url, @QueryParam("id") String distributionId,
       @QueryParam("format") String format,
       @QueryParam("downloadFile") @DefaultValue("true") boolean downloadFile,
-      @QueryParam("isPreview") @DefaultValue("false") boolean isPreview) {
+      @QueryParam("isPreview") @DefaultValue("false") boolean isPreview,
+      @QueryParam("previewMaxMB") Integer previewMaxMB) {
 
     try {
       MetadataCacheManager.getDistribution(distributionId, url);
@@ -1066,10 +1067,48 @@ public class ClientApi {
 
       try {
         WebTarget webTarget = client.target(compiledUri);
+        long previewLimit = resolvePreviewLimitBytes(previewMaxMB);
+
+        if (isPreview && previewLimit > 0) {
+          Response headResponse = null;
+          try {
+            headResponse = webTarget.request().head();
+            long headDimension = extractDimensionFromHeaders(headResponse.getHeaders());
+            if (headDimension > previewLimit) {
+              logger.info("Preview blocked by HEAD check. File size: " + headDimension
+                  + ", limit: " + previewLimit);
+              return Response.status(Status.REQUEST_ENTITY_TOO_LARGE).build();
+            }
+          } catch (Exception ex) {
+            logger.debug("Unable to evaluate preview size with HEAD request, fallback to GET", ex);
+          } finally {
+            if (headResponse != null) {
+              headResponse.close();
+            }
+          }
+        }
+
         Response request = webTarget.request().get();
         logger.info("File uri: " + compiledUri);
         logger.info("File format: " + format);
+        MultivaluedMap<String, Object> headers = request.getHeaders();
+        logger.info("Status: " + request.getStatus());
+        logger.debug(compiledUri);
+
+        if (isPreview && previewLimit > 0) {
+          long dimension = extractDimensionFromHeaders(headers);
+          if (dimension > previewLimit) {
+            logger.info("Preview blocked by GET headers. File size: " + dimension + ", limit: "
+                + previewLimit);
+            request.close();
+            return Response.status(Status.REQUEST_ENTITY_TOO_LARGE).build();
+          }
+        }
+
         ResponseBuilder responseBuilder = Response.status(request.getStatus());
+        if (request.getMediaType() != null) {
+          responseBuilder.type(request.getMediaType());
+        }
         if (downloadFile) {
 
           if (StringUtils.isNotBlank(format) && format.toLowerCase().contains("csv")) {
@@ -1081,61 +1120,11 @@ public class ClientApi {
             responseBuilder.entity(new StreamingOutput() {
               @Override
               public void write(OutputStream output) throws IOException, WebApplicationException {
-                // TODO Auto-generated method stub
                 IOUtils.copy((InputStream) request.getEntity(), output);
-                // output.flush();
                 output.close();
               }
             });
           }
-        }
-
-        MultivaluedMap<String, Object> headers = request.getHeaders();
-        Set<String> keys = headers.keySet();
-        logger.info("Status: " + request.getStatus());
-
-        logger.debug(compiledUri);
-
-        if (isPreview) {
-          try {
-            // TO-DO: renderlo configurabile
-            long previewLimit = Integer.parseInt(
-                PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT)) * 1024
-                * 1024; // 10MB
-            long dimension = 0L;
-            for (String k : keys) {
-
-              if (k.toLowerCase().contains("content-length")) {
-                logger.debug("Content-Length");
-                logger.debug(headers.get(k).get(0));
-                dimension = Long.parseLong((String) headers.get(k).get(0));
-                break;
-              } else if (k.toLowerCase().contains("content-range")) {
-                logger.debug("Content-Range");
-                logger.debug(headers.get(k));
-                logger.debug(headers.get(k).get(0).toString());
-                logger.debug(headers.get(k).get(0).toString().split("/")[1].replaceFirst("]", ""));
-                dimension = Long.parseLong(
-                    (String) headers.get(k).get(0).toString().split("/")[1].replaceFirst("]", ""));
-                break;
-              }
-
-            }
-
-            if (dimension > previewLimit) {
-              responseBuilder = Response.status(Status.REQUEST_ENTITY_TOO_LARGE);
-            }
-
-            // if(dimension==0L || dimension>previewLimit) {
-            // responseBuilder = Response.status(Status.REQUEST_ENTITY_TOO_LARGE);
-            // }
-
-          } catch (NumberFormatException ex) {
-            // System.out.println("Unable to retrieve the dimension of the element");
-            logger.error("Unable to retrieve the dimension of the element");
-            responseBuilder = Response.status(Status.REQUEST_ENTITY_TOO_LARGE);
-          }
-
         }
 
         // System.out.println("--------------------------------------------\n");
@@ -1159,6 +1148,51 @@ public class ClientApi {
       return handleErrorResponse500(e1);
     }
 
+  }
+
+  private long resolvePreviewLimitBytes(Integer previewMaxMB) {
+    if (previewMaxMB != null && previewMaxMB > 0) {
+      return previewMaxMB.longValue() * 1024L * 1024L;
+    }
+    return Integer.parseInt(PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT)) * 1024L
+        * 1024L;
+  }
+
+  private long extractDimensionFromHeaders(MultivaluedMap<String, Object> headers) {
+    if (headers == null) {
+      return 0L;
+    }
+
+    Long contentLength = parseHeaderLongValue(headers.getFirst("Content-Length"));
+    if (contentLength != null && contentLength.longValue() > 0) {
+      return contentLength.longValue();
+    }
+
+    Object contentRange = headers.getFirst("Content-Range");
+    if (contentRange != null) {
+      String[] splitBySlash = contentRange.toString().split("/");
+      if (splitBySlash.length == 2) {
+        String totalSize = splitBySlash[1].replace("]", "").trim();
+        try {
+          return Long.parseLong(totalSize);
+        } catch (NumberFormatException ex) {
+          logger.debug("Unable to parse content-range total size: " + totalSize, ex);
+        }
+      }
+    }
+
+    return 0L;
+  }
+
+  private Long parseHeaderLongValue(Object rawHeaderValue) {
+    if (rawHeaderValue == null) {
+      return null;
+    }
+    try {
+      return Long.valueOf(rawHeaderValue.toString().trim());
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 
   /**

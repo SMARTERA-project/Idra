@@ -216,23 +216,20 @@ services :
             networks:
                 idra_main:
 
-    # portal:
-    #         build:
-    #           context: ../../IdraPortal-ngx
-    #           dockerfile: ./Dockerfile
-    #           args:
-    #             BUILD_CONFIGURATION: docker
-    #             BASE_HREF: /
-    #         restart: always
-    #         depends_on:
-    #             - idra
-    #             - keycloak
-    #         ports:
-    #             - "4200:80"
-    #         volumes:
-    #             - ./idra-new-portal-config/config.json:/usr/share/nginx/html/assets/config.json:ro
-    #         networks:
-    #             idra_main:
+    portal:
+            build:
+              context: ../../IdraPortal-ngx
+              dockerfile: ./Dockerfile
+              args:
+                BUILD_CONFIGURATION: docker
+                BASE_HREF: /
+            restart: always
+            ports:
+                - "4200:80"
+            volumes:
+                - ./config.json:/usr/share/nginx/html/assets/config.json:ro
+            networks:
+                idra_main:
 
 networks:
     idra_main:
