@@ -1,0 +1,2 @@
+ALTER TABLE dcat_keyword
+  ADD COLUMN IF NOT EXISTS language VARCHAR(255) NULL AFTER keywords;

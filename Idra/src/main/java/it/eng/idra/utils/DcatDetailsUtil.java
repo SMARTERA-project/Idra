@@ -1,6 +1,7 @@
 package it.eng.idra.utils;
 
 import it.eng.idra.beans.dcat.DcatDetails;
+import it.eng.idra.beans.dcat.DcatKeyword;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -119,6 +120,55 @@ public final class DcatDetailsUtil {
         continue;
       }
       cloned.add(new DcatDetails(null, null, null, null, null, description, title, language));
+    }
+    return cloned;
+  }
+
+  /**
+   * Extract keyword details from raw keywords payloads.
+   *
+   * @param rawKeywords raw keywords
+   * @return extracted keyword details
+   */
+  public static List<DcatKeyword> extractKeywordDetails(Object rawKeywords) {
+    List<LocalizedValue> values = parseLocalizedValues(rawKeywords);
+    return localizedValuesToKeywords(values);
+  }
+
+  /**
+   * Extract keyword details from RDF literals.
+   *
+   * @param datasetResource dataset RDF resource
+   * @param keywordProperty RDF property for keyword
+   * @return extracted keyword details
+   */
+  public static List<DcatKeyword> extractKeywordDetails(Resource datasetResource, Property keywordProperty) {
+    List<LocalizedValue> values = new ArrayList<>();
+    collectRdfLiteralValues(datasetResource, keywordProperty, values);
+    return localizedValuesToKeywords(values);
+  }
+
+  /**
+   * Clone keyword details without IDs/FKs.
+   *
+   * @param source keyword details to clone
+   * @return cloned keyword details
+   */
+  public static List<DcatKeyword> cloneKeywordDetails(List<DcatKeyword> source) {
+    if (source == null || source.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<DcatKeyword> cloned = new ArrayList<>();
+    for (DcatKeyword item : source) {
+      if (item == null) {
+        continue;
+      }
+      String value = StringUtils.trimToNull(item.getValue());
+      if (value == null) {
+        continue;
+      }
+      cloned.add(new DcatKeyword(value, normalizeLanguage(item.getLanguage())));
     }
     return cloned;
   }
@@ -404,6 +454,28 @@ public final class DcatDetailsUtil {
       }
     }
     return null;
+  }
+
+  private static List<DcatKeyword> localizedValuesToKeywords(List<LocalizedValue> values) {
+    if (values == null || values.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    Map<String, DcatKeyword> deduplicated = new LinkedHashMap<>();
+    for (LocalizedValue value : values) {
+      if (value == null || StringUtils.isBlank(value.value)) {
+        continue;
+      }
+      String normalizedValue = StringUtils.trimToNull(value.value);
+      String normalizedLanguage = normalizeLanguage(value.language);
+      if (normalizedValue == null) {
+        continue;
+      }
+      String key = (normalizedLanguage == null ? "" : normalizedLanguage) + "|" + normalizedValue;
+      deduplicated.putIfAbsent(key, new DcatKeyword(normalizedValue, normalizedLanguage));
+    }
+
+    return new ArrayList<>(deduplicated.values());
   }
 
   private static final class LocalizedValue {

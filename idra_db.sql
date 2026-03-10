@@ -449,6 +449,7 @@ CREATE TABLE `dcat_keyword` (
   `dataset_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
   `keywords` varchar(255) DEFAULT NULL,
+  `language` varchar(255) DEFAULT NULL,
   KEY `FKpm1pdwl5wi8oikxue1uf86iht` (`dataset_id`,`nodeID`),
   CONSTRAINT `FKpm1pdwl5wi8oikxue1uf86iht` FOREIGN KEY (`dataset_id`, `nodeID`) REFERENCES `dcat_dataset` (`dataset_id`, `nodeID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

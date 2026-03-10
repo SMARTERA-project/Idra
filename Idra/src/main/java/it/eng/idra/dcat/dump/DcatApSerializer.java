@@ -23,6 +23,7 @@ import it.eng.idra.beans.dcat.DcatApWriteType;
 import it.eng.idra.beans.dcat.DcatDataService;
 import it.eng.idra.beans.dcat.DcatDataset;
 import it.eng.idra.beans.dcat.DcatDistribution;
+import it.eng.idra.beans.dcat.DcatKeyword;
 import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DctFrequency;
 import it.eng.idra.beans.dcat.DctLicenseDocument;
@@ -269,8 +270,24 @@ public class DcatApSerializer {
 
     serializeContactPoint(dataset.getContactPoint(), model, datasetResource);
 
-    dataset.getKeywords().stream().filter(keyword -> StringUtils.isNotBlank(keyword))
-        .forEach(keyword -> datasetResource.addLiteral(DCAT.keyword, keyword));
+    if (dataset.getKeywordDetails() != null && !dataset.getKeywordDetails().isEmpty()) {
+      dataset.getKeywordDetails().stream().filter(keyword -> keyword != null && StringUtils.isNotBlank(keyword.getValue()))
+          .forEach(keyword -> {
+            String language = StringUtils.trimToNull(keyword.getLanguage());
+            if (language != null) {
+              try {
+                datasetResource.addLiteral(DCAT.keyword, model.createLiteral(keyword.getValue(), language));
+              } catch (Exception e) {
+                datasetResource.addLiteral(DCAT.keyword, keyword.getValue());
+              }
+            } else {
+              datasetResource.addLiteral(DCAT.keyword, keyword.getValue());
+            }
+          });
+    } else {
+      dataset.getKeywords().stream().filter(keyword -> StringUtils.isNotBlank(keyword))
+          .forEach(keyword -> datasetResource.addLiteral(DCAT.keyword, keyword));
+    }
 
     // addDcatPropertyAsLiteral(dataset.getAccessRights(), datasetResource, model);
 

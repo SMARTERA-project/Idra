@@ -21,6 +21,7 @@ import it.eng.idra.beans.dcat.DcatDataset;
 import it.eng.idra.beans.dcat.DcatDatasetSeries;
 import it.eng.idra.beans.dcat.DcatDetails;
 import it.eng.idra.beans.dcat.DcatDistribution;
+import it.eng.idra.beans.dcat.DcatKeyword;
 import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DctLocation;
 import it.eng.idra.beans.dcat.DctPeriodOfTime;
@@ -134,10 +135,12 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     List<VcardOrganization> contactPointList = null;
     contactPointList = deserializeContactPoint(nodeId, datasetResource);
 
-    // Iterate over keyword properties
-    StmtIterator kit = datasetResource.listProperties(DCAT.keyword);
-    while (kit.hasNext()) {
-      keywords.add(kit.next().getString());
+    List<DcatKeyword> keywordDetails =
+        DcatDetailsUtil.extractKeywordDetails(datasetResource, DCAT.keyword);
+    for (DcatKeyword keywordDetail : keywordDetails) {
+      if (keywordDetail != null && StringUtils.isNotBlank(keywordDetail.getValue())) {
+        keywords.add(keywordDetail.getValue());
+      }
     }
     List<DctStandard> conformsTo = null;
     conformsTo = deserializeDctStandard(nodeId, datasetResource);
@@ -416,6 +419,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, rightsHolder, creator, subject, relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    mapped.setKeywordDetails(keywordDetails);
     mapped.setDatasetDetails(
         DcatDetailsUtil.extractDatasetDetails(datasetResource, DCTerms.title, DCTerms.description));
 

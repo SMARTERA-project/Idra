@@ -60,6 +60,9 @@ public class SearchRequest {
   /** The hasHvdCategory filter. */
   private Boolean hasHvdCategory;
 
+  /** The preferred language for localized metadata in search response. */
+  private String language;
+
   /**
    * Instantiates a new search request.
    *
@@ -104,6 +107,24 @@ public class SearchRequest {
    */
   public void setHasHvdCategory(Boolean hasHvdCategory) {
     this.hasHvdCategory = hasHvdCategory;
+  }
+
+  /**
+   * Gets the preferred response language.
+   *
+   * @return the language
+   */
+  public String getLanguage() {
+    return language;
+  }
+
+  /**
+   * Sets the preferred response language.
+   *
+   * @param language the language
+   */
+  public void setLanguage(String language) {
+    this.language = language;
   }
 
   /**
@@ -277,7 +298,8 @@ public class SearchRequest {
   public String toString() {
     return "SearchRequest [filters=" + filters + ", releaseDate=" + releaseDate + ", updateDate="
         + updateDate + ", live=" + live + ", euroVoc=" + euroVocFilter + ", sort=" + sort
-        + ", rows=" + rows + ", start=" + start + ", nodes=" + nodes + "]";
+        + ", rows=" + rows + ", start=" + start + ", nodes=" + nodes + ", language=" + language
+        + "]";
   }
 
 }

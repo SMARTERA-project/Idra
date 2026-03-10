@@ -29,6 +29,7 @@ import it.eng.idra.beans.dcat.DcatApWriteType;
 import it.eng.idra.beans.dcat.DcatDataset;
 import it.eng.idra.beans.dcat.DcatDetails;
 import it.eng.idra.beans.dcat.DcatDistribution;
+import it.eng.idra.beans.dcat.DcatKeyword;
 import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DctStandard;
 import it.eng.idra.beans.dcat.FoafAgent;
@@ -47,6 +48,8 @@ import it.eng.idra.beans.orion.OrionCatalogueConfiguration;
 import it.eng.idra.beans.orion.OrionDistributionConfig;
 import it.eng.idra.beans.search.SearchDateFilter;
 import it.eng.idra.beans.search.SearchEuroVocFilter;
+import it.eng.idra.beans.search.SearchFacet;
+import it.eng.idra.beans.search.SearchFacetsList;
 import it.eng.idra.beans.search.SearchFilter;
 import it.eng.idra.beans.search.SearchRequest;
 import it.eng.idra.beans.search.SearchResult;
@@ -78,9 +81,14 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -133,6 +141,25 @@ public class ClientApi {
 
   /** The client. */
   private static Client client;
+
+  private static final int LOCALIZED_TAGS_MAX_DATASETS = 5000;
+  private static final String TAGS_SEARCH_PARAMETER = "tags";
+
+  private static final Map<String, String> LANGUAGE_ALIASES = new HashMap<>();
+  static {
+    LANGUAGE_ALIASES.put("sp", "es");
+    LANGUAGE_ALIASES.put("gr", "el");
+    LANGUAGE_ALIASES.put("eng", "en");
+    LANGUAGE_ALIASES.put("ita", "it");
+    LANGUAGE_ALIASES.put("fra", "fr");
+    LANGUAGE_ALIASES.put("fre", "fr");
+    LANGUAGE_ALIASES.put("deu", "de");
+    LANGUAGE_ALIASES.put("ger", "de");
+    LANGUAGE_ALIASES.put("ell", "el");
+    LANGUAGE_ALIASES.put("gre", "el");
+    LANGUAGE_ALIASES.put("por", "pt");
+    LANGUAGE_ALIASES.put("lit", "lt");
+  }
 
   /**
    * Gets the catalogue dcat ap dump.
@@ -463,12 +490,17 @@ public class ClientApi {
               HVDCategory);
           List<DcatDetails> preservedDetails =
               DcatDetailsUtil.cloneDatasetDetails(datasetToUpdateInIdra.getDatasetDetails());
+          List<DcatKeyword> preservedKeywordDetails =
+              DcatDetailsUtil.cloneKeywordDetails(datasetToUpdateInIdra.getKeywordDetails());
           if (preservedDetails.isEmpty()) {
             datasetUpdated.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
                 datasetToUpdateInIdra.getTitle().getValue(),
                 datasetToUpdateInIdra.getDescription().getValue()));
           } else {
             datasetUpdated.setDatasetDetails(preservedDetails);
+          }
+          if (!preservedKeywordDetails.isEmpty()) {
+            datasetUpdated.setKeywordDetails(preservedKeywordDetails);
           }
 
           logger.info("Updated Dataset, to be inserted in Idra: " + datasetUpdated
@@ -637,9 +669,15 @@ public class ClientApi {
         logger.info("Rows :" + request.getRows());
         logger.info("Start :" + request.getStart());
 
+        HashMap<String, Object> localizationSearchParameters =
+            cloneSearchParameters(searchParameters);
+
         // Call FederatedSearch method in order to perform the actual
         // search
         SearchResult result = FederatedSearch.search(searchParameters);
+        if (StringUtils.isNotBlank(request.getLanguage())) {
+          localizeSearchKeywords(result, request.getLanguage(), localizationSearchParameters);
+        }
 
         // Adds search statistics
         StatisticsManager.searchStatistics(ipAddress, liveSearch ? "live" : "cache");
@@ -1909,6 +1947,284 @@ public class ClientApi {
       return handleErrorResponse500(e);
     }
 
+  }
+
+  private static void localizeSearchKeywords(SearchResult result, String preferredLanguage,
+      HashMap<String, Object> searchParameters) {
+    if (result == null || StringUtils.isBlank(preferredLanguage)) {
+      return;
+    }
+
+    localizeDatasetKeywords(result.getResults(), preferredLanguage);
+
+    List<DcatDataset> datasetsForTags = result.getResults();
+    Long totalCount = result.getCount();
+    int totalCountInt =
+        totalCount != null && totalCount > Integer.MAX_VALUE ? Integer.MAX_VALUE
+            : (totalCount != null ? totalCount.intValue() : 0);
+    if (totalCountInt > 0
+        && (datasetsForTags == null || datasetsForTags.size() < totalCountInt)) {
+      HashMap<String, Object> tagsSearchParameters = cloneSearchParameters(searchParameters);
+      int maxRows = totalCountInt;
+      if (maxRows > LOCALIZED_TAGS_MAX_DATASETS) {
+        logger.info("Search matches {} datasets, localized tags will use first {} datasets",
+            maxRows, LOCALIZED_TAGS_MAX_DATASETS);
+        maxRows = LOCALIZED_TAGS_MAX_DATASETS;
+      }
+      tagsSearchParameters.put("start", "0");
+      tagsSearchParameters.put("rows", String.valueOf(maxRows));
+
+      try {
+        SearchResult tagsResult = FederatedSearch.search(tagsSearchParameters);
+        if (tagsResult != null && tagsResult.getResults() != null) {
+          datasetsForTags = tagsResult.getResults();
+          localizeDatasetKeywords(datasetsForTags, preferredLanguage);
+        }
+      } catch (Exception e) {
+        logger.warn("Unable to build localized tags facet for language '{}': {}", preferredLanguage,
+            e.getMessage());
+      }
+    }
+
+    applyLocalizedTagsFacet(result, buildLocalizedTagFacets(datasetsForTags));
+  }
+
+  private static HashMap<String, Object> cloneSearchParameters(HashMap<String, Object> source) {
+    HashMap<String, Object> cloned = new HashMap<>();
+    if (source == null || source.isEmpty()) {
+      return cloned;
+    }
+
+    for (Map.Entry<String, Object> entry : source.entrySet()) {
+      Object value = entry.getValue();
+      if (value instanceof List) {
+        cloned.put(entry.getKey(), new ArrayList<>((List<?>) value));
+      } else if (value instanceof String[]) {
+        String[] sourceArray = (String[]) value;
+        cloned.put(entry.getKey(), Arrays.copyOf(sourceArray, sourceArray.length));
+      } else {
+        cloned.put(entry.getKey(), value);
+      }
+    }
+    return cloned;
+  }
+
+  private static void localizeDatasetKeywords(List<DcatDataset> datasets, String preferredLanguage) {
+    if (datasets == null || datasets.isEmpty()) {
+      return;
+    }
+
+    for (DcatDataset dataset : datasets) {
+      if (dataset == null) {
+        continue;
+      }
+      dataset.overrideKeywords(
+          pickLocalizedKeywords(dataset.getKeywordDetails(), dataset.getKeywords(), preferredLanguage));
+    }
+  }
+
+  private static List<String> pickLocalizedKeywords(List<DcatKeyword> keywordDetails,
+      List<String> fallbackKeywords, String preferredLanguage) {
+    List<String> fallback = uniqueStrings(fallbackKeywords);
+    if (keywordDetails == null || keywordDetails.isEmpty()) {
+      return fallback;
+    }
+
+    List<LocalizedKeyword> candidates = new ArrayList<>();
+    for (DcatKeyword keywordDetail : keywordDetails) {
+      if (keywordDetail == null) {
+        continue;
+      }
+      String value = StringUtils.trimToNull(keywordDetail.getValue());
+      if (value == null) {
+        continue;
+      }
+      candidates.add(new LocalizedKeyword(value, normalizeLanguage(keywordDetail.getLanguage())));
+    }
+
+    if (candidates.isEmpty()) {
+      return fallback;
+    }
+
+    List<LocalizedKeyword> taggedCandidates = candidates.stream()
+        .filter(candidate -> StringUtils.isNotBlank(candidate.language)).collect(Collectors.toList());
+    if (taggedCandidates.isEmpty()) {
+      return uniqueStrings(candidates.stream().map(candidate -> candidate.value).collect(Collectors.toList()));
+    }
+
+    List<String> preferredGroup =
+        pickKeywordLanguageGroup(taggedCandidates, normalizeLanguage(preferredLanguage));
+    if (!preferredGroup.isEmpty()) {
+      return preferredGroup;
+    }
+
+    List<String> englishGroup = pickKeywordLanguageGroup(taggedCandidates, "en");
+    if (!englishGroup.isEmpty()) {
+      return englishGroup;
+    }
+
+    String firstLanguage = normalizeLanguage(taggedCandidates.get(0).language);
+    List<String> firstGroup = new ArrayList<>();
+    for (LocalizedKeyword candidate : taggedCandidates) {
+      if (StringUtils.equals(normalizeLanguage(candidate.language), firstLanguage)) {
+        firstGroup.add(candidate.value);
+      }
+    }
+    return uniqueStrings(firstGroup);
+  }
+
+  private static List<String> pickKeywordLanguageGroup(List<LocalizedKeyword> candidates,
+      String preferredLanguage) {
+    List<String> values = new ArrayList<>();
+    for (LocalizedKeyword candidate : candidates) {
+      if (languageContains(candidate.language, preferredLanguage)) {
+        values.add(candidate.value);
+      }
+    }
+    return uniqueStrings(values);
+  }
+
+  private static List<SearchFacet> buildLocalizedTagFacets(List<DcatDataset> datasets) {
+    if (datasets == null || datasets.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    Map<String, Long> countsByKeyword = new LinkedHashMap<>();
+    Map<String, String> displayByKeyword = new LinkedHashMap<>();
+
+    for (DcatDataset dataset : datasets) {
+      if (dataset == null || dataset.getKeywords() == null || dataset.getKeywords().isEmpty()) {
+        continue;
+      }
+
+      Set<String> seenInDataset = new HashSet<>();
+      for (String keyword : dataset.getKeywords()) {
+        String normalizedKeyword = StringUtils.trimToNull(keyword);
+        if (normalizedKeyword == null) {
+          continue;
+        }
+        String aggregationKey = normalizedKeyword.toLowerCase(Locale.ROOT);
+        if (!seenInDataset.add(aggregationKey)) {
+          continue;
+        }
+        countsByKeyword.put(aggregationKey, countsByKeyword.getOrDefault(aggregationKey, 0L) + 1L);
+        displayByKeyword.putIfAbsent(aggregationKey, normalizedKeyword);
+      }
+    }
+
+    return countsByKeyword.entrySet().stream()
+        .sorted(Comparator.<Map.Entry<String, Long>, Long>comparing(Map.Entry::getValue)
+            .reversed()
+            .thenComparing(entry -> displayByKeyword.getOrDefault(entry.getKey(), entry.getKey()),
+                String.CASE_INSENSITIVE_ORDER))
+        .map(entry -> {
+          String display = displayByKeyword.getOrDefault(entry.getKey(), entry.getKey());
+          String facet = display + " (" + entry.getValue() + ")";
+          return new SearchFacet(facet, display, display.toLowerCase(Locale.ROOT));
+        })
+        .collect(Collectors.toList());
+  }
+
+  private static void applyLocalizedTagsFacet(SearchResult result, List<SearchFacet> localizedTags) {
+    if (result == null) {
+      return;
+    }
+
+    List<SearchFacetsList> facets = result.getFacets();
+    if (facets == null) {
+      facets = new ArrayList<>();
+      result.setFacets(facets);
+    }
+
+    SearchFacetsList tagsFacet = null;
+    for (SearchFacetsList facet : facets) {
+      if (facet == null) {
+        continue;
+      }
+      if (StringUtils.equalsIgnoreCase(facet.getSearchParameter(), TAGS_SEARCH_PARAMETER)
+          || StringUtils.equalsIgnoreCase(facet.getDisplayName(), "Tags")) {
+        tagsFacet = facet;
+        break;
+      }
+    }
+
+    if (tagsFacet == null) {
+      tagsFacet = new SearchFacetsList("Tags", TAGS_SEARCH_PARAMETER, new ArrayList<>());
+      facets.add(tagsFacet);
+    }
+
+    tagsFacet.setValues(localizedTags != null ? localizedTags : new ArrayList<>());
+  }
+
+  private static List<String> uniqueStrings(List<String> values) {
+    if (values == null || values.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List<String> result = new ArrayList<>();
+    Set<String> seen = new LinkedHashSet<>();
+    for (String value : values) {
+      String normalized = StringUtils.trimToNull(value);
+      if (normalized == null) {
+        continue;
+      }
+      if (seen.add(normalized)) {
+        result.add(normalized);
+      }
+    }
+    return result;
+  }
+
+  private static boolean languageContains(String candidate, String target) {
+    if (StringUtils.isBlank(candidate) || StringUtils.isBlank(target)) {
+      return false;
+    }
+
+    String normalizedCandidate = normalizeLanguage(candidate);
+    String normalizedTarget = normalizeLanguage(target);
+    if (StringUtils.isBlank(normalizedCandidate) || StringUtils.isBlank(normalizedTarget)) {
+      return false;
+    }
+
+    String candidatePrimary = extractPrimaryLanguageCode(normalizedCandidate);
+    String targetPrimary = extractPrimaryLanguageCode(normalizedTarget);
+    if (StringUtils.isNotBlank(candidatePrimary) && StringUtils.isNotBlank(targetPrimary)) {
+      if (candidatePrimary.contains(targetPrimary) || targetPrimary.contains(candidatePrimary)) {
+        return true;
+      }
+      if (targetPrimary.length() <= 3) {
+        return false;
+      }
+    }
+
+    return normalizedCandidate.contains(normalizedTarget)
+        || normalizedTarget.contains(normalizedCandidate);
+  }
+
+  private static String normalizeLanguage(String language) {
+    if (StringUtils.isBlank(language)) {
+      return "";
+    }
+    String normalized = language.trim().toLowerCase(Locale.ROOT).replace('_', '-');
+    return LANGUAGE_ALIASES.getOrDefault(normalized, normalized);
+  }
+
+  private static String extractPrimaryLanguageCode(String language) {
+    if (StringUtils.isBlank(language)) {
+      return "";
+    }
+    String primary = language.split("-")[0].trim().toLowerCase(Locale.ROOT);
+    return LANGUAGE_ALIASES.getOrDefault(primary, primary);
+  }
+
+  private static final class LocalizedKeyword {
+    private final String value;
+    private final String language;
+
+    private LocalizedKeyword(String value, String language) {
+      this.value = value;
+      this.language = language;
+    }
   }
 
   /**

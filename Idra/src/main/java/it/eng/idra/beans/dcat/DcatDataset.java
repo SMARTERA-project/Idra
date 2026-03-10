@@ -27,6 +27,7 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,6 +136,9 @@ public class DcatDataset implements Serializable {
 
   /** The keywords. */
   private List<String> keywords;
+
+  /** The multilingual keywords (keyword + language). */
+  private List<DcatKeyword> keywordDetails;
 
   /** The access rights. */
   // Optional
@@ -1053,12 +1057,12 @@ public class DcatDataset implements Serializable {
    *
    * @return the keywords
    */
-  @LazyCollection(LazyCollectionOption.FALSE)
-  @ElementCollection
-  @CollectionTable(name = "dcat_keyword", joinColumns = {
-      @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
-      @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+  @Transient
   public List<String> getKeywords() {
+    if ((this.keywords == null || this.keywords.isEmpty()) && keywordDetails != null && !keywordDetails.isEmpty()) {
+      this.keywords = keywordDetails.stream().filter(item -> item != null && StringUtils.isNotBlank(item.getValue()))
+          .map(item -> item.getValue()).distinct().collect(Collectors.toList());
+    }
     return this.keywords;
   }
 
@@ -1068,7 +1072,42 @@ public class DcatDataset implements Serializable {
    * @param keywords the new keywords
    */
   protected void setKeywords(List<String> keywords) {
-    this.keywords = keywords;
+    this.keywords = keywords != null ? keywords : new ArrayList<>();
+    if ((this.keywordDetails == null || this.keywordDetails.isEmpty()) && this.keywords != null
+        && !this.keywords.isEmpty()) {
+      this.keywordDetails = this.keywords.stream().filter(StringUtils::isNotBlank)
+          .map(item -> new DcatKeyword(item, null)).collect(Collectors.toList());
+    }
+  }
+
+  /**
+   * Overrides flattened keywords for response serialization without altering
+   * multilingual keyword details.
+   *
+   * @param localizedKeywords localized keywords
+   */
+  public void overrideKeywords(List<String> localizedKeywords) {
+    this.keywords = localizedKeywords != null ? new ArrayList<>(localizedKeywords) : new ArrayList<>();
+  }
+
+  @LazyCollection(LazyCollectionOption.FALSE)
+  @ElementCollection
+  @CollectionTable(name = "dcat_keyword", joinColumns = {
+      @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
+      @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+  @AttributeOverrides({
+      @AttributeOverride(name = "value", column = @Column(name = "keywords")),
+      @AttributeOverride(name = "language", column = @Column(name = "language")) })
+  public List<DcatKeyword> getKeywordDetails() {
+    return keywordDetails;
+  }
+
+  public void setKeywordDetails(List<DcatKeyword> keywordDetails) {
+    this.keywordDetails = keywordDetails;
+    if (keywordDetails != null) {
+      this.keywords = keywordDetails.stream().filter(item -> item != null && StringUtils.isNotBlank(item.getValue()))
+          .map(item -> item.getValue()).distinct().collect(Collectors.toList());
+    }
   }
 
   /*
@@ -1503,6 +1542,7 @@ public class DcatDataset implements Serializable {
     }
 
     datasetDetails = new ArrayList<>(deduplicated.values());
+    normalizeKeywordDetails();
   }
 
   private static String normalizeTextValue(String value) {
@@ -1515,6 +1555,41 @@ public class DcatDataset implements Serializable {
       return null;
     }
     return normalized.replace('_', '-').toLowerCase();
+  }
+
+  private void normalizeKeywordDetails() {
+    Map<String, DcatKeyword> deduplicated = new LinkedHashMap<>();
+
+    if (keywordDetails != null) {
+      for (DcatKeyword keywordDetail : keywordDetails) {
+        if (keywordDetail == null) {
+          continue;
+        }
+        String keywordValue = normalizeTextValue(keywordDetail.getValue());
+        String keywordLanguage = normalizeLanguageValue(keywordDetail.getLanguage());
+        if (keywordValue == null) {
+          continue;
+        }
+        keywordDetail.setValue(keywordValue);
+        keywordDetail.setLanguage(keywordLanguage);
+        String key = (keywordLanguage == null ? "" : keywordLanguage) + "|" + keywordValue;
+        deduplicated.putIfAbsent(key, keywordDetail);
+      }
+    }
+
+    if (deduplicated.isEmpty() && keywords != null) {
+      for (String keyword : keywords) {
+        String keywordValue = normalizeTextValue(keyword);
+        if (keywordValue == null) {
+          continue;
+        }
+        deduplicated.putIfAbsent("|" + keywordValue, new DcatKeyword(keywordValue, null));
+      }
+    }
+
+    keywordDetails = new ArrayList<>(deduplicated.values());
+    keywords = keywordDetails.stream().filter(item -> item != null && StringUtils.isNotBlank(item.getValue()))
+        .map(item -> item.getValue()).distinct().collect(Collectors.toList());
   }
 
   private static String extractDocFieldString(SolrDocument doc, String fieldName) {
@@ -1786,8 +1861,32 @@ public class DcatDataset implements Serializable {
               .collect(Collectors.toList()));
     }
     logger.info("distributionLicenses to doc ok");
-    if (keywords != null && !keywords.isEmpty()) {
-      doc.addField("keywords", keywords);
+    List<String> flattenedKeywords = getKeywords();
+    if (flattenedKeywords != null && !flattenedKeywords.isEmpty()) {
+      doc.addField("keywords", flattenedKeywords);
+    }
+
+    if (keywordDetails != null && !keywordDetails.isEmpty()) {
+      List<String> serializedKeywordDetails = new ArrayList<>();
+      for (DcatKeyword keywordDetail : keywordDetails) {
+        if (keywordDetail == null) {
+          continue;
+        }
+        String keywordValue = normalizeTextValue(keywordDetail.getValue());
+        String keywordLanguage = normalizeLanguageValue(keywordDetail.getLanguage());
+        if (keywordValue == null) {
+          continue;
+        }
+        try {
+          serializedKeywordDetails.add(
+              GsonUtil.obj2Json(new DcatKeyword(keywordValue, keywordLanguage), DcatKeyword.class));
+        } catch (GsonUtilException e) {
+          logger.debug("Unable to serialize keyword detail for Solr fallback field", e);
+        }
+      }
+      if (!serializedKeywordDetails.isEmpty()) {
+        doc.addField("keywordDetails_ss", serializedKeywordDetails);
+      }
     }
     logger.info("keywords to doc ok");
     // try {
@@ -1883,6 +1982,7 @@ public class DcatDataset implements Serializable {
     List<DctLocation> spatialCoverage = new ArrayList<DctLocation>();
     List<DctPeriodOfTime> temporalCoverage = new ArrayList<DctPeriodOfTime>();
     List<DcatDetails> datasetDetails = new ArrayList<DcatDetails>();
+    List<DcatKeyword> keywordDetails = new ArrayList<DcatKeyword>();
 
     if (null != childDocs) {
 
@@ -1993,6 +2093,30 @@ public class DcatDataset implements Serializable {
     String temporalResolution = null;
     if (doc.getFieldValue("temporalResolution") != null) {
       temporalResolution = doc.getFieldValue("temporalResolution").toString();
+    }
+
+    Collection<Object> serializedKeywordDetails = doc.getFieldValues("keywordDetails_ss");
+    if (serializedKeywordDetails != null) {
+      for (Object serializedKeywordDetail : serializedKeywordDetails) {
+        if (serializedKeywordDetail == null) {
+          continue;
+        }
+        try {
+          DcatKeyword keywordDetail =
+              GsonUtil.json2Obj(serializedKeywordDetail.toString(), DcatKeyword.class);
+          if (keywordDetail == null) {
+            continue;
+          }
+          String keywordValue = normalizeTextValue(keywordDetail.getValue());
+          String keywordLanguage = normalizeLanguageValue(keywordDetail.getLanguage());
+          if (keywordValue == null) {
+            continue;
+          }
+          keywordDetails.add(new DcatKeyword(keywordValue, keywordLanguage));
+        } catch (GsonUtilException e) {
+          logger.debug("Unable to parse serialized keyword detail from Solr field", e);
+        }
+      }
     }
 
     List<Relationship> qualifiedRelation = new ArrayList<Relationship>();
@@ -2110,6 +2234,10 @@ public class DcatDataset implements Serializable {
         d.setDatasetDetails(Arrays.asList(new DcatDetails(null, null, null, datasetId, nodeIdentifier,
             fallbackDescription, fallbackTitle, null)));
       }
+    }
+
+    if (!keywordDetails.isEmpty()) {
+      d.setKeywordDetails(keywordDetails);
     }
 
     return d;
