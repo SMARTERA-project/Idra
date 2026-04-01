@@ -15,5 +15,5 @@
     "mqa_base_url": "http://localhost:8000",
     "idra_docker_url": "http://docker-idra-1:8080",
     "languages": ["en","de","fr","it","sp","gr","pt","lt"],
-    "idra.orion.manager.url": false
+    "idra.orion.manager.url": true
 }

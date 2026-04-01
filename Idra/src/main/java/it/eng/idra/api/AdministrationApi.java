@@ -447,6 +447,52 @@
          throw new OdmsCatalogueChangeActiveStateException(
              "Node " + node.getHost() + " already inactive");
        }
+
+       logger.info("Deactivation of the Catalogue also in the CB. "
+           + "Calling the Broker Manager component.");
+       HashMap<String, String> conf = FederationCore.getSettings();
+       if (!conf.get("orionUrl").equals("")) {
+         Map<String, String> headers = new HashMap<String, String>();
+         headers.put("Content-Type", "application/json");
+         RestClient client = new RestClientImpl();
+
+         String api = urlOrionmanager + "deleteCatalogue";
+         String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \""
+             + conf.get("orionUrl") + "\"  }";
+         logger.info("Context Broker enabled, deleting NODEID: " + data);
+
+         HttpResponse response = client.sendPostRequest(api, data,
+             MediaType.APPLICATION_JSON_TYPE, headers);
+
+         if (response == null) {
+           logger.info("STATUS POST Delete in the CB, from BROKER MANAGER: -1"
+               + ". The NGSI-LD Broker Manager is not running.");
+         } else {
+           String body = client.getHttpResponseBody(response);
+           JSONObject objResponse = new JSONObject(body);
+           int status = objResponse.getInt("status");
+
+           if (status != 200 && status != 207 && status != 204
+               && status != 201 && status != 301) {
+             // the deletion was not successful, still federated in the CB
+             node.setFederatedInCb(true);
+             if (status == 400) {
+               logger.info("STATUS POST Delete in the CB, from BROKER MANAGER: " + status
+                   + ". Bad Request. Deletion from the CB failed.");
+             } else {
+               logger.info("STATUS POST Delete in the CB, from BROKER MANAGER: " + status
+                   + ". Deletion from the CB failed.");
+             }
+           } else {
+             node.setFederatedInCb(false);
+             logger.info("Catalogue deleted from the CB.");
+           }
+         }
+
+       } else {
+         node.setFederatedInCb(false);
+         logger.info("Context Broker NOT enabled");
+       }
  
        FederationCore.deactivateOdmsCatalogue(node, keepDatasets);
  

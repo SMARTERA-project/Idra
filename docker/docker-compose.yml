@@ -217,19 +217,68 @@ services :
                 idra_main:
 
     portal:
-            build:
-              context: ../../IdraPortal-ngx
-              dockerfile: ./Dockerfile
-              args:
+        build:
+            context: ../../IdraPortal-ngx
+            dockerfile: ./Dockerfile
+            args:
                 BUILD_CONFIGURATION: docker
                 BASE_HREF: /
-            restart: always
-            ports:
-                - "4200:80"
-            volumes:
-                - ./config.json:/usr/share/nginx/html/assets/config.json:ro
-            networks:
-                idra_main:
+        restart: always
+        ports:
+            - "4200:80"
+        volumes:
+            - ./config.json:/usr/share/nginx/html/assets/config.json:ro
+        networks:
+            idra_main:
+
+    
+    ngsi-broker:
+        build:
+            context: ../../NGSI-LDBrokerManager
+            dockerfile: ./Dockerfile
+        container_name: "ngsi-broker"
+        ports:
+        - 8082:8082
+        environment:
+        - SERVER_DEBUG=true
+        - IDRA_BASE_PATH=http://idra:8080
+        - HOST_ORION=http://orion-ld-SMARTERA-final
+        - PORT_ORION=1026
+        networks:
+            idra_main:
+
+    
+    mongo-orion-SMARTERA-final:
+        image: mongo:4.4.30
+        container_name: mongodb-orion-SMARTERA-final
+        #restart: unless-stopped
+        ports:
+            - "127.0.0.1:27017:27017"
+        #environment:
+        #  - MONGO_INITDB_ROOT_USERNAME:root
+        #  - MONGO_INITDB_ROOT_PASSWORD:psswd123
+        #command: --nojournal
+        volumes:
+            - ./mongo-data:/data
+        networks:
+            idra_main:
+ 
+    orion-ld-SMARTERA-final:
+        image: fiware/orion-ld
+        container_name: orion-ld-SMARTERA-final
+        links:
+            - mongo-orion-SMARTERA-final
+        ports:
+            - "1026:1026"
+        #environment:
+        #  - ORION_MONGO_HOST=mongo
+        #  - ORION_MONGO_PORT=27017
+        #  - ORION_MONGO_USER=root
+        #  - ORION_MONGO_PASSWORD=psswd123
+        #  - ORION_DB_NAME=admin
+        command: -dbhost mongo-orion-SMARTERA-final
+        networks:
+            idra_main:
 
 networks:
     idra_main:

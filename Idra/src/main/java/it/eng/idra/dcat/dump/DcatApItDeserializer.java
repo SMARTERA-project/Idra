@@ -122,10 +122,10 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     List<DctPeriodOfTime> temporalCoverageList = new ArrayList<DctPeriodOfTime>();
 
     if (datasetResource.hasProperty(DCTerms.title)) {
-      title = datasetResource.getRequiredProperty(DCTerms.title).getString();
+      title = getStatementValue(datasetResource.getRequiredProperty(DCTerms.title));
     }
     if (datasetResource.hasProperty(DCTerms.description)) {
-      description = datasetResource.getRequiredProperty(DCTerms.description).getString();
+      description = getStatementValue(datasetResource.getRequiredProperty(DCTerms.description));
     }
 
     // Handle theme concepts
@@ -146,13 +146,16 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     conformsTo = deserializeDctStandard(nodeId, datasetResource);
     String accessRights = null;
     if (datasetResource.hasProperty(DCTerms.accessRights)) {
-      accessRights = datasetResource.getProperty(DCTerms.accessRights).getString();
+      accessRights = getStatementValue(datasetResource.getProperty(DCTerms.accessRights));
     }
 
     // Iterate over documentation properties
     StmtIterator dit = datasetResource.listProperties(FOAF.page);
     while (dit.hasNext()) {
-      documentation.add(dit.next().getString());
+      String docValue = getStatementValue(dit.next());
+      if (StringUtils.isNotBlank(docValue)) {
+        documentation.add(docValue);
+      }
     }
     String frequency = null;
     frequency = deserializeFrequency(datasetResource);
@@ -161,7 +164,10 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     List<String> hasVersion = new ArrayList<String>();
     StmtIterator hasVit = datasetResource.listProperties(DCTerms.hasVersion);
     while (hasVit.hasNext()) {
-      hasVersion.add(hasVit.next().getString());
+      String hasVersionValue = getStatementValue(hasVit.next());
+      if (StringUtils.isNotBlank(hasVersionValue)) {
+        hasVersion.add(hasVersionValue);
+      }
     }
 
     // Iterate over isVersionOf properties
@@ -195,7 +201,10 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     List<String> provenance = new ArrayList<String>();
     StmtIterator provIt = datasetResource.listProperties(DCTerms.provenance);
     while (provIt.hasNext()) {
-      provenance.add(provIt.next().getString());
+      String provenanceValue = getStatementValue(provIt.next());
+      if (StringUtils.isNotBlank(provenanceValue)) {
+        provenance.add(provenanceValue);
+      }
     }
 
     if (datasetResource.hasProperty(DCTerms.issued)) {
@@ -207,7 +216,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     }
     String identifier = null;
     if (datasetResource.hasProperty(DCTerms.identifier)) {
-      identifier = datasetResource.getProperty(DCTerms.identifier).getString();
+      identifier = getStatementValue(datasetResource.getProperty(DCTerms.identifier));
     } else {
       identifier = landingPage;
     }
@@ -220,7 +229,10 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     StmtIterator sampleIt = datasetResource
         .listProperties(ResourceFactory.createProperty("http://www.w3.org/ns/adms#sample"));
     while (sampleIt.hasNext()) {
-      sample.add(sampleIt.next().getString());
+      String sampleValue = getStatementValue(sampleIt.next());
+      if (StringUtils.isNotBlank(sampleValue)) {
+        sample.add(sampleValue);
+      }
     }
 
     // Iterate over source properties
@@ -244,18 +256,21 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     temporalCoverage = deserializeTemporalCoverage(nodeId, datasetResource);
     String type = null;
     if (datasetResource.hasProperty(DCTerms.type)) {
-      type = datasetResource.getProperty(DCTerms.type).getString();
+      type = getStatementValue(datasetResource.getProperty(DCTerms.type));
     }
 
     if (datasetResource.hasProperty(OWL.versionInfo)) {
-      version = datasetResource.getProperty(OWL.versionInfo).getString();
+      version = getStatementValue(datasetResource.getProperty(OWL.versionInfo));
     }
 
     // Iterate over versionNotes properties
     StmtIterator vnotesIt = datasetResource
         .listProperties(ResourceFactory.createProperty("http://www.w3.org/ns/adms#versionNotes"));
     while (vnotesIt.hasNext()) {
-      versionNotes.add(vnotesIt.next().getString());
+      String versionNoteValue = getStatementValue(vnotesIt.next());
+      if (StringUtils.isNotBlank(versionNoteValue)) {
+        versionNotes.add(versionNoteValue);
+      }
     }
 
     // Handle subject concepts
@@ -285,19 +300,19 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     // Iterate over related properties
     StmtIterator relIt = datasetResource.listProperties(DCTerms.relation);
     while (relIt.hasNext()) {
-      relatedResource.add(relIt.next().getString());
+      String relatedValue = getStatementValue(relIt.next());
+      if (StringUtils.isNotBlank(relatedValue)) {
+        relatedResource.add(relatedValue);
+      }
     }
 
     // Iterate over applicableLegislation properties
     StmtIterator legIt = datasetResource.listProperties(DCATAP.applicableLegislation);
     while (legIt.hasNext()) {
       Statement stmt = legIt.next();
-      try {
-        applicableLegislation.add(stmt.getString());
-        // logger.info("applicableLegislation: " + stmt.getString());
-      } catch (LiteralRequiredException e) {
-        applicableLegislation.add(stmt.getResource().getURI());
-        // logger.info("applicableLegislation: " + stmt.getResource().getURI());
+      String legislationValue = getStatementValue(stmt);
+      if (StringUtils.isNotBlank(legislationValue)) {
+        applicableLegislation.add(legislationValue);
       }
     }
     // geographicalCoverage properties
@@ -349,12 +364,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
 
     // Extract temporalResolution property
     if (datasetResource.hasProperty(DCAT.temporalResolution)) {
-      try {
-        temporalResolution = datasetResource.getProperty(DCAT.temporalResolution).getString();
-      } catch (LiteralRequiredException e) {
-        temporalResolution = datasetResource.getProperty(DCAT.temporalResolution).getResource().getURI();
-
-      }
+      temporalResolution = getStatementValue(datasetResource.getProperty(DCAT.temporalResolution));
     }
 
     // Iterate over wasGeneratedBy properties
@@ -362,10 +372,9 @@ public class DcatApItDeserializer extends DcatApDeserializer {
         .listProperties(ResourceFactory.createProperty("http://www.w3.org/ns/prov#wasGeneratedBy"));
     while (wasGeneratedByIt.hasNext()) {
       Statement stmt = wasGeneratedByIt.next();
-      try {
-        wasGeneratedBy.add(stmt.getString());
-      } catch (LiteralRequiredException e) {
-        wasGeneratedBy.add(stmt.getResource().getURI());
+      String wasGeneratedByValue = getStatementValue(stmt);
+      if (StringUtils.isNotBlank(wasGeneratedByValue)) {
+        wasGeneratedBy.add(wasGeneratedByValue);
       }
     }
 
@@ -373,10 +382,9 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     StmtIterator HVDCategoryIt = datasetResource.listProperties(DCATAP.hvdCategory);
     while (HVDCategoryIt.hasNext()) {
       Statement stmt = HVDCategoryIt.next();
-      try {
-        HVDCategory.add(stmt.getString());
-      } catch (LiteralRequiredException e) {
-        HVDCategory.add(stmt.getResource().getURI());
+      String hvdCategoryValue = getStatementValue(stmt);
+      if (StringUtils.isNotBlank(hvdCategoryValue)) {
+        HVDCategory.add(hvdCategoryValue);
       }
     }
 
@@ -390,20 +398,12 @@ public class DcatApItDeserializer extends DcatApDeserializer {
 
           String hadRole = null;
           if (qualifiedRelationRes.hasProperty(DCAT.hadRole)) {
-            try {
-              hadRole = qualifiedRelationRes.getProperty(DCAT.hadRole).getString();
-            } catch (LiteralRequiredException e) {
-              hadRole = qualifiedRelationRes.getProperty(DCAT.hadRole).getResource().getURI();
-            }
+            hadRole = getStatementValue(qualifiedRelationRes.getProperty(DCAT.hadRole));
           }
 
           String relation = null;
           if (qualifiedRelationRes.hasProperty(DCTerms.relation)) {
-            try {
-              relation = qualifiedRelationRes.getProperty(DCTerms.relation).getString();
-            } catch (LiteralRequiredException e) {
-              relation = qualifiedRelationRes.getProperty(DCTerms.relation).getResource().getURI();
-            }
+            relation = getStatementValue(qualifiedRelationRes.getProperty(DCTerms.relation));
           }
 
           Relationship relationship = new Relationship(hadRole, relation, nodeId);
@@ -470,23 +470,31 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     if (temporalResource != null) {
 
       if (temporalResource.hasProperty(startDateProp)) {
-        startDate = new DcatProperty(startDateProp.getURI(),
-            temporalResource.getProperty(startDateProp).getString());
+        String startDateValue = getStatementValue(temporalResource.getProperty(startDateProp));
+        if (StringUtils.isNotBlank(startDateValue)) {
+          startDate = new DcatProperty(startDateProp.getURI(), startDateValue);
+        }
       }
 
       if (temporalResource.hasProperty(endDateProp)) {
-        endDate = new DcatProperty(endDateProp.getURI(),
-            temporalResource.getProperty(endDateProp).getString());
+        String endDateValue = getStatementValue(temporalResource.getProperty(endDateProp));
+        if (StringUtils.isNotBlank(endDateValue)) {
+          endDate = new DcatProperty(endDateProp.getURI(), endDateValue);
+        }
       }
 
       if (temporalResource.hasProperty(beginningProp)) {
-        beginning = new DcatProperty(beginningProp.getURI(),
-            temporalResource.getProperty(beginningProp).getString());
+        String beginningValue = getStatementValue(temporalResource.getProperty(beginningProp));
+        if (StringUtils.isNotBlank(beginningValue)) {
+          beginning = new DcatProperty(beginningProp.getURI(), beginningValue);
+        }
       }
 
       if (temporalResource.hasProperty(endProp)) {
-        end = new DcatProperty(endProp.getURI(),
-            temporalResource.getProperty(endProp).getString());
+        String endValue = getStatementValue(temporalResource.getProperty(endProp));
+        if (StringUtils.isNotBlank(endValue)) {
+          end = new DcatProperty(endProp.getURI(), endValue);
+        }
       }
 
       return new DctPeriodOfTime(DCTerms.temporal.getURI(), startDate, endDate, nodeId, beginning, end);

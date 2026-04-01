@@ -45,6 +45,7 @@ import it.eng.idra.dcat.dump.DcatApDumpManager;
 import it.eng.idra.dcat.dump.DcatApItDeserializer;
 import it.eng.idra.dcat.dump.DcatApSerializer;
 import it.eng.idra.scheduler.IdraScheduler;
+import it.eng.idra.scheduler.job.OdmsSynchJob;
 import it.eng.idra.scheduler.exception.SchedulerNotInitialisedException;
 import it.eng.idra.search.EuroVocTranslator;
 import it.eng.idra.utils.PropertyManager;
@@ -512,6 +513,15 @@ public class FederationCore {
         node.setSynchLock(OdmsSynchLock.NONE);
         OdmsManager.updateOdmsCatalogue(node, false);
 
+        // Cacheable registrations (LEVEL_2/3/4) should be federated in CB immediately, without
+        // waiting for the first periodic synchronization run.
+        try {
+          OdmsSynchJob.addCatalogueInCb(node);
+        } catch (Exception e) {
+          logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
+              + node.getId() + " in the Context Broker");
+        }
+
         /*
          * 2. Start all the Jobs after Catalogue registration
          */
@@ -965,6 +975,15 @@ public class FederationCore {
           // TODO Auto-generated catch block
           e.printStackTrace();
         }
+      }
+    }
+
+    if (node.isCacheable()) {
+      try {
+        OdmsSynchJob.addCatalogueInCb(node);
+      } catch (Exception e) {
+        logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
+            + node.getId() + " in the Context Broker");
       }
     }
 

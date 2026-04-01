@@ -65,6 +65,16 @@ public class PropertyManager {
   }
 
   /**
+   * Gets the default property value from configuration.properties, without env override.
+   *
+   * @param propName the prop name
+   * @return the default property
+   */
+  public static String getDefaultProperty(IdmProperty propName) {
+    return props.getProperty(propName.toString());
+  }
+
+  /**
    * Gets the property.
    *
    * @param propName the prop name

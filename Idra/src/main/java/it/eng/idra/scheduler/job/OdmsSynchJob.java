@@ -63,7 +63,6 @@ import org.apache.logging.log4j.Logger;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.rio.RDFParseException;
-import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
@@ -427,10 +426,11 @@ public class OdmsSynchJob implements InterruptableJob {
    * @param node    the node
    * @throws Exception exception
    */
-  private static void addCatalogueInCb(OdmsCatalogue node) throws Exception {
+  public static void addCatalogueInCb(OdmsCatalogue node) throws Exception {
     HashMap<String, String> conf = FederationCore.getSettings();
-    if (!conf.get("orionUrl").equals("")) {
-      logger.info(" -- Context Broker URL: " + conf.get("orionUrl"));
+    String contextBrokerUrl = conf.get("orionUrl");
+    if (StringUtils.isNotBlank(contextBrokerUrl)) {
+      logger.info(" -- Context Broker URL: " + contextBrokerUrl);
     
       logger.info("Started CB Federation");
       node.setSynchLockOrion(OdmsSynchLock.PERIODIC);
@@ -439,19 +439,14 @@ public class OdmsSynchJob implements InterruptableJob {
       RestClient client = new RestClientImpl();
       
       String api = urlOrionmanager + "startProcess";
-      String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \"" 
-          + conf.get("orionUrl") + "\"  }";
+      String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \""
+          + contextBrokerUrl + "\"  }";
       logger.info("Sending configurations: "  + data);
       
       HttpResponse response = client.sendPostRequest(api, data,
           MediaType.APPLICATION_JSON_TYPE, headers); 
 
-      //int status = client.getStatus(response);
-      
-      String body = client.getHttpResponseBody(response);
-      JSONObject objResponse = new JSONObject(body);
-      // logger.info(objResponse);
-      int status = objResponse.getInt("status");
+      int status = (response != null) ? client.getStatus(response) : -1;
       
       if (status != 200 && status != 207 && status != 204 
           && status != 201 && status != 301) {
@@ -464,6 +459,9 @@ public class OdmsSynchJob implements InterruptableJob {
         } else if (status == -1) {
           logger.info("STATUS POST Add in the CB, from BROKER MANAGER: " + status
               + ". The NGSI-LD Broker Manager is not running.");
+        } else {
+          logger.info("STATUS POST Add in the CB, from BROKER MANAGER: " + status
+              + ". Federation failed.");
         }
       } else {
         node.setFederatedInCb(true);
@@ -473,7 +471,7 @@ public class OdmsSynchJob implements InterruptableJob {
       logger.info("Info " + status);
       logger.info("Catalogue FEDERATED in the CB: " + node.isFederatedInCb());
     } else {
-      logger.info("Context Broker NOT enabled.");
+      logger.info("Context Broker NOT enabled. Missing configuration key 'orionUrl'.");
     }  
   }
 
