@@ -172,6 +172,7 @@ services :
                 - 8080:8080
             depends_on:
                 - db
+                - ngsi-broker
                 # - rdf4j
             command: ["./wait-for-it.sh", "db:3306", "--timeout=0", "--", "catalina.sh", "run"]
 
