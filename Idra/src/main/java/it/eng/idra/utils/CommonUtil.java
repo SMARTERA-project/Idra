@@ -453,7 +453,7 @@ public class CommonUtil {
       out = new FileWriter(filePath + fileName);
       out.write(content);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       out.close();
       Instant tock = Instant.now();
@@ -476,7 +476,7 @@ public class CommonUtil {
         logger.info("Delete operation is failed.");
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -508,7 +508,7 @@ public class CommonUtil {
       encr = Base64.getEncoder().encodeToString(encrypted);
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     return encr;
   }
@@ -531,7 +531,7 @@ public class CommonUtil {
       decrypted = new String(cipher.doFinal(decode));
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     return decrypted;
   }

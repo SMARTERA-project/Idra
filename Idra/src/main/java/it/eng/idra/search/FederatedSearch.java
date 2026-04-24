@@ -340,12 +340,11 @@ public class FederatedSearch {
           }
 
           currentConnector = null;
-          System.gc();
           logger.info("Live search success");
           logger.info("Results found:" + globalResult.size());
         } catch (Exception e) {
           logger.error("There was an error in live search");
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
           return null;
         }
       }
@@ -530,11 +529,10 @@ public class FederatedSearch {
           globalResult += nodeDatasets;
 
           currentConnector = null;
-          System.gc();
           logger.info("Live search success");
           // logger.info("Results found:" + globalResult.size());
         } catch (Exception e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
           logger.error("There was an error in live search");
           // return 0;
         }

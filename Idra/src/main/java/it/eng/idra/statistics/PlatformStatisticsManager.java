@@ -15,6 +15,7 @@
 
 package it.eng.idra.statistics;
 
+import it.eng.idra.beans.dcat.DcatDataset;
 import it.eng.idra.beans.odms.OdmsCatalogue;
 import it.eng.idra.beans.odms.OdmsSynchLock;
 import it.eng.idra.beans.search.SearchResult;
@@ -23,6 +24,7 @@ import it.eng.idra.search.FederatedSearch;
 import it.eng.idra.utils.CommonUtil;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -122,10 +124,18 @@ public class PlatformStatisticsManager {
       SearchResult resultForUpdate = FederatedSearch.search(searchParameters);
 
       ZonedDateTime start = ZonedDateTime.parse(startDate);
-      CataloguesStatistics ctlgStat = new CataloguesStatistics(nodes, resultForRelease.getResults(),
-          resultForUpdate.getResults().stream()
-              .filter(x -> start.isAfter(ZonedDateTime.parse(x.getReleaseDate().getValue())))
-              .collect(Collectors.toList()));
+      List<DcatDataset> addedDatasets = resultForRelease != null
+          && resultForRelease.getResults() != null ? resultForRelease.getResults()
+              : Collections.emptyList();
+
+      List<DcatDataset> updatedDatasets = resultForUpdate != null
+          && resultForUpdate.getResults() != null
+              ? resultForUpdate.getResults().stream()
+                  .filter(x -> isReleaseDateBeforeStart(x, start))
+                  .collect(Collectors.toList())
+              : Collections.emptyList();
+
+      CataloguesStatistics ctlgStat = new CataloguesStatistics(nodes, addedDatasets, updatedDatasets);
 
       result.setCatalogues(ctlgStat);
     } catch (Exception e) {
@@ -133,6 +143,22 @@ public class PlatformStatisticsManager {
     }
 
     return result;
+  }
+
+  private static boolean isReleaseDateBeforeStart(DcatDataset dataset, ZonedDateTime start) {
+    if (dataset == null || dataset.getReleaseDate() == null
+        || StringUtils.isBlank(dataset.getReleaseDate().getValue())) {
+      // If release date is missing, keep the record in updated results instead of failing.
+      return true;
+    }
+
+    try {
+      String fixedReleaseDate = CommonUtil.fixBadUtcDate(dataset.getReleaseDate().getValue());
+      return start.isAfter(ZonedDateTime.parse(fixedReleaseDate));
+    } catch (Exception ex) {
+      // Malformed release dates should not break the entire statistics payload.
+      return true;
+    }
   }
 
 }

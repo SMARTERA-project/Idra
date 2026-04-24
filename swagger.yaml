@@ -74,26 +74,34 @@ paths:
         '500':
           description: >-
             If an error occurs during the execution of the request, HTTP 500
-            Internal Server Error status code is returned.  
+            Internal Server Error status code is returned.
           schema:
             $ref: '#/definitions/ErrorResponse'
     post:
       description: >-
         Adds a new ODMS catalogue to the federation. When adding a new catalogue, the
-        nodeID field is ignored because it will be generated.
+        nodeID field is ignored because it will be generated. Uses multipart/form-data
+        with a 'node' part (JSON string) and optional 'dump' part (file upload for DCATDUMP type).
       operationId: addODMSCatalogue
       tags:
         - Administration Api
       consumes:
+        - multipart/form-data
+      produces:
         - application/json
       security:
         - Bearer: []
       parameters:
-        - in: body
-          name: body
+        - in: formData
+          name: node
+          type: string
           required: true
-          schema:
-            $ref: '#/definitions/ODMSCatalogue'
+          description: JSON string representation of the ODMSCatalogue to add.
+        - in: formData
+          name: dump
+          type: file
+          required: false
+          description: Optional dump file for DCATDUMP catalogue type.
       responses:
         '200':
           description: If ODMS catalogue is successfully added.
@@ -153,11 +161,15 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
     put:
-      description: Updates a specific federated ODMS catalogue by its nodeId.
+      description: >-
+        Updates a specific federated ODMS catalogue by its nodeId. Uses multipart/form-data
+        with a 'node' part (JSON string) and optional 'dump' part (file upload for DCATDUMP type).
       operationId: updateODMSCatalogue
       tags:
         - Administration Api
       consumes:
+        - multipart/form-data
+      produces:
         - application/json
       security:
         - Bearer: []
@@ -167,11 +179,16 @@ paths:
           description: The unique identifier of the ODMS catalogue.
           required: true
           type: string
-        - in: body
-          name: body
+        - in: formData
+          name: node
+          type: string
           required: true
-          schema:
-            $ref: '#/definitions/ODMSCatalogue'
+          description: JSON string representation of the updated ODMSCatalogue.
+        - in: formData
+          name: dump
+          type: file
+          required: false
+          description: Optional dump file for DCATDUMP catalogue type.
       responses:
         '200':
           description: If ODMS catalogue is successfully updated
@@ -761,15 +778,50 @@ paths:
   /api/v1/administration/login:
     x-summary: Login
     x-description: Performs administrator login through OAuth2/OIDC authorization flow
-    post:
-      operationId: loginPost
+    get:
+      operationId: loginGet
+      description: Handles OAuth2/OIDC callback with authorization code (GET). Used by Keycloak redirect.
       tags:
         - Administration Api
       consumes:
         - application/json
+      produces:
+        - text/plain
+      parameters:
+        - name: code
+          in: query
+          type: string
+          default: ''
+          description: The OAuth2 authorization code returned by the identity provider.
       responses:
         '200':
-          description: 'If login succeded, the access token is returned.'
+          description: 'If login succeeded, the access token is returned.'
+          schema:
+            type: string
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    post:
+      operationId: loginPost
+      description: Performs login via POST (e.g. direct credential submission or token exchange).
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - text/plain
+      responses:
+        '200':
+          description: 'If login succeeded, the access token is returned.'
           schema:
             type: string
         '400':
@@ -1003,6 +1055,72 @@ paths:
       responses:
         '200':
           description: The keyword statistics.
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/statistics/catalogues/details:
+    x-summary: Catalogue Statistics Details
+    x-description: Returns detailed catalogue statistics.
+    post:
+      operationId: getNodeStatisticsDetails
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: request
+          required: true
+          description: The object containing information for detailed catalogue statistics retrieval.
+          schema:
+            $ref: '#/definitions/StatisticsRequest'
+      responses:
+        '200':
+          description: The detailed catalogues statistics.
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/statistics/search/details:
+    x-summary: Search Statistics Details
+    x-description: Returns detailed search statistics.
+    post:
+      operationId: getSearchStatisticsDetails
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: request
+          required: true
+          description: The object containing information for detailed search statistics retrieval.
+          schema:
+            $ref: '#/definitions/StatisticsRequest'
+      responses:
+        '200':
+          description: The detailed search statistics.
         '400':
           description: >-
             If the request is not a valid input, HTTP 400 Bad Request status
@@ -1286,6 +1404,475 @@ paths:
             Code 500 Internal Server Error is returned.
           schema:
             $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/remoteCatalogue:
+    x-summary: Remote Catalogue Management
+    x-description: Manage remote (federated) catalogues registered in Idra.
+    post:
+      operationId: addRemoteCatalogue
+      description: Registers a new remote catalogue.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+      responses:
+        '200':
+          description: Remote catalogue successfully registered.
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    get:
+      operationId: getRemoteCatalogues
+      description: Returns all registered remote catalogues.
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: The list of remote catalogues.
+          schema:
+            type: array
+            items:
+              type: object
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/remoteCatalogue/{rmId}:
+    x-summary: Single Remote Catalogue
+    x-description: Manage a specific remote catalogue by its identifier.
+    delete:
+      operationId: deleteRemoteCatalogue
+      description: Deletes a specific remote catalogue.
+      tags:
+        - Administration Api
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: rmId
+          required: true
+          type: string
+          description: The identifier of the remote catalogue.
+      responses:
+        '200':
+          description: Remote catalogue successfully deleted.
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '404':
+          description: Remote catalogue not found.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    put:
+      operationId: updateRemoteCatalogue
+      description: Updates a specific remote catalogue.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: rmId
+          required: true
+          type: string
+          description: The identifier of the remote catalogue.
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+      responses:
+        '200':
+          description: Remote catalogue successfully updated.
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/remoteCatalogue/auth/{id}:
+    x-summary: Authenticate Remote Catalogue
+    x-description: Performs OAuth2 authentication for the remote catalogue identified by id.
+    get:
+      operationId: authRemoteCatalogue
+      description: Performs OAuth2 authentication flow for a remote catalogue.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - text/plain
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The identifier of the remote catalogue.
+      responses:
+        '200':
+          description: Authentication succeeded, token returned.
+          schema:
+            type: string
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/remoteCatalogue/authIDM/{id}:
+    x-summary: Authenticate Remote Catalogue via IDM
+    x-description: Performs IDM (Identity Manager) authentication for the remote catalogue identified by id.
+    get:
+      operationId: authRemoteCatalogueIdm
+      description: Performs IDM authentication flow for a remote catalogue.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - text/plain
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The identifier of the remote catalogue.
+      responses:
+        '200':
+          description: IDM authentication succeeded, token returned.
+          schema:
+            type: string
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/me:
+    x-summary: Current User Info
+    x-description: Returns information about the currently authenticated user (RBAC roles and permissions).
+    get:
+      operationId: getMe
+      description: Returns the current authenticated user's details including RBAC roles and permissions.
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: The current user information.
+          schema:
+            type: object
+            properties:
+              sub:
+                type: string
+                description: The user subject identifier (Keycloak sub claim).
+              email:
+                type: string
+                description: The user email address.
+              username:
+                type: string
+                description: The username.
+              id:
+                type: integer
+                description: The internal Idra user id (if registered in Idra RBAC).
+              enabled:
+                type: boolean
+                description: Whether the user is enabled.
+              roles:
+                type: array
+                items:
+                  type: string
+                description: The list of role codes assigned to the user.
+              permissions:
+                type: array
+                items:
+                  type: string
+                description: The list of permission codes for the user.
+        '401':
+          description: >-
+            If the user is not logged, HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/users:
+    x-summary: List Idra Users
+    x-description: Returns the list of all users registered in the Idra RBAC system.
+    get:
+      operationId: listUsers
+      description: Returns all users registered in the Idra RBAC system. Requires admin.users.manage permission.
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: The list of Idra users.
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: integer
+                keycloak_sub:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                enabled:
+                  type: boolean
+                roles:
+                  type: array
+                  items:
+                    type: string
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/roles:
+    x-summary: List Idra Roles
+    x-description: Returns all roles defined in the Idra RBAC system.
+    get:
+      operationId: listRoles
+      description: Returns all available RBAC roles. Requires admin.users.manage permission.
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: The list of Idra roles.
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: integer
+                code:
+                  type: string
+                  description: The role code (e.g. IDRA_ADMIN, IDRA_EDITOR).
+                description:
+                  type: string
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/permissions:
+    x-summary: List Idra Permissions
+    x-description: Returns all permissions defined in the Idra RBAC system.
+    get:
+      operationId: listPermissions
+      description: Returns all available RBAC permissions. Requires admin.users.manage permission.
+      tags:
+        - Administration Api
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: The list of Idra permissions.
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: integer
+                code:
+                  type: string
+                  description: The permission code (e.g. admin.catalogue.write).
+                description:
+                  type: string
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/users/{id}/roles:
+    x-summary: Replace User Roles
+    x-description: Replaces all roles assigned to a user with the provided role list.
+    put:
+      operationId: replaceUserRoles
+      description: >-
+        Replaces all roles assigned to the user identified by id.
+        Body: { "roles": ["IDRA_ADMIN","IDRA_EDITOR"] }. Requires admin.users.manage permission.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The internal Idra user id.
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              roles:
+                type: array
+                items:
+                  type: string
+                description: The list of role codes to assign to the user.
+      responses:
+        '200':
+          description: User roles successfully updated.
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/administration/users/{id}/enabled:
+    x-summary: Enable/Disable User
+    x-description: Enables or disables the Idra user identified by id.
+    put:
+      operationId: setUserEnabled
+      description: >-
+        Enables or disables the user identified by id.
+        Body: { "enabled": true }. Requires admin.users.manage permission.
+      tags:
+        - Administration Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The internal Idra user id.
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                description: Whether to enable (true) or disable (false) the user.
+      responses:
+        '200':
+          description: User enabled status successfully updated.
+        '401':
+          description: >-
+            If the logged user is not the administrator or the user is not logged,
+            HTTP Status Code 401 Unauthorized is returned.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
   /api/v1/client/catalogues:
     x-summary: End User Catalogues Resources
     x-description: 'This api returns the paginated list of the **active** ODMS Catalogues. It also hides, to end users, the internal additional configuration parameters of an ODMSCatalogue.'
@@ -1419,6 +2006,452 @@ paths:
             Code 500 Internal Server Error is returned.
           schema:
             $ref: '#/definitions/ErrorResponse'                    
+  /api/v1/client/dcat-ap/dump/{nodeID}:
+    x-summary: Client DCAT-AP Dump by Catalogue
+    x-description: Returns the DCAT-AP dump of the catalogue identified by nodeID (public endpoint).
+    get:
+      operationId: getClientCatalogueDcatApDump
+      description: Returns the DCAT-AP dump for a specific catalogue. Supports RDF+XML and JSON formats.
+      tags:
+        - End User Api
+      produces:
+        - application/rdf+xml
+        - application/json
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - name: forceDump
+          in: query
+          type: boolean
+          default: false
+          description: If true, forces regeneration of the dump.
+      responses:
+        '200':
+          description: The DCAT-AP dump of the selected catalogue.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/dcat-ap/dump/download/{nodeID}:
+    x-summary: Client DCAT-AP Dump Download by Catalogue
+    x-description: Downloads the DCAT-AP dump of the catalogue identified by nodeID (public endpoint).
+    get:
+      operationId: downloadClientCatalogueDcatApDump
+      description: Downloads the DCAT-AP dump for a specific catalogue as a file or zip archive.
+      tags:
+        - End User Api
+      produces:
+        - application/octet-stream
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - name: forceDump
+          in: query
+          type: boolean
+          default: false
+          description: If true, forces regeneration of the dump.
+        - name: zip
+          in: query
+          type: boolean
+          default: false
+          description: If true, returns the dump as a zip archive.
+      responses:
+        '200':
+          description: The file containing the DCAT-AP dump of the selected catalogue.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/notification/{nodeId}/{apiKey}/push:
+    x-summary: Receive NGSI-LD CB Notification
+    x-description: >-
+      Receives push notifications from an NGSI-LD Context Broker (CB) about dataset
+      or distribution changes. Used for real-time synchronization of NGSILD_CB catalogue type.
+    post:
+      operationId: receiveNotify
+      description: >-
+        Endpoint called by the Orion-LD Context Broker to push notifications about
+        entity changes (Dataset or DistributionDCAT-AP types).
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          type: string
+          description: The identifier of the ODMS catalogue (NGSILD_CB type).
+        - in: path
+          name: apiKey
+          required: true
+          type: string
+          description: The API key for authenticating the notification.
+        - in: body
+          name: notification
+          required: true
+          schema:
+            type: object
+            description: The NGSI-LD notification payload.
+      responses:
+        '200':
+          description: Notification successfully processed.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/countDataset:
+    x-summary: Count Datasets
+    x-description: Returns the count of datasets matching the search criteria, without returning the dataset list.
+    post:
+      operationId: countDataset
+      description: Returns the total count of datasets matching the search criteria.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: request
+          required: true
+          description: The dataset search request (same structure as searchDataset).
+          schema:
+            $ref: '#/definitions/SearchRequest'
+      responses:
+        '200':
+          description: The count of datasets matching the search criteria.
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+                format: int64
+        '400':
+          description: >-
+            If the request is not a valid input, HTTP 400 Bad Request status
+            code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP 500
+            Internal Server Error status code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/downloadFromUri:
+    x-summary: Download from URI
+    x-description: >-
+      Proxies a download request from an external URI. Used to download or preview
+      distribution files. Validates the distribution id before proxying the request.
+    get:
+      operationId: downloadFromUri
+      description: Downloads or previews a distribution file from an external URI through the Idra proxy.
+      tags:
+        - End User Api
+      parameters:
+        - name: url
+          in: query
+          type: string
+          required: true
+          description: The URL of the distribution file to download or preview.
+        - name: id
+          in: query
+          type: string
+          required: false
+          description: The internal distribution identifier for validation.
+        - name: format
+          in: query
+          type: string
+          required: false
+          description: The expected format of the file (e.g. csv, json).
+        - name: downloadFile
+          in: query
+          type: boolean
+          default: true
+          description: If true, streams the file content. If false, only returns headers.
+        - name: isPreview
+          in: query
+          type: boolean
+          default: false
+          description: If true, enables size-based preview limiting.
+        - name: previewMaxMB
+          in: query
+          type: integer
+          required: false
+          description: Maximum file size in MB allowed for preview. Overrides server default.
+      responses:
+        '200':
+          description: The file content or headers.
+        '413':
+          description: File exceeds the preview size limit.
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP 500
+            Internal Server Error status code is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/catalogues/{nodeID}/datasets:
+    x-summary: Datasets by Catalogue
+    x-description: Returns the paginated list of datasets belonging to the catalogue identified by nodeID.
+    get:
+      operationId: getDatasetsByNode
+      description: Returns the paginated list of datasets for a specific ODMS catalogue.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - name: rows
+          in: query
+          type: integer
+          default: 1000
+          description: The maximum number of datasets to return.
+        - name: start
+          in: query
+          type: integer
+          default: 0
+          description: The offset in the result list from which to start.
+      responses:
+        '200':
+          description: The list of datasets for the specified catalogue.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/DCATDataset'
+        '404':
+          description: The specified catalogue was not found.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/catalogues/{nodeID}/datasets/{datasetID}:
+    x-summary: Dataset Detail by Catalogue and Dataset ID
+    x-description: Returns a specific dataset identified by nodeID and datasetID.
+    get:
+      operationId: getDatasetByNodeAndId
+      description: Returns a specific dataset belonging to the ODMS catalogue identified by nodeID.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - in: path
+          name: datasetID
+          required: true
+          type: string
+          description: The unique identifier of the dataset.
+      responses:
+        '200':
+          description: The requested dataset.
+          schema:
+            $ref: '#/definitions/DCATDataset'
+        '404':
+          description: The dataset or catalogue was not found.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/catalogues/{nodeID}/datasets/{datasetID}/distributions:
+    x-summary: Distributions by Dataset
+    x-description: Returns all distributions of a specific dataset.
+    get:
+      operationId: getDistributionsByDataset
+      description: Returns the list of all distributions belonging to the specified dataset.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - in: path
+          name: datasetID
+          required: true
+          type: string
+          description: The unique identifier of the dataset.
+      responses:
+        '200':
+          description: The list of distributions for the specified dataset.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/DCATDistribution'
+        '404':
+          description: The dataset or catalogue was not found.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/catalogues/{nodeID}/datasets/{datasetID}/distributions/{distributionID}:
+    x-summary: Distribution Detail
+    x-description: Returns a specific distribution identified by nodeID, datasetID and distributionID.
+    get:
+      operationId: getDistributionById
+      description: Returns a specific distribution belonging to the specified dataset and catalogue.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: nodeID
+          required: true
+          type: string
+          description: The unique identifier of the ODMS catalogue.
+        - in: path
+          name: datasetID
+          required: true
+          type: string
+          description: The unique identifier of the dataset.
+        - in: path
+          name: distributionID
+          required: true
+          type: string
+          description: The unique identifier of the distribution.
+      responses:
+        '200':
+          description: The requested distribution.
+          schema:
+            $ref: '#/definitions/DCATDistribution'
+        '404':
+          description: The distribution, dataset or catalogue was not found.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/client/executeOrionQuery/{cbQueryID}/catalogue/{catalogueID}:
+    x-summary: Execute Orion Query
+    x-description: Executes a stored ORION query against the Orion Context Broker for a given catalogue.
+    get:
+      operationId: executeOrionQuery
+      description: >-
+        Executes the ORION Context Broker query identified by cbQueryID for the
+        ORION-type catalogue identified by catalogueID.
+      tags:
+        - End User Api
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: cbQueryID
+          required: true
+          type: string
+          description: The identifier of the stored Orion CB query (OrionDistributionConfig).
+        - in: path
+          name: catalogueID
+          required: true
+          type: string
+          description: The identifier of the ORION-type ODMS catalogue.
+      responses:
+        '200':
+          description: The result of the Orion query.
+        '400':
+          description: >-
+            If the catalogue is not ORION type or mandatory parameters are missing,
+            HTTP 400 Bad Request is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP Status
+            Code 500 Internal Server Error is returned.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/v1/statistics:
+    x-summary: Platform Statistics
+    x-description: Returns global platform statistics (datasets count, catalogue stats, etc.) optionally filtered by catalogue and date range.
+    get:
+      operationId: getGlobalStatistics
+      description: >-
+        Returns global platform statistics. Optionally filtered by catalogueID (comma-separated list of catalogue IDs)
+        and date range (startDate, endDate). Defaults to the last 7 days if no date range is provided.
+      tags:
+        - End User Api
+      produces:
+        - application/json
+      parameters:
+        - name: catalogueID
+          in: query
+          type: string
+          default: ''
+          description: Comma-separated list of catalogue IDs to filter statistics. Empty means all catalogues.
+        - name: startDate
+          in: query
+          type: string
+          description: >-
+            Start date for statistics retrieval in ISO-8601 format (e.g. 2024-01-01T00:00:00).
+            Defaults to 7 days ago if not provided.
+        - name: endDate
+          in: query
+          type: string
+          description: >-
+            End date for statistics retrieval in ISO-8601 format (e.g. 2024-01-07T23:59:59).
+            Defaults to current date/time if not provided.
+      responses:
+        '200':
+          description: The global platform statistics.
+          schema:
+            type: object
+            description: Platform statistics object (PlatformStatistcs).
+        '500':
+          description: >-
+            If an error occurs during the execution of the request, HTTP 500
+            Internal Server Error status code is returned.
   /api/v1/client/search:
     x-summary: Metadata Search
     x-description: It performs the federated search on all the dataset metadata belonging

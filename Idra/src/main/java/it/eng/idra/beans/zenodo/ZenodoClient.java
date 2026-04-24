@@ -151,7 +151,7 @@ public final class ZenodoClient {
             } catch (IOException ioe) {
                 throw new ZenodoException(ioe.getMessage());
             } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
-                e.printStackTrace();
+                logger.error(e.getMessage(), e);
                 throw new ZenodoException(e.getMessage());
             }
 
@@ -222,7 +222,7 @@ public final class ZenodoClient {
         } catch (IOException ioe) {
             throw new ZenodoException(ioe.getMessage());
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             throw new ZenodoException(e.getMessage());
         }
 
@@ -249,7 +249,7 @@ public final class ZenodoClient {
         try {
             return this.gsonExtras.fromJson(data, cls);
         } catch (JsonSyntaxException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             return null;
         }
     }

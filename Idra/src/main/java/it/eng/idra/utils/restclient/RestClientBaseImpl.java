@@ -66,7 +66,7 @@ public abstract class RestClientBaseImpl {
               RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build())
           .setSSLHostnameVerifier(new NoopHostnameVerifier()).setSSLSocketFactory(sslsf).build();
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.severe(e.getMessage());
     }
 
     return httpclient;

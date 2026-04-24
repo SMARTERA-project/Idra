@@ -165,21 +165,29 @@ public class CataloguesStatistics {
       List<DcatDataset> added, List<DcatDataset> updated) {
 
     List<DatasetUpdatedStatistics> res = new ArrayList<DatasetUpdatedStatistics>();
+    List<DcatDataset> safeAdded = added != null ? added : new ArrayList<DcatDataset>();
+    List<DcatDataset> safeUpdated = updated != null ? updated : new ArrayList<DcatDataset>();
 
     for (OdmsCatalogue c : catalogues) {
       DatasetUpdatedStatistics d = new DatasetUpdatedStatistics();
       d.setName(c.getName());
-      d.setAdded(
-          (int) added.stream().filter(x -> Integer.parseInt(x.getNodeId()) == c.getId()).count());
+      d.setAdded((int) safeAdded.stream().filter(x -> belongsToCatalogue(x, c.getId())).count());
       // NB: gli updated mi arrivano filtrati qui
       d.setUpdated(
-          (int) updated.stream().filter(x -> Integer.parseInt(x.getNodeId()) == c.getId()).count());
+          (int) safeUpdated.stream().filter(x -> belongsToCatalogue(x, c.getId())).count());
       res.add(d);
     }
 
     // return res.stream().filter(x->x.getAdded()>0 ||
     // x.getUpdated()>0).collect(Collectors.toList());
     return res.stream().collect(Collectors.toList());
+  }
+
+  private boolean belongsToCatalogue(DcatDataset dataset, int catalogueId) {
+    if (dataset == null || dataset.getNodeId() == null) {
+      return false;
+    }
+    return dataset.getNodeId().trim().equals(String.valueOf(catalogueId));
   }
 
 }

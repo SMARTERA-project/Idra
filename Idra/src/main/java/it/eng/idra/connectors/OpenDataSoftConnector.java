@@ -371,9 +371,9 @@ public class OpenDataSoftConnector implements IodmsConnector {
               propertyUri, "", Arrays.asList(new SkosPrefLabel("", FederationCore.getEnglishDcatTheme(label), nodeId)), nodeId)));
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
             | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
         } catch (Exception ex) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }

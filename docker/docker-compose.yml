@@ -15,94 +15,96 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-services :
+services:
     db:
-            image: mysql:8.4
+        image: mysql:8.4
+        restart: always
+        ports:
+            - 3306:3306
+        volumes:
+            - ./opt/idra/mysql-data:/var/lib/mysql
+            - ./db-config/idra_db.sql:/docker-entrypoint-initdb.d/idra_db.sql
+        networks:
+            idra_main:
+        environment:
+            - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/my_secret_data
+            - MYSQL_DATABASE=idra_db
+        secrets:
+            - my_secret_data 
+
+        command: --lower_case_table_names=1
+
+    keycloak-db:
+            image: postgres:16
             restart: always
-            ports:
-                - 3306:3306
+            environment:
+                - POSTGRES_DB=keycloak
+                - POSTGRES_USER=keycloak
+                - POSTGRES_PASSWORD=keycloak
             volumes:
-                - ./opt/idra/mysql-data:/var/lib/mysql
-                - ./db-config/idra_db.sql:/docker-entrypoint-initdb.d/idra_db.sql
+                - ./opt/keycloak/postgres-data:/var/lib/postgresql/data
             networks:
                 idra_main:
+
+    keycloak:
+            image: quay.io/keycloak/keycloak:24.0.5
+            restart: always
+            depends_on:
+                - keycloak-db
+            ports:
+                - 8180:8080
             environment:
-                - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/my_secret_data
-                - MYSQL_DATABASE=idra_db
-            secrets:
-                - my_secret_data 
-
-            command: --lower_case_table_names=1
-
-    # keycloak-db:
-    #         image: postgres:16
-    #         restart: always
-    #         environment:
-    #             - POSTGRES_DB=keycloak
-    #             - POSTGRES_USER=keycloak
-    #             - POSTGRES_PASSWORD=keycloak
-    #         volumes:
-    #             - ./opt/keycloak/postgres-data:/var/lib/postgresql/data
-    #         networks:
-    #             idra_main:
-
-    # keycloak:
-    #         image: quay.io/keycloak/keycloak:24.0.5
-    #         restart: always
-    #         depends_on:
-    #             - keycloak-db
-    #         ports:
-    #             - 8180:8080
-    #         environment:
-    #             - KEYCLOAK_ADMIN=admin
-    #             - KEYCLOAK_ADMIN_PASSWORD=admin
-    #             - KC_DB=postgres
-    #             - KC_DB_URL_HOST=keycloak-db
-    #             - KC_DB_URL_DATABASE=keycloak
-    #             - KC_DB_USERNAME=keycloak
-    #             - KC_DB_PASSWORD=keycloak
-    #             # Keep the legacy "/auth" base path to match existing Portal config.
-    #             - KC_HTTP_RELATIVE_PATH=/auth
-    #             - KC_HOSTNAME_STRICT=false
-    #             - KC_HOSTNAME_STRICT_HTTPS=false
-    #         command: ["start-dev", "--import-realm", "--http-port=8080"]
-    #         volumes:
-    #             - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
-    #         networks:
-    #             idra_main:
+                - KEYCLOAK_ADMIN=admin
+                - KEYCLOAK_ADMIN_PASSWORD=admin
+                - KC_DB=postgres
+                - KC_DB_URL_HOST=keycloak-db
+                - KC_DB_URL_DATABASE=keycloak
+                - KC_DB_USERNAME=keycloak
+                - KC_DB_PASSWORD=keycloak
+                # Keep the legacy "/auth" base path to match existing Portal config.
+                - KC_HTTP_RELATIVE_PATH=/auth
+                - KC_HOSTNAME_STRICT=false
+                - KC_HOSTNAME_STRICT_HTTPS=false
+            command: ["start-dev", "--import-realm", "--http-port=8080"]
+            volumes:
+                - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
+                - ./smartera:/opt/jboss/keycloak/themes/smartera/
+                - ./smartera:/opt/keycloak/themes/smartera/
+            networks:
+                idra_main:
 
     phpmyadmin:
-            image: phpmyadmin/phpmyadmin
-            restart: always
-            ports:
-                - 8086:80
-            environment:
-                - PMA_HOST=db
-                - PMA_PORT=3306
-            depends_on:
-                - db
-            networks:
-                idra_main:
+        image: phpmyadmin/phpmyadmin
+        restart: always
+        ports:
+            - 8086:80
+        environment:
+            - PMA_HOST=db
+            - PMA_PORT=3306
+        depends_on:
+            - db
+        networks:
+            idra_main:
     
-    # rdf4j:
-    #         image: yyz1989/rdf4j
-    #         ports:
-    #             - 8081:8080
-    #         volumes:
-    #             - ./opt/idra/rdf4j-data:/opt/rdf4j/data
-    #         environment:
-    #             - RDF4J_DATA=/opt/rdf4j/data
-    #         networks:
-    #             idra_main:
+    rdf4j:
+        image: yyz1989/rdf4j
+        ports:
+            - 8081:8080
+        volumes:
+            - ./opt/idra/rdf4j-data:/opt/rdf4j/data
+        environment:
+            - RDF4J_DATA=/opt/rdf4j/data
+        networks:
+            idra_main:
     
-    # deep:
-    #         image: idraopendata/deep:2.2.6
-    #         ports:
-    #             - 80:80
-    #         volumes:
-    #             - ./deep/configuration.js:/var/www/app/deep/deep-components/configuration.js
-    #         networks:
-    #             idra_main:
+    deep:
+        image: idraopendata/deep:2.2.6
+        ports:
+            - 80:80
+        volumes:
+            - ./deep/configuration.js:/var/www/app/deep/deep-components/configuration.js
+        networks:
+            idra_main:
     
     # # NEW VERSION OF THE IDRA PORTAL - integrated with Metadata Quality Validator Tool
     # idraNewPortal:
@@ -114,42 +116,42 @@ services :
     #             - ./idra-new-portal-config/nginx.conf:/etc/nginx/conf.d/default.conf
     
     # Metadata Quality Validator Tool
-    # mqa-score:
-    #         image: idraopendata/mqa-scoring:v1.3.5
-    #         container_name: mqa-score
-    #         #    build:
-    #         #      context: .
-    #         #      dockerfile: ./Dockerfile
-    #         restart: always
-    #         ports:
-    #             - "8000:8000"
-    #         environment:
-    #             - PORT=8000
-    #             - MONGO_INITDB_ROOT_USERNAME=root
-    #             - MONGO_INITDB_DATABASE=admin
-    #             - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
-    #             - MINIO_URL=play.min.io
-    #             - MINIO_ACCESS_KEY=Q3AM3UQ867SPQQA43P2F
-    #             - MINIO_SECRET_KEY=zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG
-    #             - MINIO_ACTIVE=false
-    #         networks:
-    #             idra_main:
+    mqa-score:
+        image: idraopendata/mqa-scoring:v1.3.5
+        container_name: mqa-score
+        #    build:
+        #      context: .
+        #      dockerfile: ./Dockerfile
+        restart: always
+        ports:
+            - "8000:8000"
+        environment:
+            - PORT=8000
+            - MONGO_INITDB_ROOT_USERNAME=root
+            - MONGO_INITDB_DATABASE=admin
+            - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
+            - MINIO_URL=play.min.io
+            - MINIO_ACCESS_KEY=Q3AM3UQ867SPQQA43P2F
+            - MINIO_SECRET_KEY=zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG
+            - MINIO_ACTIVE=false
+        networks:
+            idra_main:
 
-    # # Database used by the Metadata Quality Validator Tool
-    # mongodb:
-    #         container_name: mongodb-mqa
-    #         image: mongo:4.4
-    #         command: mongod --port 27020
-    #         environment:
-    #             - MONGO_INITDB_ROOT_USERNAME=root
-    #             - MONGO_INITDB_DATABASE=admin
-    #             - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
-    #         ports:
-    #             - "27020:27020"
-    #         volumes:
-    #             - ./data:/data/db  
-    #         networks:
-    #             idra_main:
+    # Database used by the Metadata Quality Validator Tool
+    mongodb:
+        container_name: mongodb-mqa
+        image: mongo:4.4
+        command: mongod --port 27020
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME=root
+            - MONGO_INITDB_DATABASE=admin
+            - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
+        ports:
+            - "27020:27020"
+        volumes:
+            - ./data:/data/db  
+        networks:
+            idra_main:
     # ngsi-broker:
     #     image: engineeringopsilab/ngsi-ldbrokermanager:v1.7
     #     container_name: "ngsi-broker-SMARTERA"
@@ -164,58 +166,58 @@ services :
     #         idra_main:
     # Idra back-end latest version
     idra:
-            # build local
-            build:
-              context: ..
-              dockerfile: ./Dockerfile
-            ports:
-                - 8080:8080
-            depends_on:
-                - db
-                - ngsi-broker
-                # - rdf4j
-            command: ["./wait-for-it.sh", "db:3306", "--timeout=0", "--", "catalina.sh", "run"]
+        # build local
+        build:
+            context: ..
+            dockerfile: ./Dockerfile
+        ports:
+            - 8080:8080
+        depends_on:
+            - db
+            - ngsi-broker
+            # - rdf4j
+        command: ["./wait-for-it.sh", "db:3306", "--timeout=0", "--", "catalina.sh", "run"]
 
-            environment:
-                - idra.db.host=jdbc:mysql://db:3306/idra_db?allowPublicKeyRetrieval=true&serverTimezone=UTC&useLegacyDatetimeCode=false&useEncoding=true&characterEncoding=UTF-8&useSSL=false
-                - idra.db.host.min=jdbc:mysql://db:3306
-                - idra.db.user_FILE=/run/secrets/my_secret_data
-                - idra.db.password_FILE=/run/secrets/my_secret_data
-                #- idra.db.user=root
-                #- idra.db.password=root
-                - idra.db.name=idra_db
-                - idra.cache.loadfromdb=true
-                - idra.synch.onstart=false
-                - idra.odms.dump.file.path=/opt/idra/dump/
-                - idra.dump.file.path=/opt/idra/dump/
-                - idra.lod.enable=true
-                - idra.lod.repo.name=Idra
-                - idra.lod.server.uri=http://rdf4j:8080/rdf4j-server/repositories/
-                - idra.lod.server.uri.query=http://rdf4j:8080/rdf4j-workbench/repositories/Idra/query
-                - idra.orion.orionDumpFilePath=/opt/idra/dump/
-                - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
-                - DATALET_ENABLED=true
-                - DATALET_URL=https://your-domain.it/deep/deep-components/demo.html
-                - JAVA_OPTS=-Xms1024m -Xmx3g
-                - idra.orion.manager.url=http://ngsi-broker:8082/
-            # env variables for KEYCLOAK authentication
-                - idra.authentication.method=KEYCLOAK
-                - idm.protocol=http
-                - idm.host=keycloak:8080/auth/realms/smartera/protocol/openid-connect
-                - idm.path.base=
-                - idm.client.id=data-platform
-                - idm.client.secret=
-                - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
-                - idm.logout.callback=http://localhost:4200
-                - idra.server.baseurl=http://localhost:8080/
-                - idm.admin.role.name=IDRA_ADMIN
-            secrets:
-                - my_secret_data           
-            volumes:
-                - ./opt/idra/dump:/opt/idra/dump
-                - /dev/urandom:/dev/random
-            networks:
-                idra_main:
+        environment:
+            - idra.db.host=jdbc:mysql://db:3306/idra_db?allowPublicKeyRetrieval=true&serverTimezone=UTC&useLegacyDatetimeCode=false&useEncoding=true&characterEncoding=UTF-8&useSSL=false
+            - idra.db.host.min=jdbc:mysql://db:3306
+            - idra.db.user_FILE=/run/secrets/my_secret_data
+            - idra.db.password_FILE=/run/secrets/my_secret_data
+            #- idra.db.user=root
+            #- idra.db.password=root
+            - idra.db.name=idra_db
+            - idra.cache.loadfromdb=true
+            - idra.synch.onstart=false
+            - idra.odms.dump.file.path=/opt/idra/dump/
+            - idra.dump.file.path=/opt/idra/dump/
+            - idra.lod.enable=true
+            - idra.lod.repo.name=Idra
+            - idra.lod.server.uri=http://rdf4j:8080/rdf4j-server/repositories/
+            - idra.lod.server.uri.query=http://rdf4j:8080/rdf4j-workbench/repositories/Idra/query
+            - idra.orion.orionDumpFilePath=/opt/idra/dump/
+            - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
+            - DATALET_ENABLED=true
+            - DATALET_URL=https://your-domain.it/deep/deep-components/demo.html
+            - JAVA_OPTS=-Xms1024m -Xmx3g -Didra.cors.allowed.origins=http://mqa-score,http://rdf4j,http://deep,http://ngsi-broker,http://localhost,http://localhost:4200,https://dx-lab.it
+            - idra.orion.manager.url=http://ngsi-broker:8082/
+        # env variables for KEYCLOAK authentication
+            - idra.authentication.method=KEYCLOAK
+            - idm.protocol=http
+            - idm.host=keycloak:8080/auth/realms/smartera/protocol/openid-connect
+            - idm.path.base=
+            - idm.client.id=data-platform
+            - idm.client.secret=vzO1KrNTiEe70y55IIgAPCbrKdG4Ov9l
+            - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
+            - idm.logout.callback=http://localhost:4200
+            - idra.server.baseurl=http://localhost:8080/
+            - idm.admin.role.name=IDRA_ADMIN
+        secrets:
+            - my_secret_data           
+        volumes:
+            - ./opt/idra/dump:/opt/idra/dump
+            - /dev/urandom:/dev/random
+        networks:
+            idra_main:
 
     portal:
         build:

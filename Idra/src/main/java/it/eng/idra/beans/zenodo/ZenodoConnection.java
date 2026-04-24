@@ -83,7 +83,7 @@ public class ZenodoConnection {
       try {
          new URL(this._host + ":" + this._port + "/api/");
       } catch (MalformedURLException var4) {
-         var4.printStackTrace();
+         logger.error(var4.getMessage(), var4);
          logger.info(var4);
       }
 
@@ -204,10 +204,10 @@ public class ZenodoConnection {
             return body;
          }
       } catch (UnknownHostException | UnsupportedOperationException var17) {
-         var17.printStackTrace();
+         logger.error(var17.getMessage(), var17);
          throw new UnknownHostException(var17.getMessage());
       } catch (IOException var18) {
-         var18.printStackTrace();
+         logger.error(var18.getMessage(), var18);
          if (!var18.getClass().equals(SocketTimeoutException.class)
                && !var18.getClass().equals(ConnectException.class)) {
             throw new IOException(var18.getMessage());
@@ -228,7 +228,7 @@ public class ZenodoConnection {
       try {
          proxyProps.load(ZenodoConnection.class.getClassLoader().getResourceAsStream("configuration.properties"));
       } catch (IOException var1) {
-         var1.printStackTrace();
+         logger.error(var1.getMessage(), var1);
       }
 
    }

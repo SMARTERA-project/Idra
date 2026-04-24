@@ -100,7 +100,7 @@ public class OdmsManager {
       ODMSConnectorsList.put(OdmsCatalogueType.ZENODO, "it.eng.idra.connectors.ZenodoConnector");
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -157,7 +157,7 @@ public class OdmsManager {
         Thread.sleep(500);
       } catch (InterruptedException e) {
 
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -205,7 +205,7 @@ public class OdmsManager {
         Thread.sleep(500);
       } catch (InterruptedException e) {
 
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -308,7 +308,7 @@ public class OdmsManager {
 
       return (IodmsConnector) cls.getDeclaredConstructor(OdmsCatalogue.class).newInstance(node);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       throw new OdmsManagerException(
           "There was an error while " + "retrieving ODMS Connector: " + e.getMessage());
     }
@@ -474,7 +474,7 @@ public class OdmsManager {
                     "dumpFileString_" + assignedNodeId);
                 node.setDumpFilePath(odmsDumpFilePath + "dumpFileString_" + assignedNodeId);
               } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e.getMessage(), e);
               }
 
             }
@@ -495,7 +495,7 @@ public class OdmsManager {
               node.setAdditionalConfig(orionConfig);
               updateNode = true;
             } catch (IOException e) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
             }
 
           } else if (node.getNodeType().equals(OdmsCatalogueType.SPARQL)) {
@@ -511,7 +511,7 @@ public class OdmsManager {
               node.setAdditionalConfig(orionConfig);
               updateNode = true;
             } catch (IOException e) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
             }
           }
           if (updateNode) {
@@ -525,7 +525,7 @@ public class OdmsManager {
       } catch (OdmsCatalogueNotFoundException e) {
         throw e;
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         throw new OdmsManagerException(
             "There was an error " + "while adding the ODMS Node: " + e.getMessage());
       } finally {
@@ -635,7 +635,7 @@ public class OdmsManager {
       return assignedNodeId;
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       throw new OdmsManagerException(
           "There was an error" + " while adding the ODMS Node: " + e.getMessage());
     } finally {

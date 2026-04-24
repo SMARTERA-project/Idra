@@ -113,7 +113,7 @@ public class FederationCore {
       MetadataCacheManager.init(loadCacheFromDb, solrPath);
       EuroVocTranslator.init();
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       manageBeansJpa.jpaClose();
     }
@@ -131,7 +131,7 @@ public class FederationCore {
       DbConnectionManager.closeDbConnection();
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -559,14 +559,14 @@ public class FederationCore {
         }
 
       } catch (InvocationTargetException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         Throwable target = null;
         if ((target = e.getCause()) != null) {
           if ((target = target.getCause()) != null) {
 
             Class targetClass = target.getClass();
             if (targetClass.equals(OdmsCatalogueOfflineException.class)) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
               logger.error("Problem during registration of Catalogue " + node.getName()
                   + ": Setting state to OFFLINE");
               OdmsManager.insertOdmsMessage(node.getId(), "Unreacheble, setting state to OFFLINE");
@@ -578,24 +578,24 @@ public class FederationCore {
               try {
                 IdraScheduler.getSingletonInstance().startCataloguesSynchJob(node, false);
               } catch (SchedulerNotInitialisedException e1) {
-                e1.printStackTrace();
+                logger.error(e1.getMessage(), e1);
 
               }
 
             } else if (targetClass.equals(OdmsCatalogueNotFoundException.class)) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
               logger.error("The node host " + node.getHost() + " was not found");
               OdmsManager.deleteOdmsCatalogue(node);
               throw new OdmsCatalogueNotFoundException(
                   "The node " + node.getHost() + " host was not found");
             } else if (targetClass.equals(OdmsCatalogueForbiddenException.class)) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
               logger.error("The ODMS Catalogue " + node.getHost() + " is forbidden");
               OdmsManager.deleteOdmsCatalogue(node);
               throw new OdmsCatalogueForbiddenException(
                   "The ODMS Catalogue " + node.getHost() + " is forbidden");
             } else if (targetClass.equals(SSLHandshakeException.class)) {
-              e.printStackTrace();
+              logger.error(e.getMessage(), e);
               logger.error("The ODMS Catalogue " + node.getHost()
                   + " requested SSL handshake, import its certificate into java keystore");
               OdmsManager.deleteOdmsCatalogue(node);
@@ -701,7 +701,6 @@ public class FederationCore {
       }
       odfScheduler.deleteJob(Integer.toString(node.getId()));
 
-      System.gc();
       logger.info("The ODMS Catalogue with name: " + node.getName() + " and ID: " + node.getId()
           + " was successfully deleted");
 
@@ -821,7 +820,7 @@ public class FederationCore {
       }
 
     } catch (SchedulerNotInitialisedException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     
     OdmsManager.updateOdmsCatalogue(node, true);
@@ -833,7 +832,7 @@ public class FederationCore {
     try {
       OdmsManager.updateOdmsCatalogueList();
     } catch (SQLException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
   }
@@ -853,7 +852,7 @@ public class FederationCore {
       IdraScheduler.getSingletonInstance().triggerNow(Integer.toString(nodeId));
     } catch (SchedulerNotInitialisedException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     // final ODMSCatalogue node = ODMSManager.getODMSNode(nodeId);
@@ -903,7 +902,7 @@ public class FederationCore {
 
     } catch (SchedulerNotInitialisedException | SchedulerException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     if (!keepDatasets) {
@@ -932,7 +931,6 @@ public class FederationCore {
       node.setNodeState(OdmsCatalogueState.OFFLINE);
       node.setSynchLock(OdmsSynchLock.NONE);
       OdmsManager.updateOdmsCatalogue(node, true);
-      System.gc();
     }
 
     logger.info("The ODMS Catalogue with name: " + node.getName() + " and ID: " + node.getId()
@@ -965,7 +963,7 @@ public class FederationCore {
         IdraScheduler.getSingletonInstance().startCataloguesSynchJob(node, startNow);
       } catch (SchedulerNotInitialisedException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     } else {
       if (startNow) {
@@ -973,7 +971,7 @@ public class FederationCore {
           MetadataCacheManager.loadCacheFromOdmsCatalogue(node, false);
         } catch (InvocationTargetException e) {
           // TODO Auto-generated catch block
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
         }
       }
     }

@@ -120,7 +120,7 @@ public class InitServletListener implements ServletContextListener {
       logger.info("Open Data Federation started");
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
   }
@@ -140,7 +140,7 @@ public class InitServletListener implements ServletContextListener {
       logger.info("Finalize end");
 
     } catch (Exception ex) {
-      ex.printStackTrace();
+      logger.error(ex.getMessage(), ex);
     }
   }
 

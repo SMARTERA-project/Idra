@@ -55,7 +55,7 @@ public class CachePersistenceManager {
     try {
       emf = Persistence.createEntityManagerFactory("org.hibernate.jpa");
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -68,7 +68,7 @@ public class CachePersistenceManager {
       em = emf.createEntityManager();
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     // logger.info("Hibernate end");
   }
@@ -158,7 +158,7 @@ public class CachePersistenceManager {
       em.getTransaction().commit();
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       em.getTransaction().rollback();
       throw e;
     }
@@ -717,6 +717,31 @@ public class CachePersistenceManager {
   }
 
   /**
+   * Sets the hasDatalets flag on a single DcatDistribution using a targeted JPQL UPDATE,
+   * avoiding a full entity merge that would trigger Hibernate orphan-removal errors on
+   * cascade="all-delete-orphan" collections.
+   *
+   * @param distributionId the distribution ID
+   * @param hasDatalets    the flag value to set
+   */
+  public void jpaSetDistributionHasDatalets(String distributionId, boolean hasDatalets) {
+    try {
+      if (!em.getTransaction().isActive()) {
+        em.getTransaction().begin();
+      }
+      em.createQuery(
+              "UPDATE DcatDistribution d SET d.hasDatalets = :flag WHERE d.id = :id")
+          .setParameter("flag", hasDatalets)
+          .setParameter("id", distributionId)
+          .executeUpdate();
+      em.getTransaction().commit();
+    } catch (Exception e) {
+      em.getTransaction().rollback();
+      throw e;
+    }
+  }
+
+  /**
    * Jpa persist and commit datalet.
    *
    * @param obj the obj
@@ -894,7 +919,6 @@ public class CachePersistenceManager {
   public static void jpaFinalize() {
     emf.close();
     emf = null;
-    System.gc();
   }
 
   /**

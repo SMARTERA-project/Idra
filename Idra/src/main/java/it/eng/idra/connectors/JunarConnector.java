@@ -187,7 +187,6 @@ public class JunarConnector implements IodmsConnector {
     }
 
     jsonArray = null;
-    System.gc();
 
     return dcatDatasets;
 
@@ -579,7 +578,7 @@ public class JunarConnector implements IodmsConnector {
                 .newInstance(new SkosConcept(property.getURI(), null, prefLabelList, nodeId)));
           } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
               | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
           }
         }
       }
@@ -733,7 +732,7 @@ public class JunarConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }

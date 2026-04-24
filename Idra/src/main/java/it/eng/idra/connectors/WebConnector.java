@@ -157,7 +157,7 @@ public class WebConnector implements IodmsConnector {
       return (doc != null) ? -1 : 0;
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return 0;
     }
   }
@@ -1211,7 +1211,7 @@ public class WebConnector implements IodmsConnector {
             nodeId)));
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
     return result;

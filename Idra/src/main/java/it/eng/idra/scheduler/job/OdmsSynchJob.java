@@ -126,7 +126,7 @@ public class OdmsSynchJob implements InterruptableJob {
         try {
           synchOdmsNode(node, false);
         } catch (OdmsCatalogueNotFoundException e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
         } catch (OdmsCatalogueForbiddenException e) {
           logger.info(e.getMessage());
           // node.setSynchLock(ODMSSynchLock.NONE);
@@ -136,13 +136,13 @@ public class OdmsSynchJob implements InterruptableJob {
         }
       }
     } catch (OdmsCatalogueNotFoundException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       // JobExecutionException e2 =
       // new JobExecutionException(e);
       // e2.setUnscheduleFiringTrigger(true);
     } catch (Exception e) {
 
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -164,7 +164,6 @@ public class OdmsSynchJob implements InterruptableJob {
     // reflection
     nodeDatasets = OdmsManager.getOdmsCatalogueConnector(node).getChangedDatasets(oldDatasets,
         startingDate);
-    System.gc();
 
     return nodeDatasets;
   }
@@ -311,7 +310,7 @@ public class OdmsSynchJob implements InterruptableJob {
 
           } catch (Exception e) {
             synchCompleted = false;
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             node.setLastUpdateDate(lastUpdate);
             OdmsManager.insertOdmsMessage(node.getId(), "Node OFFLINE " + e.getLocalizedMessage());
             logger.error("Setting node state to OFFLINE " + e.getLocalizedMessage());
@@ -361,7 +360,7 @@ public class OdmsSynchJob implements InterruptableJob {
         addCatalogueInCb(node);
       } catch (Exception e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
             + node.getId() + " in the Context Broker");
       }
@@ -408,7 +407,7 @@ public class OdmsSynchJob implements InterruptableJob {
           DcatApDumpManager.sendDumpToRepository(node);      
 
         } catch (Exception e1) {
-          e1.printStackTrace();
+          logger.error(e1.getMessage(), e1);
           logger.error("Error: " + e1.getMessage() + " in creation of the dump file for node "
               + node.getId());
         }
@@ -513,7 +512,7 @@ public class OdmsSynchJob implements InterruptableJob {
       // if (deletedRDF != 0)
       // logger.info("deletedRDF: " + deletedRDF);
     } catch (DatasetNotFoundException | SolrServerException | IOException ex) {
-      ex.printStackTrace();
+      logger.error(ex.getMessage(), ex);
       logger.info("\nDataset is already deleted\n");
       logger.error("Dataset is already deleted");
     } finally {

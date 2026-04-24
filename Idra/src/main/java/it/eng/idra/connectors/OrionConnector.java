@@ -665,7 +665,7 @@ public class OrionConnector implements IodmsConnector {
       node.setAdditionalConfig(orionConfig);
       OdmsManager.updateOdmsCatalogue(node, true);
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     // }
     return result;
@@ -704,7 +704,7 @@ public class OrionConnector implements IodmsConnector {
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 

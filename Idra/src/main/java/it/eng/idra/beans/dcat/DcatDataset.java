@@ -307,7 +307,7 @@ public class DcatDataset implements Serializable {
     try {
       setNodeName(FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId)).getName());
     } catch (NumberFormatException | OdmsCatalogueNotFoundException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       setNodeName("");
     }
 
@@ -679,7 +679,14 @@ public class DcatDataset implements Serializable {
    * @param datasetDetails dataset details
    */
   public void setDatasetDetails(List<DcatDetails> datasetDetails) {
-    this.datasetDetails = datasetDetails;
+    if (this.datasetDetails == null) {
+      this.datasetDetails = datasetDetails;
+    } else {
+      this.datasetDetails.clear();
+      if (datasetDetails != null) {
+        this.datasetDetails.addAll(datasetDetails);
+      }
+    }
   }
 
   /**
@@ -1653,7 +1660,7 @@ public class DcatDataset implements Serializable {
       }
       this.description.setValue(descTmp);
     } catch (UnsupportedEncodingException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     if (description != null) {
@@ -1785,13 +1792,17 @@ public class DcatDataset implements Serializable {
 
     if (spatialCoverage != null && !spatialCoverage.isEmpty()) {
       for (DctLocation sc : spatialCoverage) {
-        doc.addChildDocument(sc.toDoc(CacheContentType.spatialCoverage));
+        if (sc != null) {
+          doc.addChildDocument(sc.toDoc(CacheContentType.spatialCoverage));
+        }
       }
     }
 
     if (temporalCoverage != null && !temporalCoverage.isEmpty()) {
       for (DctPeriodOfTime tc : temporalCoverage) {
-        doc.addChildDocument(tc.toDoc(CacheContentType.temporalCoverage));
+        if (tc != null) {
+          doc.addChildDocument(tc.toDoc(CacheContentType.temporalCoverage));
+        }
       }
     }
 
@@ -1937,7 +1948,7 @@ public class DcatDataset implements Serializable {
       try {
         doc.addField("qualifiedRelation", GsonUtil.obj2Json(qualifiedRelation, GsonUtil.relationshipListType));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 

@@ -18,7 +18,7 @@
   },
   "clients": [
     {
-      "clientId": "urbanite",
+      "clientId": "smartera",
       "name": "Idra Portal (Local)",
       "enabled": true,
       "protocol": "openid-connect",

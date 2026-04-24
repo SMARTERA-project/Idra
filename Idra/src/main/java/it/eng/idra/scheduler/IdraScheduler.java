@@ -188,7 +188,7 @@ public class IdraScheduler {
       }
     } catch (SchedulerException e) {
 
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -207,7 +207,7 @@ public class IdraScheduler {
       }
     } catch (SchedulerException e) {
 
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -243,7 +243,7 @@ public class IdraScheduler {
       }
     } catch (SchedulerException e) {
 
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 

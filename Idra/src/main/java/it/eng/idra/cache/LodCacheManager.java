@@ -159,7 +159,7 @@ public class LodCacheManager {
           // rdfStream1.close();
 
         } catch (RDFParseException | RepositoryException | JenaException | HttpException e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
           logger.error("Exception while adding RDF: " + link + " " + e.getMessage());
 
         } finally {
@@ -197,7 +197,7 @@ public class LodCacheManager {
       logger.info("RDF file: " + node.getHost() + " loading completed successfully!");
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       repoConnection.close();
     }
@@ -253,7 +253,7 @@ public class LodCacheManager {
             // rdfStream1.close();
 
           } catch (RDFParseException | RepositoryException | JenaException | HttpException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             logger.error("Exception while adding RDF: " + link + " " + e.getMessage());
 
           } finally {
@@ -308,7 +308,7 @@ public class LodCacheManager {
         }
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 

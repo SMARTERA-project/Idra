@@ -54,7 +54,7 @@ public class EuroVocTranslator {
     try {
       emf = Persistence.createEntityManagerFactory("org.hibernate.jpa");
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -112,7 +112,7 @@ public class EuroVocTranslator {
       }
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       jpaClose();
     }
@@ -156,7 +156,7 @@ public class EuroVocTranslator {
         result.add(term);
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       jpaClose();
     }

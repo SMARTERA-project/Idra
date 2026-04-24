@@ -83,13 +83,13 @@ public class OauthTokenSynchJob implements Job {
 
     } catch (OdmsCatalogueNotFoundException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } catch (OdmsManagerException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } catch (Exception e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
   }

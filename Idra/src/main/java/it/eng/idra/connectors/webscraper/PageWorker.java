@@ -301,14 +301,14 @@ public class PageWorker implements Runnable {
                 try {
                   TimeUnit.MILLISECONDS.sleep(JSOUP_THROTTLING);
                 } catch (InterruptedException e2) {
-                  e2.printStackTrace();
+                  logger.error(e2.getMessage(), e2);
                 }
                 Document dsDoc = getDatasetDocument(e, selector);
                 if (dsDoc != null) {
                   pageResult.add(dsDoc);
                 }
               } catch (IOException | UrlNotParseableException e1) {
-                e1.printStackTrace();
+                logger.error(e1.getMessage(), e1);
                 continue;
               }
             }
@@ -325,7 +325,7 @@ public class PageWorker implements Runnable {
       System.out.println("____________________________________________________");
 
     } catch (IOException | NavigationTypeNotValidException e1) {
-      e1.printStackTrace();
+      logger.error(e1.getMessage(), e1);
       countDownLatch.countDown();
       return;
     }

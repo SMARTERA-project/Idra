@@ -48,6 +48,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.iri.IRIFactory;
@@ -519,9 +524,26 @@ public class DcatApDeserializer implements IdcatApDeserialize {
    */
   protected String extractDate(Statement dateStatement) {
     try {
-      return CommonUtil.fromLocalToUtcDate(CommonUtil.fixBadUtcDate(dateStatement.getString()),
-          null);
-    } catch (IllegalArgumentException ignore) {
+      String lexical = dateStatement.getLiteral().getLexicalForm();
+      // P1/P3: try ISO 8601 dateTime with timezone (xsd:dateTime).
+      // CommonUtil.fromLocalToUtcDate lowercases the input, which breaks the
+      // literal 'T' separator in its format pattern, causing all ISO dates to
+      // parse as null and default to 1970-01-01T00:00:00Z in DcatDataset.
+      try {
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+            ZonedDateTime.parse(lexical, DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+      } catch (DateTimeParseException ignore) {
+      }
+      // Try ISO 8601 date only (xsd:date) — normalize to midnight UTC
+      try {
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+            LocalDate.parse(lexical, DateTimeFormatter.ISO_LOCAL_DATE)
+                .atStartOfDay(ZoneOffset.UTC));
+      } catch (DateTimeParseException ignore) {
+      }
+      // Fallback for non-ISO formats (locale-specific, legacy catalogues)
+      return CommonUtil.fromLocalToUtcDate(CommonUtil.fixBadUtcDate(lexical), null);
+    } catch (Exception ignore) {
       return null;
     }
 
@@ -604,7 +626,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
               .newInstance(new SkosConcept(toExtractP.getURI(), conceptUri, labelList, nodeId)));
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
             | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
         }
       }
     }
@@ -1131,7 +1153,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     linkedSchemas = deserializeDctStandard(nodeId, r);
     String mediaType = null;
     if (r.hasProperty(DCAT.mediaType)) {
-      mediaType = deserializeMediaType(DCAT.mediaType);
+      mediaType = deserializeMediaType(r);
       // mediaType = r.getProperty(DCAT.mediaType).getString();
     }
 
@@ -1439,14 +1461,15 @@ public class DcatApDeserializer implements IdcatApDeserialize {
    * @return the string
    */
   public String extractMediaTypeFromUri(String uri) {
-    // update with https://www.iana.org/assignments/media-types/
+    // Captures full IANA media type (e.g. "application/json") from URIs like
+    // https://www.iana.org/assignments/media-types/application/json
     Matcher matcher = Pattern
         .compile(
-            "https:\\/\\/www\\.iana\\.org\\/assignments\\/media-types(\\/|#)(\\w*)")
+            "https?://www\\.iana\\.org/assignments/media-types[/#]([\\w.+\\-]+(?:/[\\w.+\\-]+)?)")
         .matcher(uri);
     String result = null;
 
-    return (matcher.find() && (result = matcher.group(2)) != null) ? result : "";
+    return (matcher.find() && (result = matcher.group(1)) != null) ? result : "";
 
   }
 

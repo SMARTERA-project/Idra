@@ -84,7 +84,7 @@ public class CustomQuartzInitializer extends QuartzInitializerListener {
     try {
       schedFactory.initialize(getQuartzProperties(configFile));
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     return schedFactory;
 

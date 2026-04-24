@@ -58,6 +58,7 @@ import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.response.UpdateResponse;
+import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
@@ -105,7 +106,7 @@ public class MetadataCacheManager {
     // Don't touch
     // query.setQuery("(id:\"" + id + "\" or legacyIdentifier:\"" + id + "\") and
     // nodeID:" + nodeID);
-    query.setQuery("(identifier:\"" + id + "\") and nodeID:" + nodeId);
+    query.setQuery("(identifier:\"" + ClientUtils.escapeQueryChars(id) + "\") and nodeID:" + nodeId);
 
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
     query.set("defType", "edismax");
@@ -141,7 +142,7 @@ public class MetadataCacheManager {
     SolrQuery query = new SolrQuery();
     // Don't touch
     // query.setQuery("(id:\"" + id + "\" or seoIdentifier:\"" + id + "\")");
-    query.setQuery("(id:\"" + id + "\")");
+    query.setQuery("(id:\"" + ClientUtils.escapeQueryChars(id) + "\")");
 
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
     query.set("defType", "edismax");
@@ -177,8 +178,8 @@ public class MetadataCacheManager {
       throws DistributionNotFoundException, IOException, SolrServerException {
 
     SolrQuery query = new SolrQuery();
-    query.setQuery("(id:\"" + id + "\")");
-    query.addFilterQuery("(accessURL:\"" + url + "\" OR downloadURL:\"" + url + "\")");
+    query.setQuery("(id:\"" + ClientUtils.escapeQueryChars(id) + "\")");
+    query.addFilterQuery("(accessURL:\"" + ClientUtils.escapeQueryChars(url) + "\" OR downloadURL:\"" + ClientUtils.escapeQueryChars(url) + "\")");
 
     query.set("parent_filter", "content_type:" + CacheContentType.distribution);
     query.set("defType", "edismax");
@@ -214,7 +215,7 @@ public class MetadataCacheManager {
 
     SolrQuery query = new SolrQuery();
 
-    query.setQuery("(id:\"" + id + "\")");
+    query.setQuery("(id:\"" + ClientUtils.escapeQueryChars(id) + "\")");
 
     query.set("parent_filter", "content_type:" + CacheContentType.distribution);
     query.set("defType", "edismax");
@@ -491,7 +492,6 @@ public class MetadataCacheManager {
     jpaInstance.jpaClose();
     jpaInstance = null;
     // matchingDatasets = null;
-    System.gc();
 
     logger.info("Deleting datasets completed successfully");
   }
@@ -600,6 +600,29 @@ public class MetadataCacheManager {
 
     jpaInstance.jpaClose();
     jpaInstance = null;
+  }
+
+  /**
+   * Updates the hasDatalets flag on a single distribution (targeted JPQL UPDATE, no full
+   * entity merge) and refreshes the dataset document in Solr.
+   *
+   * @param nodeId         the node ID
+   * @param dataset        the dataset (already has hasDatalets updated on the distribution)
+   * @param distributionId the distribution whose hasDatalets flag changed
+   * @param hasDatalets    the new flag value
+   */
+  public static synchronized void updateDatasetInsertDatalet(int nodeId, DcatDataset dataset,
+      String distributionId, boolean hasDatalets)
+      throws SolrServerException, IOException, DatasetNotFoundException {
+    CachePersistenceManager jpaInstance = new CachePersistenceManager();
+    try {
+      jpaInstance.jpaSetDistributionHasDatalets(distributionId, hasDatalets);
+      server.deleteByQuery("_root_:\"" + dataset.getId() + "\"");
+      server.add(dataset.toDoc());
+      server.commit();
+    } finally {
+      jpaInstance.jpaClose();
+    }
   }
 
   /**
@@ -1097,15 +1120,20 @@ public class MetadataCacheManager {
       } else if (key.equals("nodeID")) {
 
         if (StringUtils.isNotBlank((String) value)) {
-          queryString += (isFirst ? "" : " AND ") + "nodeID:" + ((String) value);
+          // nodeID value is built internally from integer IDs (e.g. "(1 OR 2)") — not user input.
+          // Do NOT quote or escapeQueryChars: that would escape parentheses and break the Solr OR query.
+          queryString += (isFirst ? "" : " AND ") + "nodeID:" + value;
         }
 
         isFirst = false;
 
       } else if (key.equals("tags")) {
 
-        queryString += (isFirst ? "" : " AND ") + "keywords" + ":" + "(\""
-            + value.replace(",", "\" AND \"") + "\")";
+        String[] tags = value.split(",");
+        String escapedTags = Arrays.stream(tags)
+            .map(t -> ClientUtils.escapeQueryChars(t.trim()))
+            .collect(Collectors.joining("\" AND \""));
+        queryString += (isFirst ? "" : " AND ") + "keywords" + ":" + "(\"" + escapedTags + "\")";
         isFirst = false;
 
       } else if (!key.equals("sort") && !key.equals("rows") && !key.equals("start")
@@ -1117,11 +1145,11 @@ public class MetadataCacheManager {
         if (paramValue instanceof List) {
           List<?> values = (List<?>) paramValue;
           String joined = values.stream()
-            .map(v -> "\"" + v.toString() + "\"")
+            .map(v -> "\"" + ClientUtils.escapeQueryChars(v.toString()) + "\"")
             .collect(Collectors.joining(" OR "));
           queryString += (isFirst ? "" : " AND ") + key.trim() + ":(" + joined + ")";
         } else {
-          queryString += (isFirst ? "" : " AND ") + key.trim() + ":(\"" + value + "\")";
+          queryString += (isFirst ? "" : " AND ") + key.trim() + ":(\"" + ClientUtils.escapeQueryChars(value) + "\")";
         }
         isFirst = false;
       }
@@ -1132,19 +1160,49 @@ public class MetadataCacheManager {
 
     if (searchParameters.containsKey("releaseDate")) {
       String[] startEnd = (String[]) searchParameters.remove("releaseDate");
-      String end = startEnd[1].replace("T00:00:00Z", "") + "T23:59:59Z";
+      String end = normalizeRangeEnd(startEnd[1], "releaseDate");
+      if (!startEnd[0].matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")) {
+        throw new IllegalArgumentException("Invalid releaseDate start value: " + startEnd[0]);
+      }
+      if (!end.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")) {
+        throw new IllegalArgumentException("Invalid releaseDate end value: " + end);
+      }
       queryString += (isFirst ? "" : " AND ") + "releaseDate:[" + startEnd[0] + " TO " + end + "]";
       isFirst = false;
     }
 
     if (searchParameters.containsKey("updateDate")) {
       String[] startEnd = (String[]) searchParameters.remove("updateDate");
-      String end = startEnd[1].replace("T00:00:00Z", "") + "T23:59:59Z";
+      String end = normalizeRangeEnd(startEnd[1], "updateDate");
+      if (!startEnd[0].matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")) {
+        throw new IllegalArgumentException("Invalid updateDate start value: " + startEnd[0]);
+      }
+      if (!end.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")) {
+        throw new IllegalArgumentException("Invalid updateDate end value: " + end);
+      }
       queryString += ((isFirst ? "" : " AND ") + "updateDate:[" + startEnd[0] + " TO " + end + "]");
       isFirst = false;
     }
     logger.info(queryString);
     return queryString;
+  }
+
+  private static String normalizeRangeEnd(String rawEnd, String fieldName) {
+    if (StringUtils.isBlank(rawEnd)) {
+      throw new IllegalArgumentException("Invalid " + fieldName + " end value: " + rawEnd);
+    }
+
+    String datePart = rawEnd;
+    int separatorIndex = rawEnd.indexOf('T');
+    if (separatorIndex > 0) {
+      datePart = rawEnd.substring(0, separatorIndex);
+    }
+
+    if (!datePart.matches("\\d{4}-\\d{2}-\\d{2}")) {
+      throw new IllegalArgumentException("Invalid " + fieldName + " end value: " + rawEnd);
+    }
+
+    return datePart + "T23:59:59Z";
   }
 
   /*
@@ -1473,7 +1531,7 @@ public class MetadataCacheManager {
 
         logger.info("LOAD DB CACHE to SOLR - end");
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
 
     }
@@ -1482,7 +1540,6 @@ public class MetadataCacheManager {
      * Init DCAT-AP datasets dump scheduler
      */
 
-    System.gc();
     logger.info("LOAD CACHE end");
   }
 
@@ -1631,7 +1688,7 @@ public class MetadataCacheManager {
           logger.info("There was an error while committing " + "the current datasets page: "
               + e.getClass() + " - " + e.getMessage());
           logger.info("Starting to persist datasets one by one");
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
 
           // cachePersistence.jpaClear();
           server.rollback();
@@ -1753,7 +1810,6 @@ public class MetadataCacheManager {
       StatisticsManager.odmsStatistics(node, node.getDatasetCount(), 0, 0, node.getRdfCount(), 0,
           0);
 
-      System.gc();
 
     } catch (Exception e) {
       if (!isProtocolChange) {
@@ -1763,7 +1819,7 @@ public class MetadataCacheManager {
         loadCacheFromOdmsCatalogue(node, true);
 
       } else {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         throw new InvocationTargetException(e, e.getMessage());
       }
 
@@ -1899,7 +1955,7 @@ public class MetadataCacheManager {
       CachePersistenceManager.jpaFinalize();
       EuroVocTranslator.jpaFinalize();
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 

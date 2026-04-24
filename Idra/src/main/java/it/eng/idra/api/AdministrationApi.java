@@ -66,7 +66,7 @@
  import java.nio.charset.Charset;
  import java.nio.charset.StandardCharsets;
  import java.nio.file.Files;
- import java.nio.file.Paths;
+import java.nio.file.Paths;
  import java.text.ParseException;
  import java.util.ArrayList;
  import java.util.Base64;
@@ -337,7 +337,7 @@
          HashMap<Integer, Long> messages = FederationCore.getAllOdmsMessagesCount();
          nodes.stream().forEach(node -> node.setMessageCount(messages.get(node.getId())));
        } catch (Exception e) {
-         e.printStackTrace();
+         logger.error(e.getMessage(), e);
          nodes.stream().forEach(node -> node.setMessageCount(0L));
        }
  
@@ -381,7 +381,11 @@
              && StringUtils.isNotBlank(node.getDumpFilePath())) {
  
            // Read the content of the file from the file system
-           String dumpString = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())));
+           java.nio.file.Path dumpSafePath = Paths.get(node.getDumpFilePath()).normalize();
+           if (dumpSafePath.toString().contains("..") || !dumpSafePath.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dumpString = new String(Files.readAllBytes(dumpSafePath));
            node.setDumpString(dumpString);
          }
        }
@@ -391,26 +395,32 @@
          if (StringUtils.isBlank(conf.getOrionDatasetDumpString())
              && StringUtils.isNotBlank(conf.getOrionDatasetFilePath())) {
            // Read the content of the file from the file system
-           String dumpOrion = new String(
-               Files.readAllBytes(Paths.get(conf.getOrionDatasetFilePath())));
+           java.nio.file.Path orionSafePath1 = Paths.get(conf.getOrionDatasetFilePath()).normalize();
+           if (orionSafePath1.toString().contains("..") || !orionSafePath1.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dumpOrion = new String(Files.readAllBytes(orionSafePath1));
            conf.setOrionDatasetDumpString(dumpOrion);
            node.setAdditionalConfig(conf);
          }
        }
- 
+
        if (node.getNodeType().equals(OdmsCatalogueType.SPARQL)) {
          SparqlCatalogueConfiguration conf = (SparqlCatalogueConfiguration) node
              .getAdditionalConfig();
          if (StringUtils.isBlank(conf.getSparqlDatasetDumpString())
              && StringUtils.isNotBlank(conf.getSparqlDatasetFilePath())) {
            // Read the content of the file from the file system
-           String dumpOrion = new String(
-               Files.readAllBytes(Paths.get(conf.getSparqlDatasetFilePath())));
+           java.nio.file.Path sparqlSafePath1 = Paths.get(conf.getSparqlDatasetFilePath()).normalize();
+           if (sparqlSafePath1.toString().contains("..") || !sparqlSafePath1.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dumpOrion = new String(Files.readAllBytes(sparqlSafePath1));
            conf.setSparqlDatasetDumpString(dumpOrion);
            node.setAdditionalConfig(conf);
          }
        }
- 
+
        FederationCore.activateOdmsCatalogue(node);
  
        return Response.status(Response.Status.OK).build();
@@ -529,31 +539,41 @@
        if (node.getNodeType().equals(OdmsCatalogueType.DCATDUMP)) {
          if (StringUtils.isBlank(node.getDumpString())) {
            // Read the content of the file from the file system
-           String dump = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())));
+           java.nio.file.Path dumpSafePath2 = Paths.get(node.getDumpFilePath()).normalize();
+           if (dumpSafePath2.toString().contains("..") || !dumpSafePath2.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dump = new String(Files.readAllBytes(dumpSafePath2));
            node.setDumpString(dump);
          }
        }
- 
+
        if (node.getNodeType().equals(OdmsCatalogueType.ORION)) {
          OrionCatalogueConfiguration conf = (OrionCatalogueConfiguration) node.getAdditionalConfig();
          if (StringUtils.isBlank(conf.getOrionDatasetDumpString())
              && StringUtils.isNotBlank(conf.getOrionDatasetFilePath())) {
            // Read the content of the file from the file system
-           String dumpOrion = new String(
-               Files.readAllBytes(Paths.get(conf.getOrionDatasetFilePath())));
+           java.nio.file.Path orionSafePath2 = Paths.get(conf.getOrionDatasetFilePath()).normalize();
+           if (orionSafePath2.toString().contains("..") || !orionSafePath2.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dumpOrion = new String(Files.readAllBytes(orionSafePath2));
            conf.setOrionDatasetDumpString(dumpOrion);
            node.setAdditionalConfig(conf);
          }
        }
- 
+
        if (node.getNodeType().equals(OdmsCatalogueType.SPARQL)) {
          SparqlCatalogueConfiguration conf = (SparqlCatalogueConfiguration) node
              .getAdditionalConfig();
          if (StringUtils.isBlank(conf.getSparqlDatasetDumpString())
              && StringUtils.isNotBlank(conf.getSparqlDatasetFilePath())) {
            // Read the content of the file from the file system
-           String dumpOrion = new String(
-               Files.readAllBytes(Paths.get(conf.getSparqlDatasetFilePath())));
+           java.nio.file.Path sparqlSafePath2 = Paths.get(conf.getSparqlDatasetFilePath()).normalize();
+           if (sparqlSafePath2.toString().contains("..") || !sparqlSafePath2.isAbsolute()) {
+             throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+           }
+           String dumpOrion = new String(Files.readAllBytes(sparqlSafePath2));
            conf.setSparqlDatasetDumpString(dumpOrion);
            node.setAdditionalConfig(conf);
          }
@@ -647,7 +667,11 @@
        if (requestNode.getNodeType().equals(OdmsCatalogueType.ORION)) {
          OrionCatalogueConfiguration c = (OrionCatalogueConfiguration) requestNode
              .getAdditionalConfig();
-         String oldDump = new String(Files.readAllBytes(Paths.get(c.getOrionDatasetFilePath())));
+         java.nio.file.Path orionSafePath3 = Paths.get(c.getOrionDatasetFilePath()).normalize();
+         if (orionSafePath3.toString().contains("..") || !orionSafePath3.isAbsolute()) {
+           throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+         }
+         String oldDump = new String(Files.readAllBytes(orionSafePath3));
          if (StringUtils.isBlank(c.getOrionDatasetDumpString())) {
            c.setOrionDatasetDumpString(oldDump);
            requestNode.setAdditionalConfig(c);
@@ -655,11 +679,15 @@
            rescheduleJob = true;
          }
        }
- 
+
        if (requestNode.getNodeType().equals(OdmsCatalogueType.SPARQL)) {
          SparqlCatalogueConfiguration c = (SparqlCatalogueConfiguration) requestNode
              .getAdditionalConfig();
-         String oldDump = new String(Files.readAllBytes(Paths.get(c.getSparqlDatasetFilePath())));
+         java.nio.file.Path sparqlSafePath3 = Paths.get(c.getSparqlDatasetFilePath()).normalize();
+         if (sparqlSafePath3.toString().contains("..") || !sparqlSafePath3.isAbsolute()) {
+           throw new IllegalArgumentException("Invalid dump file path: must be absolute and contain no traversal");
+         }
+         String oldDump = new String(Files.readAllBytes(sparqlSafePath3));
          if (StringUtils.isBlank(c.getSparqlDatasetDumpString())) {
            c.setSparqlDatasetDumpString(oldDump);
            requestNode.setAdditionalConfig(c);
@@ -2034,7 +2062,8 @@
          DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
          dataset.getDistributions().stream().filter(x -> x.getId().equals(distributionIdentifier))
              .findFirst().get().setHasDatalets(false);
-         MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset);
+         MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset,
+             distributionIdentifier, false);
        }
  
        return Response.ok().build();
@@ -2257,7 +2286,7 @@
     */
    private static Response handleErrorResponseLogin(Exception e) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
          e.getClass().getSimpleName(), e.getMessage());
@@ -2273,7 +2302,7 @@
     */
    private static Response handleErrorResponse500(Exception e) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
          e.getClass().getSimpleName(), "An error occurred, please contact the administrator!");
@@ -2289,7 +2318,7 @@
     */
    private static Response handleBadRequestErrorResponse(Exception e) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("Exception " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
@@ -2306,7 +2335,7 @@
     */
    private static Response handleUnauthorizedErrorResponse(Exception e) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("Exception " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.UNAUTHORIZED.getStatusCode()), e.getMessage(),
@@ -2324,7 +2353,7 @@
     */
    private static Response handlePrefixNotFoundErrorResponse(Exception e, String prefixId) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("Prefix " + prefixId + " raised exception " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()), e.getMessage(),
@@ -2359,7 +2388,7 @@
     */
    private static Response handleNodeHostNotFoundErrorResponse(Exception e, String nodeHost) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("NodeHost " + nodeHost + " not found: " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()), e.getMessage(),
@@ -2378,7 +2407,7 @@
     */
    private static Response handleNodeForbiddenErrorResponse(Exception e, String nodeHost) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("NodeHost " + nodeHost + " forbidden: " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.FORBIDDEN.getStatusCode()), e.getMessage(),
@@ -2397,7 +2426,7 @@
     */
    private static Response handleNodeOfflineErrorResponse(Exception e, String nodeHost) {
  
-     e.printStackTrace();
+     logger.error(e.getMessage(), e);
      logger.error("NodeHost " + nodeHost + " offline: " + e.getLocalizedMessage());
      ErrorResponse error = new ErrorResponse(
          String.valueOf(Response.Status.FORBIDDEN.getStatusCode()), e.getMessage(),

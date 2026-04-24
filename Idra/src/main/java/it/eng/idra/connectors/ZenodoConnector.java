@@ -202,12 +202,11 @@ public class ZenodoConnector implements IodmsConnector {
       logger.info("\n-----------------------\n");
 
     } catch (ZenodoException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       handleError(e);
     }
 
     zc = null;
-    System.gc();
 
     return dcatResults;
   }
@@ -300,12 +299,11 @@ public class ZenodoConnector implements IodmsConnector {
       }
 
       zc = null;
-      System.gc();
 
       return resultsCount;
 
     } catch (ZenodoException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       handleError(e);
       return 0;
     }
@@ -541,7 +539,7 @@ public class ZenodoConnector implements IodmsConnector {
       return mapped;
 
     } catch (ZenodoException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       handleError(e);
       return null;
     }
@@ -626,10 +624,9 @@ public class ZenodoConnector implements IodmsConnector {
         }
 
         zc = null;
-        System.gc();
 
       } catch (ZenodoException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         if (e.getMessage() != null && e.getMessage().contains("The ODMS host does not exist")) {
           throw new OdmsCatalogueNotFoundException(e.getMessage());
         } else {
@@ -716,7 +713,7 @@ public class ZenodoConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }
@@ -1113,7 +1110,7 @@ public class ZenodoConnector implements IodmsConnector {
             nodeId)));
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 

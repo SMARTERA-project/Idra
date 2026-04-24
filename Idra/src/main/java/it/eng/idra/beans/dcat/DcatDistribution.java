@@ -560,7 +560,14 @@ public class DcatDistribution implements Serializable {
    * @param distributionDetails distribution details
    */
   public void setDistributionDetails(List<DcatDetails> distributionDetails) {
-    this.distributionDetails = distributionDetails;
+    if (this.distributionDetails == null) {
+      this.distributionDetails = distributionDetails;
+    } else {
+      this.distributionDetails.clear();
+      if (distributionDetails != null) {
+        this.distributionDetails.addAll(distributionDetails);
+      }
+    }
   }
 
   /**
@@ -1291,7 +1298,7 @@ public class DcatDistribution implements Serializable {
       }
       this.description.setValue(descTmp);
     } catch (UnsupportedEncodingException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     if (accessUrl != null) {
@@ -1312,7 +1319,7 @@ public class DcatDistribution implements Serializable {
       try {
         doc.addField("license", GsonUtil.obj2Json(license, GsonUtil.licenseType));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
     // if (license != null)
@@ -1326,7 +1333,7 @@ public class DcatDistribution implements Serializable {
         doc.addField("checksum", GsonUtil.obj2Json(checksum, GsonUtil.checksumType));
         // doc.addField("checksum",checksum.toDoc(CacheContentType.checksum));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -1362,7 +1369,7 @@ public class DcatDistribution implements Serializable {
       try {
         doc.addField("linkedSchemas", GsonUtil.obj2Json(linkedSchemas, GsonUtil.stdListType));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
     // if (linkedSchemas != null && !linkedSchemas.isEmpty())
@@ -1394,7 +1401,7 @@ public class DcatDistribution implements Serializable {
       try {
         doc.addField("status", GsonUtil.obj2Json(status, GsonUtil.conceptType));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -1404,7 +1411,7 @@ public class DcatDistribution implements Serializable {
       try {
         doc.addField("accessService", GsonUtil.obj2Json(accessService, GsonUtil.dataServiceListType));
       } catch (GsonUtilException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 

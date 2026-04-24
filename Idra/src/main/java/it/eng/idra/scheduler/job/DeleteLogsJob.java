@@ -58,7 +58,7 @@ public class DeleteLogsJob implements Job {
       logger.info("Logs deleted ");
     } catch (Exception e) {
       logger.error("Error during logs deletion " + e.getLocalizedMessage());
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       jpa.jpaClose();
     }

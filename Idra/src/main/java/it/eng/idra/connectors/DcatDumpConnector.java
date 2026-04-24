@@ -29,7 +29,10 @@ import it.eng.idra.dcat.dump.DcatApItDeserializer;
 import it.eng.idra.dcat.dump.DcatApSerializer;
 import it.eng.idra.management.OdmsManager;
 import it.eng.idra.utils.PropertyManager;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
@@ -208,6 +211,12 @@ public class DcatDumpConnector implements IodmsConnector {
         return getDatasetsFromDumpUrl(dumpUrl);
       } else if (StringUtils.isNotBlank(dumpString = node.getDumpString())) {
         return getDatasetsFromDumpString(dumpString);
+      } else if (StringUtils.isNotBlank(node.getDumpFilePath())
+          && new File(node.getDumpFilePath()).exists()) {
+        // Fallback: dumpString was cleared after initial parse but the cached file still
+        // exists (e.g. retry after a JPA transaction failure during registration).
+        String content = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())));
+        return getDatasetsFromDumpString(content);
       } else {
         throw new Exception("The node must have either the dumpURL or dumpString");
       }
@@ -377,7 +386,7 @@ public class DcatDumpConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }

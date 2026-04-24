@@ -1319,7 +1319,7 @@ public class DcatApSerializer {
       out = new FileWriter(filePath + fileName);
       model.write(out, format.name());
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     } finally {
       if (out != null) {
         out.close();

@@ -140,7 +140,7 @@ public class NativeClient {
       return new JSONObject(sendGetRequest(node.getHost() + "/odf/odms/datasets/" + id));
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return null;
     }
 
@@ -208,7 +208,7 @@ public class NativeClient {
       return new JSONArray(sendGetRequest(node.getHost() + "/odf/odms/datasets"));
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return null;
     }
 
@@ -287,7 +287,7 @@ public class NativeClient {
 
       body = result.toString();
     } catch (IOException ioe) {
-      ioe.printStackTrace();
+      logger.error(ioe.getMessage(), ioe);
       logger.info(ioe);
     } finally {
       httpclient.getConnectionManager().shutdown();

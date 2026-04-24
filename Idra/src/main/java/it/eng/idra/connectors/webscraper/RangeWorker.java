@@ -136,7 +136,7 @@ public class RangeWorker implements Runnable {
           try {
             TimeUnit.MILLISECONDS.sleep(JSOUP_THROTTLING);
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
           }
 
           Document doc = WebScraper.getDatasetDocumentByIncrement(startUrl, navParam,
@@ -158,7 +158,7 @@ public class RangeWorker implements Runnable {
           retryNum++;
           if (retryNum > RANGE_RETRY_NUM) {
             retry = false;
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
           }
         }
 

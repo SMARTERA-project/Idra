@@ -119,7 +119,7 @@ public class SpodConnector implements IodmsConnector {
     try {
       return getAllIds().size();
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       throw new OdmsCatalogueOfflineException(e.getMessage());
     }
   }
@@ -153,7 +153,7 @@ public class SpodConnector implements IodmsConnector {
       return datasetToDcat(getCkanDataset(datasetId), node);
     } catch (Exception e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       throw new OdmsCatalogueOfflineException(e.getMessage());
     }
   }
@@ -199,7 +199,7 @@ public class SpodConnector implements IodmsConnector {
         }).forEach(dcatResults::addAll);
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
       LocalDateTime b = LocalDateTime.now();
       logger.info("Finished at: " + b.toString());
@@ -208,7 +208,7 @@ public class SpodConnector implements IodmsConnector {
       return dcatResults;
     } catch (Exception e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       throw new OdmsCatalogueOfflineException(e.getMessage());
     }
   }
@@ -253,7 +253,7 @@ public class SpodConnector implements IodmsConnector {
         added++;
       } catch (Exception e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -294,7 +294,7 @@ public class SpodConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }
@@ -335,7 +335,7 @@ public class SpodConnector implements IodmsConnector {
         return datasetToDcat(getCkanDataset(x), node);
       } catch (Exception e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         return null;
       }
     }).filter(x -> x != null).collect(Collectors.toList());
@@ -1002,7 +1002,7 @@ public class SpodConnector implements IodmsConnector {
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 

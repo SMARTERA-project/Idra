@@ -161,7 +161,7 @@ public class CkanConnector implements IodmsConnector {
       return result.count;
 
     } catch (CKANException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       handleError(e);
       return 0;
     }
@@ -250,7 +250,6 @@ public class CkanConnector implements IodmsConnector {
 
     // }
     c = null;
-    System.gc();
 
     // if(isEurovoc){
     // searchParameters.put("euroVoc", isEurovoc);
@@ -934,7 +933,7 @@ public class CkanConnector implements IodmsConnector {
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
@@ -1227,7 +1226,7 @@ public class CkanConnector implements IodmsConnector {
         result = null;
 
       } catch (CKANException e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         if (e.getMessage() != null && e.getMessage().contains("The ODMS host does not exist")) {
           throw new OdmsCatalogueNotFoundException(e.getMessage());
         } else {
@@ -1308,7 +1307,7 @@ public class CkanConnector implements IodmsConnector {
       newDatasetsNames = Arrays.asList(c.getAllDatasetsID());
 
     } catch (CKANException | MalformedURLException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       logger.info(e.getMessage());
       if (e.getClass().equals(CKANException.class)) {
         handleError((CKANException) e);
@@ -1348,7 +1347,7 @@ public class CkanConnector implements IodmsConnector {
         } catch (NumberFormatException | DatasetNotFoundException | IOException
             | SolrServerException e) {
           // TODO Auto-generated catch block
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
         }
 
       }
@@ -1407,7 +1406,7 @@ public class CkanConnector implements IodmsConnector {
           retry = false;
 
         } catch (CKANException e) {
-          e.printStackTrace();
+          logger.error(e.getMessage(), e);
           logger.info("Exception! Attempt n: " + retryNum);
           retry = true;
           retryNum++;
@@ -1443,7 +1442,6 @@ public class CkanConnector implements IodmsConnector {
 
     c = null;
     result = null;
-    System.gc();
     return syncrhoResult;
 
   }

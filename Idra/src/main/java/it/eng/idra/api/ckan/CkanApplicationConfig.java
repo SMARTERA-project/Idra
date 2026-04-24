@@ -38,6 +38,7 @@ public class CkanApplicationConfig extends Application {
     Set<Class<?>> resources = new HashSet<Class<?>>();
     resources.add(org.glassfish.jersey.media.multipart.MultiPartFeature.class);
     resources.add(it.eng.idra.api.CorsResponseFilter.class);
+    resources.add(it.eng.idra.api.CorsPreflightFilter.class);
     resources.add(it.eng.idra.api.ckan.CkanApi.class);
 
     return resources;

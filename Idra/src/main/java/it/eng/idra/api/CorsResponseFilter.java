@@ -22,7 +22,6 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.Provider;
 
-// TODO: Auto-generated Javadoc
 /**
  * The Class CorsResponseFilter.
  */
@@ -41,9 +40,32 @@ public class CorsResponseFilter implements ContainerResponseFilter {
 
     MultivaluedMap<String, Object> headers = responseContext.getHeaders();
 
-    headers.add("Access-Control-Allow-Origin", "*");
-    headers.add("Access-Control-Allow-Methods", "GET,POST,DELETE,PUT,OPTIONS");
-    headers.add("Access-Control-Allow-Headers", "*");
+    String origin = requestContext.getHeaderString("Origin");
+    if (origin != null && isAllowedOrigin(origin)) {
+      // Reflect specific origin so credentials (cookies, auth) are accepted by the browser.
+      // "*" + "Access-Control-Allow-Credentials: true" is invalid and browsers reject it.
+      headers.putSingle("Access-Control-Allow-Origin", origin);
+      headers.putSingle("Access-Control-Allow-Credentials", "true");
+      headers.putSingle("Vary", "Origin");
+    }
+    // If origin is not in the allowlist, no Access-Control-Allow-Origin header is set
+    // and the browser blocks the response — correct CORS security behavior.
+
+    headers.putSingle("Access-Control-Allow-Methods", "GET,POST,DELETE,PUT,OPTIONS");
+    headers.putSingle("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN");
+  }
+
+  private boolean isAllowedOrigin(String origin) {
+    String allowed = System.getProperty("idra.cors.allowed.origins", "");
+    if (allowed == null || allowed.isBlank()) {
+      return false;
+    }
+    for (String a : allowed.split(",")) {
+      if (a.trim().equalsIgnoreCase(origin)) {
+        return true;
+      }
+    }
+    return false;
   }
 
 }

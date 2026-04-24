@@ -136,7 +136,6 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
     }
 
     c = null;
-    System.gc();
     return dcatResults;
 
   }
@@ -579,7 +578,7 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
           } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
               | InvocationTargetException | NoSuchMethodException | SecurityException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
           }
         }
       }
@@ -792,7 +791,7 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
           ResourceFactory.createProperty("http://www.w3.org/ns/adms#status"), nodeId,
           SkosConceptStatus.class).get(0);
     } catch (IndexOutOfBoundsException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     // new
@@ -880,7 +879,6 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
 
     datasetsArray = null;
     client = null;
-    System.gc();
 
     return dcatDatasets;
   }
@@ -962,7 +960,7 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }

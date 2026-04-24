@@ -607,7 +607,7 @@ public class SocrataConnector implements IodmsConnector {
           } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
               | InvocationTargetException | NoSuchMethodException | SecurityException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
           }
         }
       }
@@ -679,7 +679,6 @@ public class SocrataConnector implements IodmsConnector {
     }
 
     datasetsArray = null;
-    System.gc();
 
     return dcatDatasets;
   }
@@ -756,7 +755,7 @@ public class SocrataConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }
@@ -815,7 +814,7 @@ public class SocrataConnector implements IodmsConnector {
           }
         });
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         logger.error("", e);
         // throw OurExceptionUtils.wrapInRuntimeExceptionIfNecessary(e);
       }
@@ -831,7 +830,7 @@ public class SocrataConnector implements IodmsConnector {
       String res = response.readEntity(String.class);
       return res;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return "";
     }
 

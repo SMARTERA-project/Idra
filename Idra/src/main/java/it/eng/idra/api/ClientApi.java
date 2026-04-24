@@ -77,6 +77,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -138,9 +140,6 @@ public class ClientApi {
 
   /** The logger. */
   private static Logger logger = LogManager.getLogger(ClientApi.class);
-
-  /** The client. */
-  private static Client client;
 
   private static final int LOCALIZED_TAGS_MAX_DATASETS = 5000;
   private static final String TAGS_SEARCH_PARAMETER = "tags";
@@ -243,7 +242,10 @@ public class ClientApi {
     logger.info("Catalogue ID about the Notification from the CB: " + nodeId);
 
     if (node.getNodeType().equals(OdmsCatalogueType.NGSILD_CB)
-        && node.getApiKey().equals(apiKey)) {
+        && node.getApiKey() != null
+        && MessageDigest.isEqual(
+            node.getApiKey().getBytes(StandardCharsets.UTF_8),
+            apiKey.getBytes(StandardCharsets.UTF_8))) {
 
       Notification notification = GsonUtil.json2Obj(n, GsonUtil.notifcation);
 
@@ -1061,12 +1063,12 @@ public class ClientApi {
       // TimeUnit.SECONDS).build();
       int timeout = Integer.parseInt(PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT))
           * 1000;
-      client = ClientBuilder.newClient().register(RedirectFilter.class);
-      client.property(ClientProperties.CONNECT_TIMEOUT, timeout);
-      client.property(ClientProperties.READ_TIMEOUT, timeout);
+      Client localClient = ClientBuilder.newClient().register(RedirectFilter.class);
+      localClient.property(ClientProperties.CONNECT_TIMEOUT, timeout);
+      localClient.property(ClientProperties.READ_TIMEOUT, timeout);
 
       try {
-        WebTarget webTarget = client.target(compiledUri);
+        WebTarget webTarget = localClient.target(compiledUri);
         long previewLimit = resolvePreviewLimitBytes(previewMaxMB);
 
         if (isPreview && previewLimit > 0) {
@@ -1134,17 +1136,17 @@ public class ClientApi {
         return responseBuilder.build();
 
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
         return handleErrorResponse500(e);
 
       } finally {
         // request.close();
-        client.close();
+        localClient.close();
       }
 
     } catch (DistributionNotFoundException | IOException | SolrServerException e1) {
       // TODO Auto-generated catch block
-      e1.printStackTrace();
+      logger.error(e1.getMessage(), e1);
       return handleErrorResponse500(e1);
     }
 
@@ -1245,7 +1247,8 @@ public class ClientApi {
       }
 
       if (updateSolr) {
-        MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset);
+        MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset,
+            distributionIdentifier, true);
       }
 
       if (StringUtils.isBlank(datalet.getTitle())) {
@@ -1527,7 +1530,6 @@ public class ClientApi {
 
       JSONArray array = new JSONArray(GsonUtil.obj2JsonWithExclude(nodes, GsonUtil.nodeListType));
       result.put("catalogues", array);
-      System.gc();
       return Response.status(Response.Status.OK).entity(result.toString()).build();
 
     } catch (Exception e) {
@@ -1913,9 +1915,9 @@ public class ClientApi {
             + (!catalogueConfig.isNgsild() ? "/v2/entities" : "/ngsi-ld/v1/entities") + "?"
             + distributionConfig.getQuery();
 
-        client = ClientBuilder.newClient();
+        Client localClient = ClientBuilder.newClient();
 
-        WebTarget webTarget = client.target(compiledUri);
+        WebTarget webTarget = localClient.target(compiledUri);
         Invocation.Builder builder = webTarget.request();
         if (StringUtils.isNotBlank(distributionConfig.getFiwareService())) {
           builder = builder.header("Fiware-Service", distributionConfig.getFiwareService());
@@ -2269,7 +2271,7 @@ public class ClientApi {
    */
   private static Response handleErrorResponse500(Exception e) {
 
-    e.printStackTrace();
+    logger.error(e.getMessage(), e);
     ErrorResponse error = new ErrorResponse(
         String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
         e.getClass().getSimpleName(), "An error occurred, please contact the administrator!");
@@ -2284,7 +2286,7 @@ public class ClientApi {
    */
   private static Response handleEuroVocNotFound(EuroVocTranslationNotFoundException e) {
 
-    e.printStackTrace();
+    logger.error(e.getMessage(), e);
     ErrorResponse error = new ErrorResponse(
         String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
         e.getClass().getSimpleName(), "No results found!");
@@ -2299,7 +2301,7 @@ public class ClientApi {
    */
   private static Response handleBadRequestErrorResponse(Exception e) {
 
-    e.printStackTrace();
+    logger.error(e.getMessage(), e);
     ErrorResponse error = new ErrorResponse(
         String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
         e.getClass().getSimpleName(), "The request body is not a valid JSON");
@@ -2314,7 +2316,7 @@ public class ClientApi {
    */
   private static Response handleBadQueryErrorResponse(Exception e) {
 
-    e.printStackTrace();
+    logger.error(e.getMessage(), e);
     ErrorResponse error = new ErrorResponse(
         String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
         e.getClass().getSimpleName(), "Malformed SPARQL query");

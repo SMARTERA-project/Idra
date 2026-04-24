@@ -74,7 +74,7 @@ public class PersistenceManager {
     try {
       emf = Persistence.createEntityManagerFactory("org.hibernate.jpa.beans");
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -86,7 +86,7 @@ public class PersistenceManager {
     try {
       em = emf.createEntityManager();
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
     // logger.info("Hibernate end");
   }
@@ -388,7 +388,7 @@ public class PersistenceManager {
       // em.flush();
       return mex.getId();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     return 0;
@@ -450,7 +450,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -471,7 +471,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -492,7 +492,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -554,7 +554,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception ex) {
-      ex.printStackTrace();
+      logger.error(ex.getMessage(), ex);
       return false;
     }
   }
@@ -619,7 +619,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception ex) {
-      ex.printStackTrace();
+      logger.error(ex.getMessage(), ex);
       return false;
     }
   }
@@ -640,7 +640,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -663,7 +663,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -683,7 +683,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
       return false;
     }
   }
@@ -838,7 +838,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       // em.flush();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -857,7 +857,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       // em.flush();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -900,7 +900,7 @@ public class PersistenceManager {
       // System.out.println(node.getId());
       // return mex.getId();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -919,7 +919,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       // em.flush();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -938,7 +938,7 @@ public class PersistenceManager {
       q.executeUpdate();
       em.getTransaction().commit();
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -979,7 +979,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       // em.flush();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -998,7 +998,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
       // em.flush();
     } catch (IllegalStateException e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
   }
 
@@ -1164,7 +1164,7 @@ public class PersistenceManager {
       em.getTransaction().commit();
 
     } catch (IllegalStateException | NoSuchAlgorithmException ex) {
-      ex.printStackTrace();
+      logger.error(ex.getMessage(), ex);
     }
 
   }
@@ -1225,7 +1225,6 @@ public class PersistenceManager {
   public static void jpaFinalize() {
     emf.close();
     emf = null;
-    System.gc();
   }
 
   /**

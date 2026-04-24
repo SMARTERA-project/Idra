@@ -968,7 +968,6 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
     }
 
     datasetsArray = null;
-    System.gc();
 
     return dcatDatasets;
 
@@ -1084,7 +1083,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       } catch (Exception ex) {
         exception++;
         if (exception % 1000 == 0) {
-          ex.printStackTrace();
+          logger.error(ex.getMessage(), ex);
         }
       }
     }
@@ -1117,7 +1116,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        logger.error(e.getMessage(), e);
       }
     }
 
