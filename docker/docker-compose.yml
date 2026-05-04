@@ -206,7 +206,7 @@ services:
             - idm.host=keycloak:8080/auth/realms/smartera/protocol/openid-connect
             - idm.path.base=
             - idm.client.id=data-platform
-            - idm.client.secret=vzO1KrNTiEe70y55IIgAPCbrKdG4Ov9l
+            - idm.client.secret=
             - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
             - idm.logout.callback=http://localhost:4200
             - idra.server.baseurl=http://localhost:8080/

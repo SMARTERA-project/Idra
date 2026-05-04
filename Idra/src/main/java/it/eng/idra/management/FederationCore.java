@@ -521,6 +521,7 @@ public class FederationCore {
           logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
               + node.getId() + " in the Context Broker");
         }
+        OdmsManager.updateOdmsCatalogue(node, false);
 
         /*
          * 2. Start all the Jobs after Catalogue registration
@@ -983,6 +984,7 @@ public class FederationCore {
         logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
             + node.getId() + " in the Context Broker");
       }
+      OdmsManager.updateOdmsCatalogue(node, false);
     }
 
   }
