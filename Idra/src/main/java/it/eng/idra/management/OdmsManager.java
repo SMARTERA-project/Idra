@@ -187,7 +187,16 @@ public class OdmsManager {
    * @throws SQLException the SQL exception
    */
   public static void updateOdmsCatalogueList() throws SQLException {
-    federatedNodes = getOdmsCataloguesfromDb(false);
+    List<OdmsCatalogue> newNodes = getOdmsCataloguesfromDb(false);
+    for (OdmsCatalogue newNode : newNodes) {
+      OdmsCatalogue existing = federatedNodes.stream()
+          .filter(n -> n.getId() == newNode.getId())
+          .findFirst().orElse(null);
+      if (existing != null && existing.getImage() != null) {
+        newNode.setImage(existing.getImage());
+      }
+    }
+    federatedNodes = newNodes;
   }
 
   /**

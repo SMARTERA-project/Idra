@@ -338,6 +338,19 @@ public final class GsonUtil {
             JsonSerializationContext jsonSerializationContext) {
           return new JsonPrimitive(property.getValue().toString());
         }
+      }).registerTypeAdapter(DcatProperty.class, new JsonDeserializer<DcatProperty>() {
+        @Override
+        public DcatProperty deserialize(JsonElement json, Type type,
+            JsonDeserializationContext context) throws JsonParseException {
+          if (json.isJsonPrimitive()) {
+            return new DcatProperty((String) null, json.getAsString());
+          } else if (json.isJsonObject()) {
+            JsonObject obj = json.getAsJsonObject();
+            String value = obj.has("value") ? obj.get("value").getAsString() : null;
+            return new DcatProperty((String) null, value);
+          }
+          return new DcatProperty();
+        }
       }).registerTypeAdapter(OdmsCatalogue.class, new AnnotatedDeserializer<OdmsCatalogue>())
         // Accept both string or object for WebScraperSitemap during deserialization
         .registerTypeAdapter(it.eng.idra.beans.webscraper.WebScraperSitemap.class,
@@ -543,6 +556,19 @@ public final class GsonUtil {
               DateTimeFormatter fmt = DateTimeFormatter.ISO_OFFSET_DATE_TIME
                   .withZone(ZoneOffset.UTC);
               return new JsonPrimitive(fmt.format(zonedDateTime.truncatedTo(ChronoUnit.SECONDS)));
+            }
+          }).registerTypeAdapter(DcatProperty.class, new JsonDeserializer<DcatProperty>() {
+            @Override
+            public DcatProperty deserialize(JsonElement json, Type type,
+                JsonDeserializationContext context) throws JsonParseException {
+              if (json.isJsonPrimitive()) {
+                return new DcatProperty((String) null, json.getAsString());
+              } else if (json.isJsonObject()) {
+                JsonObject obj = json.getAsJsonObject();
+                String value = obj.has("value") ? obj.get("value").getAsString() : null;
+                return new DcatProperty((String) null, value);
+              }
+              return new DcatProperty();
             }
           }).create().fromJson(je, type);
 

@@ -266,6 +266,12 @@ public class PersistenceManager {
     if (!em.getTransaction().isActive()) {
       em.getTransaction().begin();
     }
+    if (node.getImage() == null) {
+      OdmsCatalogue existing = em.find(OdmsCatalogue.class, node.getId());
+      if (existing != null && existing.getImage() != null) {
+        node.setImage(existing.getImage());
+      }
+    }
     em.merge(node);
     em.getTransaction().commit();
   }
