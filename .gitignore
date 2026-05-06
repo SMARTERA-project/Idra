@@ -10,7 +10,7 @@ bower_components
 .vscode
 .vscode/*
 
-docker/data
+/docker/data/
 ### Eclipse ###
 .vscode
 .metadata
