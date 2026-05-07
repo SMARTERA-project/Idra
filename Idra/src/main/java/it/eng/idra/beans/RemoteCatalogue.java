@@ -22,6 +22,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -74,6 +75,10 @@ public class RemoteCatalogue {
   /** The is idra. */
   @Column(name = "isIdra", unique = false)
   private boolean isIdra;
+
+  /** Reachability status (transient, not persisted). Values: ONLINE, OFFLINE, UNKNOWN. */
+  @Transient
+  private String reachabilityStatus;
 
   /**
    * Instantiates a new remote catalogue.
@@ -244,9 +249,17 @@ public class RemoteCatalogue {
     this.portal = portal;
   }
 
+  public String getReachabilityStatus() {
+    return reachabilityStatus;
+  }
+
+  public void setReachabilityStatus(String reachabilityStatus) {
+    this.reachabilityStatus = reachabilityStatus;
+  }
+
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see java.lang.Object#toString()
    */
   @Override

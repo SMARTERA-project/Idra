@@ -979,6 +979,45 @@ import java.nio.file.Paths;
    }
  
    /**
+    * checkRemoteCatalogueHealth.
+    * Checks HTTP reachability of a given URL and returns ONLINE / OFFLINE / UNKNOWN.
+    *
+    * @param url the catalogue URL to probe
+    * @return JSON {"status": "ONLINE"|"OFFLINE"|"UNKNOWN"}
+    */
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/remoteCatalogue/health")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response checkRemoteCatalogueHealth(@QueryParam("url") String url) {
+    String status = "UNKNOWN";
+    if (url != null && !url.trim().isEmpty()) {
+      java.net.HttpURLConnection conn = null;
+      try {
+        java.net.URL urlObj = new java.net.URL(url);
+        conn = (java.net.HttpURLConnection) urlObj.openConnection();
+        conn.setRequestMethod("HEAD");
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+        conn.setInstanceFollowRedirects(true);
+        int code = conn.getResponseCode();
+        // 405 means server rejected HEAD but is alive — treat as ONLINE
+        status = (code < 500 || code == 405) ? "ONLINE" : "OFFLINE";
+      } catch (Exception e) {
+        status = "OFFLINE";
+      } finally {
+        if (conn != null) {
+          conn.disconnect();
+        }
+      }
+    }
+    return Response.status(Response.Status.OK)
+        .entity(new JSONObject().put("status", status).toString())
+        .build();
+  }
+
+   /**
     * deleteRemCat.
     *
     * @param rmId parameter
