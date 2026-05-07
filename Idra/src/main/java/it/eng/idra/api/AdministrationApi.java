@@ -461,14 +461,18 @@ import java.nio.file.Paths;
        logger.info("Deactivation of the Catalogue also in the CB. "
            + "Calling the Broker Manager component.");
        HashMap<String, String> conf = FederationCore.getSettings();
-       if (!conf.get("orionUrl").equals("")) {
+       String orionUrlDeact = conf.get("orionUrl");
+       if (orionUrlDeact == null || orionUrlDeact.isEmpty()) {
+         orionUrlDeact = PropertyManager.getProperty(IdraProperty.ORION_CB_URL);
+       }
+       if (orionUrlDeact != null && !orionUrlDeact.isEmpty()) {
          Map<String, String> headers = new HashMap<String, String>();
          headers.put("Content-Type", "application/json");
          RestClient client = new RestClientImpl();
 
          String api = urlOrionmanager + "deleteCatalogue";
          String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \""
-             + conf.get("orionUrl") + "\"  }";
+             + orionUrlDeact + "\"  }";
          logger.info("Context Broker enabled, deleting NODEID: " + data);
 
          HttpResponse response = client.sendPostRequest(api, data,
@@ -746,14 +750,18 @@ import java.nio.file.Paths;
        logger.info("Deletion of the Catalogue also in the CB. "
            + "Calling the Broker Manager component.");
        HashMap<String, String> conf = FederationCore.getSettings();
-       if (!conf.get("orionUrl").equals("")) {
+       String orionUrlDel = conf.get("orionUrl");
+       if (orionUrlDel == null || orionUrlDel.isEmpty()) {
+         orionUrlDel = PropertyManager.getProperty(IdraProperty.ORION_CB_URL);
+       }
+       if (orionUrlDel != null && !orionUrlDel.isEmpty()) {
          Map<String, String> headers = new HashMap<String, String>();
          headers.put("Content-Type", "application/json");
          RestClient client = new RestClientImpl();
-         
+
          String api = urlOrionmanager + "deleteCatalogue";
-         String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \"" 
-             + conf.get("orionUrl") + "\"  }";
+         String data = "{ \"catalogueId\": \"" + node.getId() + "\", \"contextBrokerUrl\": \""
+             + orionUrlDel + "\"  }";
          logger.info("Context Broker enabled, deleting NODEID: "  + data);
          
          HttpResponse response = client.sendPostRequest(api, data,

@@ -200,6 +200,7 @@ services:
             - DATALET_URL=https://your-domain.it/deep/deep-components/demo.html
             - JAVA_OPTS=-Xms1024m -Xmx3g -Didra.cors.allowed.origins=http://mqa-score,http://rdf4j,http://deep,http://ngsi-broker,http://localhost,http://localhost:4200,https://dx-lab.it
             - idra.orion.manager.url=http://ngsi-broker:8082/
+            - idra.orion.cb.url=http://orion-ld-SMARTERA-final:1026/
         # env variables for KEYCLOAK authentication
             - idra.authentication.method=KEYCLOAK
             - idm.protocol=http

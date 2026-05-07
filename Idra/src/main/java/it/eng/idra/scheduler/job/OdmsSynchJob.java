@@ -363,6 +363,14 @@ public class OdmsSynchJob implements InterruptableJob {
         logger.error(e.getMessage(), e);
         logger.error("Error: " + e.getMessage() + " in creation of the Catalogue node "
             + node.getId() + " in the Context Broker");
+      } finally {
+        try {
+          OdmsManager.updateOdmsCatalogue(node, true);
+          logger.info("isFederatedInCb persisted: " + node.isFederatedInCb());
+        } catch (Exception e) {
+          logger.error("Error persisting isFederatedInCb for node " + node.getId() + ": "
+              + e.getMessage());
+        }
       }
 
       if (synchCompleted) {
