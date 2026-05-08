@@ -266,13 +266,57 @@ public class PersistenceManager {
     if (!em.getTransaction().isActive()) {
       em.getTransaction().begin();
     }
-    if (node.getImage() == null) {
-      OdmsCatalogue existing = em.find(OdmsCatalogue.class, node.getId());
-      if (existing != null && existing.getImage() != null) {
-        node.setImage(existing.getImage());
+    OdmsCatalogue managed = em.find(OdmsCatalogue.class, node.getId());
+    if (managed != null) {
+      managed.setName(node.getName());
+      managed.setHost(node.getHost());
+      managed.setHomepage(node.getHomepage());
+      managed.setApiKey(node.getApiKey());
+      managed.setPublisherName(node.getPublisherName());
+      managed.setPublisherUrl(node.getPublisherUrl());
+      managed.setPublisherEmail(node.getPublisherEmail());
+      managed.setDescription(node.getDescription());
+      managed.setCountry(node.getCountry());
+      managed.setCategory(node.getCategory());
+      managed.setCommunities(node.getCommunities());
+      managed.setRefreshPeriod(node.getRefreshPeriod());
+      managed.setFederationLevel(node.getFederationLevel());
+      managed.setNodeState(node.getNodeState());
+      managed.setDatasetCount(node.getDatasetCount());
+      managed.setRegisterDate(node.getRegisterDate());
+      managed.setLastUpdateDate(node.getLastUpdateDate());
+      managed.setRdfCount(node.getRdfCount());
+      managed.setDatasetStart(node.getDatasetStart());
+      managed.setLocation(node.getLocation());
+      managed.setLocationDescription(node.getLocationDescription());
+      managed.setDcatProfile(node.getDcatProfile());
+      managed.setDumpFilePath(node.getDumpFilePath());
+      managed.setDumpUrl(node.getDumpUrl());
+      managed.setDumpString(node.getDumpString());
+      managed.setSynchLock(node.getSynchLock());
+      managed.setAutoUpdate(node.getAutoUpdate());
+      if (node.isActive() != null) {
+        managed.setActive(node.isActive());
       }
+      if (node.isFederatedInCb() != null) {
+        managed.setFederatedInCb(node.isFederatedInCb());
+      }
+      if (node.getImage() != null) {
+        if (managed.getImage() != null) {
+          managed.getImage().setImageData(node.getImage().getImageData());
+        } else {
+          managed.setImage(node.getImage());
+        }
+      }
+      if (node.getAdditionalConfig() != null) {
+        managed.setAdditionalConfig(node.getAdditionalConfig());
+      }
+      if (node.getSitemap() != null) {
+        managed.setSitemap(node.getSitemap());
+      }
+    } else {
+      em.merge(node);
     }
-    em.merge(node);
     em.getTransaction().commit();
   }
 
