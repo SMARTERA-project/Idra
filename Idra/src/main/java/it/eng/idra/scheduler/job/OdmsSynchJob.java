@@ -436,6 +436,9 @@ public class OdmsSynchJob implements InterruptableJob {
   public static void addCatalogueInCb(OdmsCatalogue node) throws Exception {
     HashMap<String, String> conf = FederationCore.getSettings();
     String contextBrokerUrl = conf.get("orionUrl");
+    if (StringUtils.isBlank(contextBrokerUrl)) {
+      contextBrokerUrl = PropertyManager.getProperty(IdraProperty.ORION_CB_URL);
+    }
     if (StringUtils.isNotBlank(contextBrokerUrl)) {
       logger.info(" -- Context Broker URL: " + contextBrokerUrl);
     
