@@ -1,9 +1,17 @@
 @import url('https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap');
 @import url('https://fonts.googleapis.com/css?family=Roboto:200,300,400,500,600,700,800&display=swap');
 
-/* MODIFIED */
+/* SmartEra brand: override PatternFly 5 global color tokens */
+:root {
+    --pf-v5-global--primary-color--100: #165040;
+    --pf-v5-global--primary-color--200: #0e3529;
+    --pf-v5-global--link--Color: #165040;
+    --pf-v5-global--link--Color--hover: #6CB7AF;
+    --pf-v5-global--active-color--100: #165040;
+}
+
 body {
-	font-family: Roboto, "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: Roboto, "Open Sans", Helvetica, Arial, sans-serif;
 }
 
 .login-pf body {
@@ -12,241 +20,54 @@ body {
     height: 100%;
 }
 
-.pf-c-button.pf-m-primary {
-    color: var(--pf-c-button--m-primary--Color);
-    background-color: #165040;
+/* ── Primary button (KC26 v2: modifiers use pf-m-* without v5 prefix) ── */
+.pf-v5-c-button.pf-m-primary {
+    background-color: #165040 !important;
+    color: #fff !important;
 }
 
-.pf-c-button.pf-m-primary:active, .pf-c-button.pf-m-primary.pf-m-active {
-    --pf-c-button--m-primary--Color: var(--pf-c-button--m-primary--active--Color);
-    --pf-c-button--m-primary--BackgroundColor: #165040;
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary.pf-m-hover {
+    background-color: #0e3529 !important;
 }
 
-.pf-c-button.pf-m-primary:hover, .pf-c-button.pf-m-primary.pf-m-hover {
-    --pf-c-button--m-primary--Color: var(--pf-c-button--m-primary--hover--Color);
-    --pf-c-button--m-primary--BackgroundColor: #165040;
+.pf-v5-c-button.pf-m-primary:active,
+.pf-v5-c-button.pf-m-primary.pf-m-active {
+    background-color: #0e3529 !important;
 }
 
-.pf-m-primary:hover {
-     background-color: #165040 !important; 
-    /* background-color: var(--pf-global--primary-color--200); */
+/* dark mode override (KC26 adds pf-v5-theme-dark on html when OS is dark) */
+.pf-v5-theme-dark .pf-v5-c-button.pf-m-primary {
+    background-color: #165040 !important;
+    color: #fff !important;
 }
 
-
-.pf-m-primary:active {
-    background-color: #165040 !important; 
-   /* background-color: var(--pf-global--primary-color--200); */
+/* ── Form control ── */
+.pf-v5-c-form-control {
+    font-size: 14px;
 }
 
-.pf-c-form-control:hover, .pf-c-form-control:focus, .pf-c-form-control:active {
-    border-bottom-color: #165040 !important;
-    border-bottom-width: 2px;
-    border-bottom-width: var(--pf-global--BorderWidth--md);
+.pf-v5-c-form-control:hover,
+.pf-v5-c-form-control:focus {
+    --pf-v5-c-form-control--after--BorderBottomColor: #165040;
 }
 
-div.kc-logo-text {
-    background-image: url(../img/smartera-logo.png);
-    background-repeat: no-repeat;
-    height: 140px;
-    width: 510px;
-    margin: 0 auto;
+.pf-v5-c-form-control[aria-invalid="true"] {
+    --pf-v5-c-form-control--after--BorderBottomColor: #C9190B;
 }
 
+/* ── Card ── */
 .card-pf {
     margin: 0 auto;
-    box-shadow: var(--pf-global--BoxShadow--lg);
+    box-shadow: 0 0.5rem 1rem 0 rgba(3, 3, 3, .16), 0 0 0.375rem 0 rgba(3, 3, 3, .08);
     padding: 0 20px;
     max-width: 500px;
-    border-top: 4px solid;
-    border-color: #165040; /* default - IE compatibility */
-    /* border-color: var(--pf-global--primary-color--100); */
-}
-/* END MODIFIED */
-/*IE compatibility*/
-.pf-c-form-control {
-    font-size: 14px;
-    font-size: var(--pf-global--FontSize--sm);
-    border-width: 1px;
-    border-width: var(--pf-global--BorderWidth--sm);;
-    border-color: #EDEDED #EDEDED #8A8D90 #EDEDED;
-    border-color: var(--pf-global--BorderColor--300) var(--pf-global--BorderColor--300) var(--pf-global--BorderColor--200) var(--pf-global--BorderColor--300);
-    background-color: #FFFFFF;
-    background-color: var(--pf-global--BackgroundColor--100);
-    height: 36px;
-    height: calc(var(--pf-c-form-control--FontSize) * var(--pf-c-form-control--LineHeight) + var(--pf-c-form-control--BorderWidth) * 2 + var(--pf-c-form-control--PaddingTop) + var(--pf-c-form-control--PaddingBottom));
-    padding: 5px 0.5rem;
-    padding: var(--pf-c-form-control--PaddingTop) var(--pf-c-form-control--PaddingRight) var(--pf-c-form-control--PaddingBottom) var(--pf-c-form-control--PaddingLeft);
+    border-top: 4px solid #165040;
 }
 
-.pf-c-form-control:hover, .pf-c-form-control:focus {
-    border-bottom-color: #165040;
-    border-bottom-color: var(--pf-global--primary-color--100);
-    border-bottom-width: 2px;
-    border-bottom-width: var(--pf-global--BorderWidth--md);
-}
-
-.pf-c-form-control[aria-invalid="true"] {
-    border-bottom-color: #C9190B;
-    border-bottom-color: var(--pf-global--danger-color--100);
-    border-bottom-width: 2px;
-    border-bottom-width: var(--pf-global--BorderWidth--md);
-}
-
-.pf-c-alert.pf-m-inline {
-    margin-bottom: 0.5rem; /* default - IE compatibility */
-    margin-bottom: var(--pf-global--spacer--sm);
-    padding: 0.25rem;
-    padding: var(--pf-global--spacer--xs);
-    border: solid #ededed;
-    border: solid var(--pf-global--BorderColor--300);
-    border-width: 1px;
-    border-width: var(--pf-c-alert--m-inline--BorderTopWidth) var(--pf-c-alert--m-inline--BorderRightWidth) var(--pf-c-alert--m-inline--BorderBottomWidth) var(--pf-c-alert--m-inline--BorderLeftWidth);
-    display: -ms-flexbox;
-    display: grid;
-    -ms-grid-columns: max-content 1fr max-content;
-    grid-template-columns:max-content 1fr max-content;
-    grid-template-columns: var(--pf-c-alert--grid-template-columns);
-    grid-template-rows: 1fr auto;
-    grid-template-rows: var(--pf-c-alert--grid-template-rows);
-}
-
-.pf-c-alert.pf-m-inline::before {
-    position: absolute;
-    top: -1px;
-    top: var(--pf-c-alert--m-inline--before--Top);
-    bottom: -1px;
-    bottom: var(--pf-c-alert--m-inline--before--Bottom);
-    left: 0;
-    width: 3px;
-    width: var(--pf-c-alert--m-inline--before--Width);
-    content: "";
-    background-color: #FFFFFF;
-    background-color: var(--pf-global--BackgroundColor--100);
-}
-
-.pf-c-alert.pf-m-inline.pf-m-success::before {
-    background-color: #C4DA8B;
-    background-color: var(--pf-global--success-color--100);
-}
-
-.pf-c-alert.pf-m-inline.pf-m-danger::before {
-    background-color: #C9190B;
-    background-color: var(--pf-global--danger-color--100);
-}
-
-.pf-c-alert.pf-m-inline.pf-m-warning::before {
-    background-color: #DFA500;
-    background-color: var(--pf-global--warning-color--100);
-}
-
-.pf-c-alert.pf-m-inline .pf-c-alert__icon {
-    padding: 1rem 0.5rem 1rem 1rem;
-    padding: var(--pf-c-alert--m-inline__icon--PaddingTop) var(--pf-c-alert--m-inline__icon--PaddingRight) var(--pf-c-alert--m-inline__icon--PaddingBottom) var(--pf-c-alert--m-inline__icon--PaddingLeft);
-    font-size: 16px;
-    font-size: var(--pf-c-alert--m-inline__icon--FontSize);
-}
-
-.pf-c-alert.pf-m-success .pf-c-alert__icon {
-    color: #C4DA8B;
-    color: var(--pf-global--success-color--100);
-}
-
-.pf-c-alert.pf-m-success .pf-c-alert__title {
-    color: #165040;
-    color: var(--pf-global--success-color--200);
-}
-
-.pf-c-alert.pf-m-danger .pf-c-alert__icon {
-    color: #C9190B;
-    color: var(--pf-global--danger-color--100);
-}
-
-.pf-c-alert.pf-m-danger .pf-c-alert__title {
-    color: #A30000;
-    color: var(--pf-global--danger-color--200);
-}
-
-.pf-c-alert.pf-m-warning .pf-c-alert__icon {
-    color: #DFA500;
-    color: var(--pf-global--warning-color--100);
-}
-
-.pf-c-alert.pf-m-warning .pf-c-alert__title {
-    color: #795600;
-    color: var(--pf-global--warning-color--200);
-}
-
-.pf-c-alert__title {
-    font-size: 14px; /* default - IE compatibility */
-    font-size: var(--pf-global--FontSize--sm);
-    padding: 5px 8px;
-    padding: var(--pf-c-alert__title--PaddingTop) var(--pf-c-alert__title--PaddingRight) var(--pf-c-alert__title--PaddingBottom) var(--pf-c-alert__title--PaddingLeft);
-}
-
-.pf-c-button{
-    padding:0.375rem 1rem;
-    padding: var(--pf-global--spacer--form-element) var(--pf-global--spacer--md);
-}
-
-/* default - IE compatibility */
-.pf-m-primary {
-    color: #FFFFFF;
-    background-color: #165040;
-    background-color: var(--pf-global--primary-color--100);
-}
-
-/* default - IE compatibility */
-.pf-m-primary:hover {
-    background-color: #165040;
-    background-color: var(--pf-global--primary-color--200);
-}
-
-/* default - IE compatibility */
-.pf-c-button.pf-m-control {
-    border: solid 1px;
-    border: solid var(--pf-global--BorderWidth--sm);
-    border-color: rgba(230, 230, 230, 0.5);
-}
-/*End of IE compatibility*/
-h1#kc-page-title {
-    margin-top: 10px;
-}
-
-#kc-locale ul {
-    background-color: #FFF;
-    background-color: var(--pf-global--BackgroundColor--100);
+/* ── Logo ── */
+div.kc-logo-text span {
     display: none;
-    top: 20px;
-    min-width: 100px;
-    padding: 0;
-}
-
-#kc-locale:hover ul {
-    display: block;
-}
-
-/* IE compatibility */
-#kc-locale-dropdown a {
-    color: #6A6E73;
-    color: var(--pf-global--Color--200);
-    text-align: right;
-    font-size: 14px;
-    font-size: var(--pf-global--FontSize--sm);
-}
-
-/* IE compatibility */
-a#kc-current-locale-link::after {
-    content: "\2c5";
-    margin-left: 4px;
-    margin-left: var(--pf-global--spacer--xs)
-}
-
-.login-pf .container {
-    padding-top: 40px;
-}
-
-.login-pf a:hover {
-    color: #6CB7AF;
 }
 
 #kc-logo {
@@ -259,10 +80,6 @@ a#kc-current-locale-link::after {
     height: 63px;
     width: 300px;
     margin: 62px auto 0;
-}
-
-div.kc-logo-text span {
-    display: none;
 }
 
 #kc-header {
@@ -291,6 +108,70 @@ div.kc-logo-text span {
     background-size: contain;
 }
 
+/* ── Registration footer band ── */
+/* #kc-info renders as .pf-v5-c-login__main-footer-band — strip its white bg */
+.pf-v5-c-login__main-footer-band,
+.pf-v5-theme-dark .pf-v5-c-login__main-footer-band {
+    background-color: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* "Register" link → green button */
+#kc-registration a {
+    display: inline-block;
+    background-color: #165040;
+    color: #fff !important;
+    padding: 6px 18px;
+    border-radius: 3px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background-color 0.15s ease;
+}
+
+#kc-registration a:hover {
+    background-color: #0e3529;
+    color: #fff !important;
+}
+
+/* "New user?" label color on dark bg */
+#kc-registration span,
+#kc-registration-container {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Alerts (PF5 — modifiers: pf-m-* without v5 prefix) ── */
+.pf-v5-c-alert.pf-m-inline {
+    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: max-content 1fr max-content;
+    grid-template-rows: 1fr auto;
+}
+
+.pf-v5-c-alert.pf-m-inline.pf-m-success::before {
+    background-color: #3E8635;
+}
+
+.pf-v5-c-alert.pf-m-success .pf-v5-c-alert__title {
+    color: #1e4f18;
+}
+
+.pf-v5-c-alert.pf-m-inline.pf-m-danger::before {
+    background-color: #C9190B;
+}
+
+.pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title {
+    color: #A30000;
+}
+
+.pf-v5-c-alert.pf-m-inline.pf-m-warning::before {
+    background-color: #F0AB00;
+}
+
+.pf-v5-c-alert.pf-m-warning .pf-v5-c-alert__title {
+    color: #795600;
+}
+
+/* ── Layout / content ── */
 #kc-content {
     width: 100%;
 }
@@ -304,7 +185,7 @@ div.kc-logo-text span {
 
 #kc-username {
     text-align: center;
-    margin-bottom:-10px;
+    margin-bottom: -10px;
 }
 
 #kc-webauthn-settings-form {
@@ -320,13 +201,13 @@ div.kc-logo-text span {
 }
 
 #kc-info {
-    margin: 20px -40px -30px;
+    margin: 20px 0 -30px;
 }
 
 #kc-info-wrapper {
     font-size: 13px;
     padding: 15px 35px;
-    background-color: #F0F0F0;
+    background-color: var(--pf-v5-c-login__main--BackgroundColor);
 }
 
 #kc-form-options span {
@@ -346,8 +227,30 @@ div.kc-logo-text span {
     margin-bottom: 0;
 }
 
-/* TOTP */
+#kc-form-buttons {
+    margin-top: 20px;
+}
 
+#kc-back {
+    margin-top: 5px;
+}
+
+#kc-content-wrapper .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.no-bottom-margin {
+    margin-bottom: 0;
+}
+
+#kc-form-login div.form-group:last-of-type,
+#kc-register-form div.form-group:last-of-type,
+#kc-update-profile-form div.form-group:last-of-type {
+    margin-bottom: 0;
+}
+
+/* ── TOTP ── */
 .subtitle {
     text-align: right;
     margin-top: 30px;
@@ -355,8 +258,7 @@ div.kc-logo-text span {
 }
 
 .required {
-    color: #A30000; /* default - IE compatibility */
-    color: var(--pf-global--danger-color--200);
+    color: #C9190B;
 }
 
 ol#kc-totp-settings {
@@ -369,19 +271,78 @@ ul#kc-totp-supported-apps {
 }
 
 #kc-totp-secret-qr-code {
-    max-width:150px;
-    max-height:150px;
+    max-width: 150px;
+    max-height: 150px;
 }
 
 #kc-totp-secret-key {
     background-color: #fff;
-    color: #333333;
+    color: #333;
     font-size: 16px;
     padding: 10px 0;
 }
 
-/* OAuth */
+/* ── Locale dropdown ── */
+#kc-locale ul {
+    background-color: #fff;
+    display: none;
+    top: 20px;
+    min-width: 100px;
+    padding: 0;
+}
 
+#kc-locale:hover ul {
+    display: block;
+}
+
+#kc-locale-dropdown a {
+    color: #6A6E73;
+    text-align: right;
+    font-size: 14px;
+}
+
+a#kc-current-locale-link::after {
+    content: "\2c5";
+    margin-left: 4px;
+}
+
+/* ── Links ── */
+.login-pf a:hover {
+    color: #6CB7AF;
+}
+
+/* ── Container ── */
+.login-pf .container {
+    padding-top: 40px;
+}
+
+.card-pf form.form-actions .btn {
+    float: right;
+    margin-left: 10px;
+}
+
+/* ── Portal brand ── */
+.login-pf-page .login-pf-brand {
+    margin-top: 20px;
+    max-width: 360px;
+    width: 40%;
+}
+
+.login-pf-page .login-pf-signup {
+    font-size: 15px;
+    color: #8f8c80;
+}
+
+.login-pf-page .btn-primary {
+    margin-top: 0;
+}
+
+.login-pf-page.login-pf-page-accounts {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ── OAuth ── */
 #kc-oauth h3 {
     margin-top: 0;
 }
@@ -407,13 +368,12 @@ ul#kc-totp-supported-apps {
     width: 50%;
 }
 
-/* Code */
 #kc-code textarea {
     width: 100%;
     height: 8em;
 }
 
-/* Social */
+/* ── Social providers ── */
 .kc-social-links {
     margin-top: 20px;
 }
@@ -426,13 +386,11 @@ ul#kc-totp-supported-apps {
 }
 
 .kc-social-gray {
-    color: #737679; /* default - IE compatibility */
-    color: var(--pf-global--Color--200);
+    color: #737679;
 }
 
 .kc-social-item {
-    margin-bottom: 0.5rem; /* default - IE compatibility */
-    margin-bottom: var(--pf-global--spacer--sm);
+    margin-bottom: 0.5rem;
     font-size: 15px;
     text-align: center;
 }
@@ -447,55 +405,51 @@ ul#kc-totp-supported-apps {
 }
 
 .kc-social-grid {
-    display:grid;
+    display: grid;
     grid-column-gap: 10px;
     grid-row-gap: 5px;
     grid-column-end: span 6;
-    --pf-l-grid__item--GridColumnEnd: span 6;
 }
 
 .kc-social-grid .kc-social-icon-text {
     left: -10px;
 }
 
+.kc-social-section {
+    text-align: center;
+}
+
+.kc-social-section hr {
+    margin-bottom: 10px;
+}
+
+/* ── Tooltip ── */
 .kc-login-tooltip {
     position: relative;
     display: inline-block;
 }
 
-.kc-social-section {
-    text-align: center;
-}
-
-.kc-social-section hr{
-    margin-bottom: 10px
-}
-
-.kc-login-tooltip .kc-tooltip-text{
-    top:-3px;
-    left:160%;
+.kc-login-tooltip .kc-tooltip-text {
+    top: -3px;
+    left: 160%;
     background-color: black;
     visibility: hidden;
     color: #fff;
-
-    min-width:130px;
+    min-width: 130px;
     text-align: center;
     border-radius: 2px;
-    box-shadow:0 1px 8px rgba(0,0,0,0.6);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
     padding: 5px;
-
     position: absolute;
-    opacity:0;
-    transition:opacity 0.5s;
+    opacity: 0;
+    transition: opacity 0.5s;
 }
 
-/* Show tooltip */
 .kc-login-tooltip:hover .kc-tooltip-text {
     visibility: visible;
-    opacity:0.7;
+    opacity: 0.7;
 }
 
-/* Arrow for tooltip */
 .kc-login-tooltip .kc-tooltip-text::after {
     content: " ";
     position: absolute;
@@ -507,6 +461,47 @@ ul#kc-totp-supported-apps {
     border-color: transparent black transparent transparent;
 }
 
+/* ── Select authenticator ── */
+.select-auth-box-parent {
+    border-top: 1px solid #d2d2d2;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    cursor: pointer;
+}
+
+.select-auth-box-parent:hover {
+    background-color: #f7f8f8;
+}
+
+.select-auth-container {
+    padding-bottom: 0 !important;
+}
+
+.select-auth-box-headline {
+    font-size: 1rem;
+    color: #165040;
+    font-weight: bold;
+}
+
+.select-auth-box-desc {
+    font-size: 0.875rem;
+}
+
+.select-auth-box-arrow {
+    display: flex;
+    align-items: center;
+    margin-right: 2rem;
+}
+
+.select-auth-box-icon {
+    display: flex;
+    flex: 0 0 2em;
+    justify-content: center;
+    margin-right: 1rem;
+    margin-left: 3rem;
+}
+
+/* ── Responsive ── */
 @media (min-width: 768px) {
     #kc-container-wrapper {
         position: absolute;
@@ -525,7 +520,6 @@ ul#kc-totp-supported-apps {
 }
 
 @media (max-width: 767px) {
-
     .login-pf body {
         background: #000 url(../img/smartera-bg.png) no-repeat center center fixed;
         background-size: cover;
@@ -539,12 +533,7 @@ ul#kc-totp-supported-apps {
     }
 
     #kc-header-wrapper {
-        font-size: 0;
-        font-weight: bold;
-        padding: 20px 0px 0 0;
-        color: transparent;
-        letter-spacing: 0;
-        line-height: 0;
+        padding: 20px 0 0;
     }
 
     #kc-header-wrapper::before {
@@ -589,6 +578,22 @@ ul#kc-totp-supported-apps {
         margin: 20px 0 0 20px;
     }
 
+    .kc-social-grid {
+        grid-column-end: 12;
+    }
+
+    .kc-social-grid .kc-social-icon-text {
+        left: -15px;
+    }
+
+    .login-pf-page .card-pf {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding-top: 0;
+        border-top: 0;
+        box-shadow: none;
+    }
 }
 
 @media (min-height: 646px) {
@@ -603,147 +608,3 @@ ul#kc-totp-supported-apps {
         top: 20%;
     }
 }
-
-.card-pf form.form-actions .btn {
-    float: right;
-    margin-left: 10px;
-}
-
-#kc-form-buttons {
-    margin-top: 20px;
-}
-
-.login-pf-page .login-pf-brand {
-    margin-top: 20px;
-    max-width: 360px;
-    width: 40%;
-}
-
-/* Internet Explorer 11 compatibility workaround for select-authenticator screen */
-@media all and (-ms-high-contrast: none),
-(-ms-high-contrast: active) {
-    .select-auth-box-parent {
-        border-top: 1px solid #f0f0f0;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        cursor: pointer;
-    }
-
-    .select-auth-box-headline {
-        font-size: 16px;
-        color: #165040;
-        font-weight: bold;
-    }
-
-    .select-auth-box-desc {
-        font-size: 14px;
-    }
-
-    .pf-l-stack {
-        flex-basis: 100%;
-    }
-}
-/* End of IE11 workaround for select-authenticator screen */
-
-.select-auth-box-arrow{
-    display: flex;
-    align-items: center;
-    margin-right: 2rem;
-}
-
-.select-auth-box-icon{
-    display: flex;
-    flex: 0 0 2em;
-    justify-content: center;
-    margin-right: 1rem;
-    margin-left: 3rem;
-}
-
-.select-auth-box-parent{
-    border-top: 1px solid var(--pf-global--palette--black-200);
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    cursor: pointer;
-}
-
-.select-auth-box-parent:hover{
-    background-color: #f7f8f8;
-}
-
-.select-auth-container {
-    padding-bottom: 0px !important;
-}
-
-.select-auth-box-headline {
-    font-size: var(--pf-global--FontSize--md);
-    color: var(--pf-global--primary-color--100);
-    font-weight: bold;
-}
-
-.select-auth-box-desc {
-    font-size: var(--pf-global--FontSize--sm);
-}
-
-
-
-/*phone*/
-@media (max-width: 767px) {
-    .login-pf-page .card-pf {
-        max-width: none;
-        margin-left: 0;
-        margin-right: 0;
-        padding-top: 0;
-        border-top: 0;
-        box-shadow: 0 0;
-    }
-
-    .kc-social-grid {
-        grid-column-end: 12;
-        --pf-l-grid__item--GridColumnEnd: span 12;
-    }
-
-    .kc-social-grid .kc-social-icon-text {
-        left: -15px;
-    }
-}
-
-.login-pf-page .login-pf-signup {
-    font-size: 15px;
-    color: #8f8c80;
-}
-#kc-content-wrapper .row {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.login-pf-page.login-pf-page-accounts {
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.login-pf-page .btn-primary {
-    margin-top: 0;
-}
-
-.login-pf-page .list-view-pf .list-group-item {
-    border-bottom: 1px solid #ededed;
-}
-
-.login-pf-page .list-view-pf-description {
-    width: 100%;
-}
-
-#kc-form-login div.form-group:last-of-type,
-#kc-register-form div.form-group:last-of-type,
-#kc-update-profile-form div.form-group:last-of-type {
-    margin-bottom: 0px;
-}
-
-.no-bottom-margin {
-    margin-bottom: 0;
-}
-
-#kc-back {
-    margin-top: 5px;
-}
-

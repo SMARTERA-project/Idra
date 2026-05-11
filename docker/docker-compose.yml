@@ -47,7 +47,7 @@ services:
                 idra_main:
 
     keycloak:
-            image: quay.io/keycloak/keycloak:24.0.5
+            image: quay.io/keycloak/keycloak:26.2.5
             restart: always
             depends_on:
                 - keycloak-db
@@ -64,11 +64,9 @@ services:
                 # Keep the legacy "/auth" base path to match existing Portal config.
                 - KC_HTTP_RELATIVE_PATH=/auth
                 - KC_HOSTNAME_STRICT=false
-                - KC_HOSTNAME_STRICT_HTTPS=false
             command: ["start-dev", "--import-realm", "--http-port=8080"]
             volumes:
                 - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
-                - ./smartera:/opt/jboss/keycloak/themes/smartera/
                 - ./smartera:/opt/keycloak/themes/smartera/
             networks:
                 idra_main:

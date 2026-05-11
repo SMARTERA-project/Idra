@@ -1,6 +1,52 @@
 @import url('https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap');
 @import url('https://fonts.googleapis.com/css?family=Roboto:200,300,400,500,600,700,800&display=swap');
 
+/* ── Minimal Bootstrap-compatible grid (replaces removed PatternFly/Bootstrap dep) ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+.container-fluid {
+    width: 100%;
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -15px;
+    margin-left: -15px;
+}
+
+[class^="col-"] {
+    padding-right: 15px;
+    padding-left: 15px;
+    width: 100%;
+}
+
+/* xs (default) */
+.col-xs-12 { width: 100%; }
+
+/* sm ≥ 576px */
+@media (min-width: 576px) {
+    .col-sm-4  { width: 33.3333%; }
+    .col-sm-10 { width: 83.3333%; }
+    .col-sm-offset-1 { margin-left: 8.3333%; }
+}
+
+/* md ≥ 768px */
+@media (min-width: 768px) {
+    .col-md-8 { width: 66.6666%; }
+    .col-md-offset-2 { margin-left: 16.6666%; }
+}
+
+/* lg ≥ 992px */
+@media (min-width: 992px) {
+    .col-lg-8 { width: 66.6666%; }
+    .col-lg-offset-2 { margin-left: 16.6666%; }
+}
+
 body {
 	font-family: Roboto, "Open Sans", Helvetica, Arial, sans-serif;
 	background: #fff url(../bg_evita.png);
