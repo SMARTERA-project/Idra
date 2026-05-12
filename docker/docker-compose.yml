@@ -115,11 +115,10 @@ services:
     
     # Metadata Quality Validator Tool
     mqa-score:
-        image: idraopendata/mqa-scoring:v1.3.5
+        build:
+            context: ../../mqa-scoring
+            dockerfile: ./Dockerfile
         container_name: mqa-score
-        #    build:
-        #      context: .
-        #      dockerfile: ./Dockerfile
         restart: always
         ports:
             - "8000:8000"
