@@ -679,14 +679,12 @@ public class DcatDataset implements Serializable {
    * @param datasetDetails dataset details
    */
   public void setDatasetDetails(List<DcatDetails> datasetDetails) {
-    if (this.datasetDetails == null) {
-      this.datasetDetails = datasetDetails;
-    } else {
-      this.datasetDetails.clear();
-      if (datasetDetails != null) {
-        this.datasetDetails.addAll(datasetDetails);
-      }
-    }
+    // Plain assignment. The previous clear()+addAll() pattern broke Hibernate:
+    // during flush Hibernate wraps the live list in a PersistentBag and calls
+    // setDatasetDetails(wrapper). The wrapper delegates to the same underlying
+    // list — so clear() emptied it, and addAll(wrapper) then iterated zero
+    // items, silently dropping every detail.
+    this.datasetDetails = datasetDetails;
   }
 
   /**
@@ -1548,7 +1546,13 @@ public class DcatDataset implements Serializable {
       }
     }
 
-    datasetDetails = new ArrayList<>(deduplicated.values());
+    List<DcatDetails> normalizedDetails = new ArrayList<>(deduplicated.values());
+    if (datasetDetails == null) {
+      datasetDetails = normalizedDetails;
+    } else {
+      datasetDetails.clear();
+      datasetDetails.addAll(normalizedDetails);
+    }
     normalizeKeywordDetails();
   }
 
@@ -1594,7 +1598,13 @@ public class DcatDataset implements Serializable {
       }
     }
 
-    keywordDetails = new ArrayList<>(deduplicated.values());
+    List<DcatKeyword> normalizedKeywords = new ArrayList<>(deduplicated.values());
+    if (keywordDetails == null) {
+      keywordDetails = normalizedKeywords;
+    } else {
+      keywordDetails.clear();
+      keywordDetails.addAll(normalizedKeywords);
+    }
     keywords = keywordDetails.stream().filter(item -> item != null && StringUtils.isNotBlank(item.getValue()))
         .map(item -> item.getValue()).distinct().collect(Collectors.toList());
   }

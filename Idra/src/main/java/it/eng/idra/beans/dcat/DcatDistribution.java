@@ -560,14 +560,9 @@ public class DcatDistribution implements Serializable {
    * @param distributionDetails distribution details
    */
   public void setDistributionDetails(List<DcatDetails> distributionDetails) {
-    if (this.distributionDetails == null) {
-      this.distributionDetails = distributionDetails;
-    } else {
-      this.distributionDetails.clear();
-      if (distributionDetails != null) {
-        this.distributionDetails.addAll(distributionDetails);
-      }
-    }
+    // See DcatDataset.setDatasetDetails: plain assignment to avoid the
+    // PersistentBag self-wrap pitfall that empties the collection on flush.
+    this.distributionDetails = distributionDetails;
   }
 
   /**
@@ -1237,7 +1232,13 @@ public class DcatDistribution implements Serializable {
       }
     }
 
-    distributionDetails = new ArrayList<>(deduplicated.values());
+    List<DcatDetails> normalizedDetails = new ArrayList<>(deduplicated.values());
+    if (distributionDetails == null) {
+      distributionDetails = normalizedDetails;
+    } else {
+      distributionDetails.clear();
+      distributionDetails.addAll(normalizedDetails);
+    }
   }
 
   private static String normalizeTextValue(String value) {

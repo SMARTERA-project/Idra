@@ -301,7 +301,7 @@ public class PersistenceManager {
       if (node.isFederatedInCb() != null) {
         managed.setFederatedInCb(node.isFederatedInCb());
       }
-      if (node.getImage() != null) {
+      if (node.getImage() != null && Hibernate.isInitialized(node.getImage())) {
         if (managed.getImage() != null) {
           managed.getImage().setImageData(node.getImage().getImageData());
         } else {

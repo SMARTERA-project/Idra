@@ -486,9 +486,18 @@ public class DcatApSerializer {
     OdmsCatalogue node = nodeResources.get(new Integer(dataset.getNodeId()));
 
     /*
-     * Add the Catalogue with the Dataset to the global Model
+     * Add the Catalogue with the Dataset to the global Model.
+     * node.getHost() may be a non-IRI identifier (e.g. a hash for DCATDUMP nodes);
+     * fall back to homepage or a urn:idra:catalogue:<id> when invalid.
      */
-    model.createResource(node.getHost(), DCAT.Catalog).addLiteral(DCTerms.title, node.getName())
+    String catalogueUri = toSafeResourceUri(node.getHost());
+    if (catalogueUri == null) {
+      catalogueUri = toSafeResourceUri(node.getHomepage());
+    }
+    if (catalogueUri == null) {
+      catalogueUri = "urn:idra:catalogue:" + node.getId();
+    }
+    model.createResource(catalogueUri, DCAT.Catalog).addLiteral(DCTerms.title, node.getName())
         .addLiteral(DCTerms.description, node.getDescription())
         .addProperty(DCAT.dataset, datasetResource)
         .addProperty(DCTerms.issued, node.getRegisterDate().toString(), XSDDateType.XSDdateTime)

@@ -120,6 +120,12 @@ public class DcatApDeserializer implements IdcatApDeserialize {
   public Model dumpToModel(String modelText, OdmsCatalogue node) throws RiotException {
 
     String nodeBaseUri = node.getHost();
+    // Jena's RDF/XML parser rejects BCP 47 extension language tags such as
+    // "cs-t-en-t0-mtec" (Extension T / transformed-content), silently dropping
+    // those triples — which makes multilingual dct:title / dct:description /
+    // dcat:keyword literals invisible to the deserializer. Reduce extension
+    // tags to their primary language subtag before parsing.
+    modelText = normalizeRdfLanguageTags(modelText);
     // create an empty model
     Model model = ModelFactory.createDefaultModel();
     for (DcatApFormat format : DcatApFormat.values()) {
@@ -138,6 +144,23 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       }
     }
     return model;
+  }
+
+  private static final java.util.regex.Pattern EXTENDED_LANG_TAG = java.util.regex.Pattern
+      .compile("(xml:lang\\s*=\\s*\")([A-Za-z]{2,3})-[tT]-[^\"]*(\")");
+
+  /**
+   * Strip BCP 47 Extension T transformed-content tags ("xx-t-..."), which Jena
+   * rejects, replacing them with the primary subtag so the literal is kept.
+   *
+   * @param modelText raw RDF/XML payload
+   * @return modelText with extension tags reduced to the primary subtag
+   */
+  static String normalizeRdfLanguageTags(String modelText) {
+    if (modelText == null || modelText.isEmpty()) {
+      return modelText;
+    }
+    return EXTENDED_LANG_TAG.matcher(modelText).replaceAll("$1$2$3");
   }
 
   /**
