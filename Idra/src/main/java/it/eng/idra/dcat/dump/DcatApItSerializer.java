@@ -95,9 +95,8 @@ public class DcatApItSerializer extends DcatApSerializer {
 
     datasetResource.addProperty(RDF.type, DCAT.Dataset);
 
-    addDcatPropertyAsLiteral(dataset.getTitle(), datasetResource, model);
-
-    addDcatPropertyAsLiteral(dataset.getDescription(), datasetResource, model);
+    addMultiLangTitleDescription(dataset.getDatasetDetails(),
+        dataset.getTitle(), dataset.getDescription(), datasetResource, model);
 
     serializeConcept(dataset.getTheme(), model, datasetResource);
 
@@ -479,7 +478,8 @@ public class DcatApItSerializer extends DcatApSerializer {
 
     addDcatPropertyAsResource(distribution.getAccessUrl(), distResource, model, false);
 
-    addDcatPropertyAsLiteral(distribution.getDescription(), distResource, model);
+    addMultiLangTitleDescription(distribution.getDistributionDetails(),
+        distribution.getTitle(), distribution.getDescription(), distResource, model);
 
     serializeFormat(distribution.getFormat(), model, distResource);
 
@@ -494,7 +494,8 @@ public class DcatApItSerializer extends DcatApSerializer {
     distResource.addProperty(distribution.getUpdateDate().getProperty(),
         distribution.getUpdateDate().getValue(), XSDDateType.XSDdateTime);
 
-    addDcatPropertyAsLiteral(distribution.getTitle(), distResource, model);
+    // Title (and description) already emitted near the top of this method via
+    // addMultiLangTitleDescription, which preserves multilingual variants.
 
     // new
     // Serialize accessService(s)

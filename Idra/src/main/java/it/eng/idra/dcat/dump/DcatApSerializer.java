@@ -45,7 +45,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.StringWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -262,9 +265,8 @@ public class DcatApSerializer {
 
     Resource datasetResource = model.createResource(iri.toString(), DCAT.Dataset);
 
-    addDcatPropertyAsLiteral(dataset.getTitle(), datasetResource, model);
-
-    addDcatPropertyAsLiteral(dataset.getDescription(), datasetResource, model);
+    addMultiLangTitleDescription(dataset.getDatasetDetails(),
+        dataset.getTitle(), dataset.getDescription(), datasetResource, model);
 
     serializeConcept(dataset.getTheme(), model, datasetResource);
 
@@ -809,7 +811,8 @@ public class DcatApSerializer {
 
     addDcatPropertyAsResource(distribution.getAccessUrl(), distResource, model, false);
 
-    addDcatPropertyAsLiteral(distribution.getDescription(), distResource, model);
+    addMultiLangTitleDescription(distribution.getDistributionDetails(),
+        distribution.getTitle(), distribution.getDescription(), distResource, model);
 
     serializeFormat(distribution.getFormat(), model, distResource);
 
@@ -856,7 +859,8 @@ public class DcatApSerializer {
 
     serializeConcept(Arrays.asList(distribution.getStatus()), model, distResource);
 
-    addDcatPropertyAsLiteral(distribution.getTitle(), distResource, model);
+    // Title (and description) already emitted near the top of this method via
+    // addMultiLangTitleDescription, which preserves multilingual variants.
 
     // new
     // Serialize accessService(s)
@@ -1258,6 +1262,66 @@ public class DcatApSerializer {
   }
 
   /**
+   * Adds dct:title and dct:description language variants from a list of {@link it.eng.idra.beans.dcat.DcatDetails}.
+   * Falls back to single fallbackTitle/fallbackDescription when the details list is empty.
+   * A row is emitted for each non-blank title/description; the row's language tag is preserved
+   * when present (an empty/null language produces a plain literal, matching source RDF that
+   * omits xml:lang).
+   */
+  protected static void addMultiLangTitleDescription(
+      java.util.List<it.eng.idra.beans.dcat.DcatDetails> details,
+      DcatProperty fallbackTitle, DcatProperty fallbackDescription,
+      Resource parentResource, Model model) {
+
+    if (details != null && !details.isEmpty()) {
+      java.util.Set<String> titleLangs = new java.util.HashSet<>();
+      java.util.Set<String> descLangs = new java.util.HashSet<>();
+      for (it.eng.idra.beans.dcat.DcatDetails d : details) {
+        if (d == null) continue;
+        String lang = StringUtils.trimToNull(d.getLanguage());
+        String langKey = lang == null ? "" : lang.toLowerCase();
+        if (StringUtils.isNotBlank(d.getTitle()) && titleLangs.add(langKey + "|" + d.getTitle())) {
+          if (lang != null) {
+            try {
+              parentResource.addProperty(DCTerms.title, model.createLiteral(d.getTitle(), lang));
+            } catch (Exception e) {
+              parentResource.addProperty(DCTerms.title, model.createLiteral(d.getTitle()));
+            }
+          } else {
+            parentResource.addProperty(DCTerms.title, model.createLiteral(d.getTitle()));
+          }
+        }
+        if (StringUtils.isNotBlank(d.getDescription()) && descLangs.add(langKey + "|" + d.getDescription())) {
+          if (lang != null) {
+            try {
+              parentResource.addProperty(DCTerms.description,
+                  model.createLiteral(d.getDescription(), lang));
+            } catch (Exception e) {
+              parentResource.addProperty(DCTerms.description, model.createLiteral(d.getDescription()));
+            }
+          } else {
+            parentResource.addProperty(DCTerms.description, model.createLiteral(d.getDescription()));
+          }
+        }
+      }
+      // Ensure the canonical (no-lang) title/description from the fallback property is
+      // present too — but only if no detail row already covered the same value.
+      if (fallbackTitle != null && StringUtils.isNotBlank(fallbackTitle.getValue())
+          && titleLangs.add("|" + fallbackTitle.getValue())) {
+        parentResource.addProperty(DCTerms.title, model.createLiteral(fallbackTitle.getValue()));
+      }
+      if (fallbackDescription != null && StringUtils.isNotBlank(fallbackDescription.getValue())
+          && descLangs.add("|" + fallbackDescription.getValue())) {
+        parentResource.addProperty(DCTerms.description,
+            model.createLiteral(fallbackDescription.getValue()));
+      }
+    } else {
+      addDcatPropertyAsLiteral(fallbackTitle, parentResource, model);
+      addDcatPropertyAsLiteral(fallbackDescription, parentResource, model);
+    }
+  }
+
+  /**
    * Adds the dcat property as typed literal.
    *
    * @param property       the property
@@ -1320,12 +1384,15 @@ public class DcatApSerializer {
       String fileName) throws IOException {
     /* This method is used to serialize the Jena-model to file. */
 
-    FileWriter out = null;
+    Writer out = null;
     logger.info("Writing model to file: " + filePath + fileName);
 
     Instant tick = Instant.now();
     try {
-      out = new FileWriter(filePath + fileName);
+      // Explicit UTF-8 — FileWriter uses the platform default charset, which on
+      // Windows is typically cp1252 and corrupts non-ASCII RDF literals.
+      out = new OutputStreamWriter(new FileOutputStream(filePath + fileName),
+          StandardCharsets.UTF_8);
       model.write(out, format.name());
     } catch (Exception e) {
       logger.error(e.getMessage(), e);
@@ -1360,7 +1427,7 @@ public class DcatApSerializer {
       ZipEntry e = new ZipEntry(fileName);
       out.putNextEntry(e);
 
-      byte[] data = writeModelToString(model, format).getBytes();
+      byte[] data = writeModelToString(model, format).getBytes(StandardCharsets.UTF_8);
       out.write(data, 0, data.length);
       out.closeEntry();
       out.close();

@@ -33,7 +33,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.solr.client.solrj.SolrServerException;
-import java.nio.charset.Charset;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -126,12 +125,12 @@ public class DcatApDumpManager {
       } else {
         logger.info("Reading dump file" + (StringUtils.isNotBlank(nodeId) ? ("for nodeID: " + nodeId)
             : "" + " from file system"));
-        byte[] val = Files.readAllBytes(Paths.get(globalDumpFilePath + globalDumpFileName
+        // The dump file is written as UTF-8 by writeModelToFile; return raw bytes.
+        // Previously this read the file as ISO-8859-1 and re-encoded as UTF-8, which
+        // double-mangled every multibyte character (mojibake like "podnikÅ¯" instead of "podniků").
+        return Files.readAllBytes(Paths.get(globalDumpFilePath + globalDumpFileName
             + (StringUtils.isBlank(nodeId) ? "" : "_node_" + nodeId)
             + (returnZip ? ".zip" : "")));
-            // read as ANSI
-            String ansiString = new String(val, Charset.forName("ISO-8859-1"));
-            return ansiString.getBytes(StandardCharsets.UTF_8);
       }
 
     } catch (NoSuchFileException e) {
