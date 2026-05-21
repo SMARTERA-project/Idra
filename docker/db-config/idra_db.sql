@@ -1389,6 +1389,7 @@ CREATE TABLE `odms` (
   `category` varchar(255) DEFAULT NULL,
   `country` varchar(255) DEFAULT NULL,
   `dcatProfile` int(11) DEFAULT NULL,
+  `dcatVersion` varchar(32) DEFAULT NULL,
   `isActive` bit(1) DEFAULT NULL,
   `homepage` varchar(255) NOT NULL,
   `additionalconfig_id` varchar(255) DEFAULT NULL,

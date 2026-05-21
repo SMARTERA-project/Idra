@@ -255,20 +255,23 @@ public class DcatApSerializer {
    */
   protected static Model addDatasetToModel(DcatDataset dataset, Model model) {
 
-    String landingPage = dataset.getLandingPage().getValue();
-    IRI iri = iriFactory.create(landingPage);
-    if (iri.hasViolation(false)) {
-      throw new IllegalArgumentException(
-          "URI for dataset: " + iri + "is not valid, skipping the dataset in the Jena Model:"
-              + (iri.violations(false).next()).getShortMessage());
-    }
-
-    Resource datasetResource = model.createResource(iri.toString(), DCAT.Dataset);
+    // Synthesize the dataset URI from its stable internal identifiers instead of
+    // reusing the landingPage value. Reason: when the landingPage happens to also
+    // appear as a foaf:page in the source RDF (common in DCAT-AP-Stat dumps), the
+    // documentation serializer creates a sibling resource at the same URI with
+    // type=foaf:Document — Jena then picks foaf:Document as the dataset element
+    // type in the RDF/XML output, producing invalid DCAT-AP (the dataset is no
+    // longer a dcat:Dataset). Consistent with the catalog URN scheme
+    // (urn:idra:catalogue:<id>) already used elsewhere in the serializer.
+    String datasetUri = "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
+    Resource datasetResource = model.createResource(datasetUri, DCAT.Dataset);
 
     addMultiLangTitleDescription(dataset.getDatasetDetails(),
         dataset.getTitle(), dataset.getDescription(), datasetResource, model);
 
     serializeConcept(dataset.getTheme(), model, datasetResource);
+    // dct:subject — modelled as SKOS concepts like dcat:theme.
+    serializeConcept(dataset.getSubject(), model, datasetResource);
 
     serializeContactPoint(dataset.getContactPoint(), model, datasetResource);
 
@@ -558,19 +561,43 @@ public class DcatApSerializer {
    */
   protected static void serializeTemporalCoverage(List<DctPeriodOfTime> temporalCoverage, Model model,
       Resource datasetResource) {
-    if (temporalCoverage != null) {
-      for (DctPeriodOfTime period : temporalCoverage) {
-        datasetResource.addProperty(model.createProperty(period.getUri()),
-            model.createResource(DctPeriodOfTime.getRdfClass())
-                .addProperty(period.getStartDate().getProperty(),
-                    period.getStartDate().getValue(), XSDDateType.XSDdate)
-                .addProperty(period.getEndDate().getProperty(),
-                    period.getEndDate().getValue(), XSDDateType.XSDdate)
-                .addProperty(period.getBeginning().getProperty(), period.getBeginning().getValue(),
-                    XSDDateType.XSDdate)
-                .addProperty(period.getEnd().getProperty(), period.getEnd().getValue(),
-                    XSDDateType.XSDdate));
+    if (temporalCoverage == null) {
+      return;
+    }
+    for (DctPeriodOfTime period : temporalCoverage) {
+      // Don't emit a <dct:PeriodOfTime> if all four date fields are blank — Jena would
+      // otherwise write an empty literal with xsd:date datatype, producing invalid RDF.
+      boolean hasStart = period.getStartDate() != null
+          && StringUtils.isNotBlank(period.getStartDate().getValue());
+      boolean hasEnd = period.getEndDate() != null
+          && StringUtils.isNotBlank(period.getEndDate().getValue());
+      boolean hasBeginning = period.getBeginning() != null
+          && StringUtils.isNotBlank(period.getBeginning().getValue());
+      boolean hasEndPoint = period.getEnd() != null
+          && StringUtils.isNotBlank(period.getEnd().getValue());
+
+      if (!hasStart && !hasEnd && !hasBeginning && !hasEndPoint) {
+        continue;
       }
+
+      Resource periodResource = model.createResource(DctPeriodOfTime.getRdfClass());
+      if (hasStart) {
+        periodResource.addProperty(period.getStartDate().getProperty(),
+            period.getStartDate().getValue(), XSDDateType.XSDdate);
+      }
+      if (hasEnd) {
+        periodResource.addProperty(period.getEndDate().getProperty(),
+            period.getEndDate().getValue(), XSDDateType.XSDdate);
+      }
+      if (hasBeginning) {
+        periodResource.addProperty(period.getBeginning().getProperty(),
+            period.getBeginning().getValue(), XSDDateType.XSDdate);
+      }
+      if (hasEndPoint) {
+        periodResource.addProperty(period.getEnd().getProperty(),
+            period.getEnd().getValue(), XSDDateType.XSDdate);
+      }
+      datasetResource.addProperty(model.createProperty(period.getUri()), periodResource);
     }
   }
 
@@ -584,38 +611,55 @@ public class DcatApSerializer {
   protected static void serializeSpatialCoverage(List<DctLocation> spatialCoverage, Model model,
       Resource parentResource) {
 
-    if (spatialCoverage != null) {
-
-      for (DctLocation location : spatialCoverage) {
-        Resource spatialResource = model.createResource(DctLocation.getRdfClass());
-        String geoUri = null;
-        // Initialize spatial Resource
-
-        if (StringUtils.isNotBlank(geoUri = location.getGeographicalIdentifier().getValue())) {
-
-          if (IRIFactory.iriImplementation().create(geoUri).hasViolation(false)) {
-            location.getGeographicalIdentifier().setValue(GEO_BASE_URI + geoUri);
-          }
-
-          addDcatPropertyAsLiteral(location.getGeographicalIdentifier(), spatialResource,
-              model);
-        }
-
-        addDcatPropertyAsLiteral(location.getGeographicalIdentifier(), spatialResource, model);
-        addDcatPropertyAsLiteral(location.getGeometry(), spatialResource, model);
-
-        // TODO Geographical Name as SKOS CONCEPT
-        addDcatPropertyAsResource(location.getGeographicalName(), spatialResource, model,
-            false);
-
-        addDcatPropertyAsLiteral(location.getBbox(), spatialResource, model);
-        addDcatPropertyAsLiteral(location.getCentroid(), spatialResource, model);
-
-        parentResource.addProperty(model.createProperty(location.getUri()), spatialResource);
-
-      }
+    if (spatialCoverage == null) {
+      return;
     }
 
+    for (DctLocation location : spatialCoverage) {
+      // Don't emit an empty <dct:Location/> when no sub-property carries a value.
+      boolean hasGeoId = location.getGeographicalIdentifier() != null
+          && StringUtils.isNotBlank(location.getGeographicalIdentifier().getValue());
+      boolean hasGeometry = location.getGeometry() != null
+          && StringUtils.isNotBlank(location.getGeometry().getValue());
+      boolean hasGeoName = location.getGeographicalName() != null
+          && StringUtils.isNotBlank(location.getGeographicalName().getValue());
+      boolean hasBbox = location.getBbox() != null
+          && StringUtils.isNotBlank(location.getBbox().getValue());
+      boolean hasCentroid = location.getCentroid() != null
+          && StringUtils.isNotBlank(location.getCentroid().getValue());
+
+      if (!hasGeoId && !hasGeometry && !hasGeoName && !hasBbox && !hasCentroid) {
+        continue;
+      }
+
+      Resource spatialResource = model.createResource(DctLocation.getRdfClass());
+
+      if (hasGeoId) {
+        String geoUri = location.getGeographicalIdentifier().getValue();
+        if (IRIFactory.iriImplementation().create(geoUri).hasViolation(false)) {
+          location.getGeographicalIdentifier().setValue(GEO_BASE_URI + geoUri);
+        }
+        addDcatPropertyAsLiteral(location.getGeographicalIdentifier(), spatialResource, model);
+      }
+
+      if (hasGeometry) {
+        addDcatPropertyAsLiteral(location.getGeometry(), spatialResource, model);
+      }
+
+      // TODO Geographical Name as SKOS CONCEPT
+      if (hasGeoName) {
+        addDcatPropertyAsResource(location.getGeographicalName(), spatialResource, model, false);
+      }
+
+      if (hasBbox) {
+        addDcatPropertyAsLiteral(location.getBbox(), spatialResource, model);
+      }
+      if (hasCentroid) {
+        addDcatPropertyAsLiteral(location.getCentroid(), spatialResource, model);
+      }
+
+      parentResource.addProperty(model.createProperty(location.getUri()), spatialResource);
+    }
   }
 
   /**

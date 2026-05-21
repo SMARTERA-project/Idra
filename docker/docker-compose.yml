@@ -184,7 +184,7 @@ services:
             #- idra.db.password=root
             - idra.db.name=idra_db
             - idra.cache.loadfromdb=true
-            - idra.synch.onstart=false
+            - idra.synch.onstart=true
             - idra.odms.dump.file.path=/opt/idra/dump/
             - idra.dump.file.path=/opt/idra/dump/
             - idra.lod.enable=true

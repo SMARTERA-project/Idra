@@ -46,6 +46,7 @@ import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -745,7 +746,8 @@ public class SparqlConnector implements IodmsConnector {
 
     if (StringUtils.isBlank(config.getSparqlDatasetDumpString())) {
       config.setSparqlDatasetDumpString(
-          new String(Files.readAllBytes(Paths.get(config.getSparqlDatasetFilePath()))));
+          new String(Files.readAllBytes(Paths.get(config.getSparqlDatasetFilePath())),
+              StandardCharsets.UTF_8));
     }
 
     List<DcatDataset> result = new ArrayList<DcatDataset>();
@@ -794,20 +796,7 @@ public class SparqlConnector implements IodmsConnector {
    */
   private <T extends SkosConcept> List<T> extractConceptList(String propertyUri,
       List<String> concepts, Class<T> type) {
-    List<T> result = new ArrayList<T>();
-
-    for (String label : concepts) {
-      try {
-        result.add(type.getDeclaredConstructor(SkosConcept.class).newInstance(new SkosConcept(
-            propertyUri, "", Arrays.asList(new SkosPrefLabel("", FederationCore.getEnglishDcatTheme(label), nodeId)), nodeId)));
-      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        // TODO Auto-generated catch block
-        logger.error(e.getMessage(), e);
-      }
-    }
-
-    return result;
+    return it.eng.idra.utils.SkosConceptFactory.build(propertyUri, concepts, type, nodeId);
   }
 
 }

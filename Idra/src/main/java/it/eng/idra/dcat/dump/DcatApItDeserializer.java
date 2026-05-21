@@ -247,9 +247,8 @@ public class DcatApItDeserializer extends DcatApDeserializer {
       }
     }
 
-    // Handle spatial property
-    DctLocation spatialCoverage = null;
-    spatialCoverage = deserializeSpatialCoverage(nodeId, datasetResource);
+    // Handle spatial property — list ALL dct:spatial values, not just the first.
+    List<DctLocation> spatialCoverageList = deserializeAllSpatialCoverage(nodeId, datasetResource);
 
     // Handle temporal property
     DctPeriodOfTime temporalCoverage = null;
@@ -316,7 +315,9 @@ public class DcatApItDeserializer extends DcatApDeserializer {
       }
     }
     // geographicalCoverage properties
-    geographicalCoverage.add(spatialCoverage);
+    if (spatialCoverageList != null && !spatialCoverageList.isEmpty()) {
+      geographicalCoverage.addAll(spatialCoverageList);
+    }
 
     /*
      * DcatDetails dcatDetails = new DcatDetails();
@@ -427,7 +428,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     contactPointList = null;
     publisher = null;
     conformsTo = null;
-    spatialCoverage = null;
+    spatialCoverageList = null;
     temporalCoverage = null;
     keywords = null;
     theme = null;
@@ -469,10 +470,18 @@ public class DcatApItDeserializer extends DcatApDeserializer {
 
     if (temporalResource != null) {
 
+      // Read DCATAP_IT specific properties first; fall back to standard DCAT-AP v3
+      // (dcat:startDate / dcat:endDate) for datasets that mix profiles or that come
+      // from sources using the W3C vocabulary directly.
       if (temporalResource.hasProperty(startDateProp)) {
         String startDateValue = getStatementValue(temporalResource.getProperty(startDateProp));
         if (StringUtils.isNotBlank(startDateValue)) {
           startDate = new DcatProperty(startDateProp.getURI(), startDateValue);
+        }
+      } else if (temporalResource.hasProperty(DCAT.startDate)) {
+        String startDateValue = getStatementValue(temporalResource.getProperty(DCAT.startDate));
+        if (StringUtils.isNotBlank(startDateValue)) {
+          startDate = new DcatProperty(DCAT.startDate.getURI(), startDateValue);
         }
       }
 
@@ -480,6 +489,11 @@ public class DcatApItDeserializer extends DcatApDeserializer {
         String endDateValue = getStatementValue(temporalResource.getProperty(endDateProp));
         if (StringUtils.isNotBlank(endDateValue)) {
           endDate = new DcatProperty(endDateProp.getURI(), endDateValue);
+        }
+      } else if (temporalResource.hasProperty(DCAT.endDate)) {
+        String endDateValue = getStatementValue(temporalResource.getProperty(DCAT.endDate));
+        if (StringUtils.isNotBlank(endDateValue)) {
+          endDate = new DcatProperty(DCAT.endDate.getURI(), endDateValue);
         }
       }
 

@@ -83,6 +83,36 @@ import org.json.JSONObject;
  */
 public class CkanConnector implements IodmsConnector {
 
+  // Customize the static Gson used by org.ckan.Client so that String values for
+  // fields typed as List<String> in the library model are accepted. Some CKAN
+  // installations (data.gov.ie at 2026-05) emit `language: "en"` (scalar) where
+  // the library expects an array — without this the entire response fails to
+  // parse with "Expected BEGIN_ARRAY but was STRING at path $.language".
+  static {
+    com.google.gson.Gson tolerant = new com.google.gson.GsonBuilder()
+        .registerTypeAdapter(
+            new com.google.gson.reflect.TypeToken<java.util.List<String>>() {}.getType(),
+            (com.google.gson.JsonDeserializer<java.util.List<String>>) (json, type, ctx) -> {
+              if (json == null || json.isJsonNull()) return new java.util.ArrayList<>();
+              if (json.isJsonArray()) {
+                java.util.List<String> out = new java.util.ArrayList<>();
+                for (com.google.gson.JsonElement el : json.getAsJsonArray()) {
+                  if (el != null && !el.isJsonNull()) out.add(el.getAsString());
+                }
+                return out;
+              }
+              if (json.isJsonPrimitive()) {
+                java.util.List<String> out = new java.util.ArrayList<>();
+                String s = json.getAsString();
+                if (StringUtils.isNotBlank(s)) out.add(s);
+                return out;
+              }
+              return new java.util.ArrayList<>();
+            })
+        .create();
+    org.ckan.Client.gson = tolerant;
+  }
+
   /** The node id. */
   private String nodeId;
 
@@ -815,6 +845,17 @@ public class CkanConnector implements IodmsConnector {
       // logger.info("HVDCategory: " + d.getHvd_category());
       HVDCategory.add(d.getHvd_category());
 
+      // dct:language — top-level field used by CKAN with the ckanext-dcat plugin.
+      // The older code only read extras["language"], which is empty for catalogs that
+      // expose the field at the top level (e.g. Beopen's CKAN deployment).
+      if (language.isEmpty() && d.getLanguage() != null && !d.getLanguage().isEmpty()) {
+        for (String lang : d.getLanguage()) {
+          if (StringUtils.isNotBlank(lang)) {
+            language.add(lang);
+          }
+        }
+      }
+
       // Distributions
       List<Resource> resourceList = d.getResources();
       if (resourceList != null) {
@@ -919,25 +960,13 @@ public class CkanConnector implements IodmsConnector {
    */
   /*
    * Return a List of SKOSConcept, each of them containing a prefLabel from input
-   * String list.
+   * String list. Detects URI inputs (e.g. http://publications.europa.eu/resource/authority/data-theme/ENVI)
+   * and preserves them as the concept's resourceUri so downstream code can render
+   * them as SKOS Concept references instead of plain string labels.
    */
   private <T extends SkosConcept> List<T> extractConceptList(String propertyUri,
       List<String> concepts, Class<T> type) {
-    List<T> result = new ArrayList<T>();
-
-    for (String label : concepts) {
-      try {
-        result.add(type.getDeclaredConstructor(SkosConcept.class).newInstance(new SkosConcept(
-            propertyUri, "", Arrays.asList(new SkosPrefLabel("", FederationCore.getEnglishDcatTheme(label), nodeId)),
-            nodeId)));
-      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        // TODO Auto-generated catch block
-        logger.error(e.getMessage(), e);
-      }
-    }
-
-    return result;
+    return it.eng.idra.utils.SkosConceptFactory.build(propertyUri, concepts, type, nodeId);
   }
 
   /**

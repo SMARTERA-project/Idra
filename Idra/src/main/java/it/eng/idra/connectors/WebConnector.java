@@ -1202,19 +1202,7 @@ public class WebConnector implements IodmsConnector {
    */
   private <T extends SkosConcept> List<T> extractConceptList(String propertyUri,
       List<String> concepts, Class<T> type) {
-    List<T> result = new ArrayList<T>();
-
-    for (String label : concepts) {
-      try {
-        result.add(type.getDeclaredConstructor(SkosConcept.class).newInstance(new SkosConcept(
-            propertyUri, "", Arrays.asList(new SkosPrefLabel("", FederationCore.getEnglishDcatTheme(label), nodeId)),
-            nodeId)));
-      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        logger.error(e.getMessage(), e);
-      }
-    }
-    return result;
+    return it.eng.idra.utils.SkosConceptFactory.build(propertyUri, concepts, type, nodeId);
   }
 
 }

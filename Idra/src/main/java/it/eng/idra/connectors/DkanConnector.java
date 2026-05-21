@@ -600,27 +600,18 @@ public class DkanConnector implements IodmsConnector {
   protected <T extends SkosConcept> List<T> deserializeConcept(JSONObject obj, String fieldName,
       Property property, String nodeId, Class<T> type) throws JSONException {
 
-    List<T> result = new ArrayList<T>();
     JSONArray conceptArray = obj.optJSONArray(fieldName);
-
-    if (conceptArray != null) {
-      for (int i = 0; i < conceptArray.length(); i++) {
-
-        String label = conceptArray.getString(i);
-        if (StringUtils.isNotBlank(label)) {
-
-          List<SkosPrefLabel> prefLabelList = Arrays.asList(new SkosPrefLabel(null, FederationCore.getEnglishDcatTheme(label), nodeId));
-          try {
-            result.add(type.getDeclaredConstructor(SkosConcept.class)
-                .newInstance(new SkosConcept(property.getURI(), null, prefLabelList, nodeId)));
-          } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-              | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-            // TODO Auto-generated catch block
-            logger.error(e.getMessage(), e);
-          }
-        }
+    if (conceptArray == null) {
+      return new ArrayList<T>();
+    }
+    List<String> entries = new ArrayList<String>();
+    for (int i = 0; i < conceptArray.length(); i++) {
+      String label = conceptArray.getString(i);
+      if (StringUtils.isNotBlank(label)) {
+        entries.add(label);
       }
     }
+    List<T> result = it.eng.idra.utils.SkosConceptFactory.build(property.getURI(), entries, type, nodeId);
 
     return result;
   }

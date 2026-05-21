@@ -82,15 +82,11 @@ public class DcatApItSerializer extends DcatApSerializer {
    */
   protected static Model addDatasetToModel(DcatDataset dataset, Model model) {
 
-    String landingPage = dataset.getLandingPage().getValue();
-    IRI iri = iriFactory.create(landingPage);
-    if (iri.hasViolation(false)) {
-      throw new IllegalArgumentException(
-          "URI for dataset: " + iri + "is not valid, skipping the dataset in the Jena Model:"
-              + (iri.violations(false).next()).getShortMessage());
-    }
-
-    Resource datasetResource = model.createResource(iri.toString(),
+    // See DcatApSerializer.addDatasetToModel for the rationale behind the synthetic URN:
+    // avoids collisions between the dataset URI and foaf:page/foaf:Document entries
+    // that share the landingPage value.
+    String datasetUri = "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
+    Resource datasetResource = model.createResource(datasetUri,
         model.createResource(DCATAP_IT_BASE_URI + "Dataset"));
 
     datasetResource.addProperty(RDF.type, DCAT.Dataset);

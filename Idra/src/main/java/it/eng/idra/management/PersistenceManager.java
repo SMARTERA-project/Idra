@@ -290,6 +290,7 @@ public class PersistenceManager {
       managed.setLocation(node.getLocation());
       managed.setLocationDescription(node.getLocationDescription());
       managed.setDcatProfile(node.getDcatProfile());
+      managed.setDcatVersion(node.getDcatVersion());
       managed.setDumpFilePath(node.getDumpFilePath());
       managed.setDumpUrl(node.getDumpUrl());
       managed.setDumpString(node.getDumpString());

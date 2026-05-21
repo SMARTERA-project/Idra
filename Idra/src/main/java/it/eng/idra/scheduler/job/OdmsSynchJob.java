@@ -45,6 +45,7 @@ import it.eng.idra.utils.restclient.RestClient;
 import it.eng.idra.utils.restclient.RestClientImpl;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
@@ -204,7 +205,8 @@ public class OdmsSynchJob implements InterruptableJob {
         && StringUtils.isNotBlank(node.getDumpFilePath())) {
 
       // Read the content of the file from the file system
-      String dumpString = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())));
+      String dumpString = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())),
+          StandardCharsets.UTF_8);
       node.setDumpString(dumpString);
 
     }
@@ -302,6 +304,22 @@ public class OdmsSynchJob implements InterruptableJob {
             for (DcatDataset dataset : synchroResult.getChangedDatasets()) {
               updatedRdf += OdmsSynchJob.updateDataset(node, dataset);
             }
+
+            // Refresh DCAT-AP version detection. If we already have a v3 verdict keep it
+            // (detection is monotonic); otherwise scan added+changed first, and if those
+            // don't carry v3 markers fall back to inspecting the current cache so a
+            // catalog whose delta is empty can still be classified correctly.
+            java.util.List<DcatDataset> deltaForDetection = new java.util.ArrayList<>();
+            deltaForDetection.addAll(synchroResult.getAddedDatasets());
+            deltaForDetection.addAll(synchroResult.getChangedDatasets());
+            it.eng.idra.beans.dcat.DcatApVersion detected =
+                it.eng.idra.utils.DcatVersionDetector.detect(deltaForDetection, node.getDcatVersion());
+            if (detected != it.eng.idra.beans.dcat.DcatApVersion.DCAT_AP_3) {
+              java.util.List<DcatDataset> fullCatalogue =
+                  MetadataCacheManager.getAllDatasetsByOdmsCatalogue(node.getId());
+              detected = it.eng.idra.utils.DcatVersionDetector.detect(fullCatalogue, detected);
+            }
+            node.setDcatVersion(detected);
 
             // } else if (node.getNodeType().equals(ODMSCatalogueType.DCATDUMP)) {
             //// Do nothing for node type DUMP

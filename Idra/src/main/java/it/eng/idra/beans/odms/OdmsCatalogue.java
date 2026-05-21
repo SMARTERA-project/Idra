@@ -21,6 +21,7 @@ import com.google.gson.annotations.SerializedName;
 import it.eng.idra.beans.dcat.DCATAP;
 import it.eng.idra.beans.dcat.DcatApFormat;
 import it.eng.idra.beans.dcat.DcatApProfile;
+import it.eng.idra.beans.dcat.DcatApVersion;
 import it.eng.idra.beans.dcat.DcatCatalogueRecord;
 import it.eng.idra.beans.dcat.DcatDataService;
 import it.eng.idra.beans.dcat.DcatProperty;
@@ -249,6 +250,16 @@ public class OdmsCatalogue {
   /** The dcat profile. */
   // @Transient
   private DcatApProfile dcatProfile;
+
+  /**
+   * DCAT-AP version (v2 vs v3). Automatically inferred at sync time by
+   * {@code DcatVersionDetector} — never chosen by the end user. Null until the
+   * first successful sync.
+   */
+  @Expose
+  @Enumerated(EnumType.STRING)
+  @Column(name = "dcatVersion", length = 32)
+  private DcatApVersion dcatVersion;
 
   /** The dcat format. */
   @Transient
@@ -1264,6 +1275,14 @@ public class OdmsCatalogue {
    */
   public void setDcatProfile(DcatApProfile profile) {
     this.dcatProfile = profile;
+  }
+
+  public DcatApVersion getDcatVersion() {
+    return dcatVersion;
+  }
+
+  public void setDcatVersion(DcatApVersion dcatVersion) {
+    this.dcatVersion = dcatVersion;
   }
 
   /**

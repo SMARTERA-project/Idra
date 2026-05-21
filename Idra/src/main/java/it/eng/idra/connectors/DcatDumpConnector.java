@@ -31,6 +31,7 @@ import it.eng.idra.management.OdmsManager;
 import it.eng.idra.utils.PropertyManager;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -215,7 +216,8 @@ public class DcatDumpConnector implements IodmsConnector {
           && new File(node.getDumpFilePath()).exists()) {
         // Fallback: dumpString was cleared after initial parse but the cached file still
         // exists (e.g. retry after a JPA transaction failure during registration).
-        String content = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())));
+        String content = new String(Files.readAllBytes(Paths.get(node.getDumpFilePath())),
+            StandardCharsets.UTF_8);
         return getDatasetsFromDumpString(content);
       } else {
         throw new Exception("The node must have either the dumpURL or dumpString");

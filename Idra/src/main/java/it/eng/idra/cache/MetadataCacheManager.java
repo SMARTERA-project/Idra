@@ -31,6 +31,7 @@ import it.eng.idra.beans.search.SearchResult;
 import it.eng.idra.management.OdmsManager;
 import it.eng.idra.management.StatisticsManager;
 import it.eng.idra.search.EuroVocTranslator;
+import it.eng.idra.utils.DcatVersionDetector;
 import it.eng.idra.utils.PropertyManager;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -1674,6 +1675,8 @@ public class MetadataCacheManager {
           cachePersistence.jpaCommitTransanction();
           logger.info("SOLR Commit");
           server.commit();
+          // Auto-detect DCAT-AP version from this page's payload (monotonic toward v3).
+          node.setDcatVersion(DcatVersionDetector.detect(currentDatasets, node.getDcatVersion()));
           currentDatasets = null;
           skipped += currentSkipped;
           logger.info("Current datasets page was successfully committed and persisted");
@@ -1739,6 +1742,8 @@ public class MetadataCacheManager {
 
           }
 
+          // Auto-detect DCAT-AP version (monotonic toward v3) on the per-dataset fallback path.
+          node.setDcatVersion(DcatVersionDetector.detect(currentDatasets, node.getDcatVersion()));
           currentDatasets = null;
 
         }

@@ -210,6 +210,9 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     }
 
     theme = deserializeConcept(nodeId, datasetResource, DCAT.theme, SkosConceptTheme.class);
+    // dct:subject — modelled the same way as theme (SKOS concepts).
+    List<SkosConceptSubject> subjects = deserializeConcept(nodeId, datasetResource,
+        DCTerms.subject, SkosConceptSubject.class);
     FoafAgent publisher = null;
     publisher = deserializeFoafAgent(nodeId, datasetResource.getProperty(DCTerms.publisher));
     List<VcardOrganization> contactPointList = null;
@@ -342,9 +345,8 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       }
     }
 
-    // Handle spatial property
-    DctLocation spatialCoverage = null;
-    spatialCoverage = deserializeSpatialCoverage(nodeId, datasetResource);
+    // Handle spatial property — list ALL dct:spatial values, not just the first.
+    List<DctLocation> spatialCoverageList = deserializeAllSpatialCoverage(nodeId, datasetResource);
 
     // Handle temporal property
     DctPeriodOfTime temporalCoverage = null;
@@ -388,7 +390,9 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     }
 
     // geographicalCoverage properties
-    geographicalCoverage.add(spatialCoverage);
+    if (spatialCoverageList != null && !spatialCoverageList.isEmpty()) {
+      geographicalCoverage.addAll(spatialCoverageList);
+    }
 
     /*
      * DcatDetails dcatDetails = new DcatDetails();
@@ -504,7 +508,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         publisher, contactPointList, keywords, accessRights, conformsTo, documentation, frequency,
         hasVersion, isVersionOf, landingPage, language, provenance, releaseDate, updateDate,
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
-        versionNotes, null, null, new ArrayList<SkosConceptSubject>(), relatedResource, applicableLegislation,
+        versionNotes, null, null, subjects != null ? subjects : new ArrayList<SkosConceptSubject>(), relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setKeywordDetails(keywordDetails);
     mapped.setDatasetDetails(
@@ -514,7 +518,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     contactPointList = null;
     publisher = null;
     conformsTo = null;
-    spatialCoverage = null;
+    spatialCoverageList = null;
     temporalCoverage = null;
     keywords = null;
     theme = null;
@@ -707,12 +711,19 @@ public class DcatApDeserializer implements IdcatApDeserialize {
 
     if (temporalResource != null) {
 
+      // schema.org/startDate fallback used by some DCAT-AP-Stat dumps that emit
+      // schema:startDate on the PeriodOfTime instead of dcat:startDate.
+      Property schemaStart = ResourceFactory.createProperty("http://schema.org/startDate");
+      Property schemaEnd = ResourceFactory.createProperty("http://schema.org/endDate");
+
       if (temporalResource.hasProperty(DCAT.startDate)) {
         try {
           startDate = temporalResource.getProperty(DCAT.startDate).getString();
         } catch (LiteralRequiredException e) {
           startDate = temporalResource.getProperty(DCAT.startDate).getResource().getURI();
         }
+      } else if (temporalResource.hasProperty(schemaStart)) {
+        startDate = getStatementValue(temporalResource.getProperty(schemaStart));
       }
 
       if (temporalResource.hasProperty(DCAT.endDate)) {
@@ -721,6 +732,8 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         } catch (LiteralRequiredException e) {
           endDate = temporalResource.getProperty(DCAT.endDate).getResource().getURI();
         }
+      } else if (temporalResource.hasProperty(schemaEnd)) {
+        endDate = getStatementValue(temporalResource.getProperty(schemaEnd));
       }
 
       /*
@@ -779,71 +792,112 @@ public class DcatApDeserializer implements IdcatApDeserialize {
    * @return the dct location
    */
   public DctLocation deserializeSpatialCoverage(String nodeId, Resource datasetResource) {
+    // Backward-compatible wrapper: return the first location only.
+    List<DctLocation> all = deserializeAllSpatialCoverage(nodeId, datasetResource);
+    return all.isEmpty() ? null : all.get(0);
+  }
 
-    // StmtIterator spatialIt = datasetResource.listProperties(DCTerms.spatial);
-    // while (spatialIt.hasNext()) {
-    // Resource spatialResource = (Resource) spatialIt.next().getResource();
+  /**
+   * Deserialize all spatial coverages attached to the dataset.
+   * DCAT-AP allows multiple dct:spatial properties (e.g. statistical datasets
+   * referencing 30+ country URIs); the older single-value method silently dropped
+   * everything except the first.
+   *
+   * @param nodeId          the node ID
+   * @param datasetResource the dataset resource
+   * @return the list of dct locations (empty if none)
+   */
+  public List<DctLocation> deserializeAllSpatialCoverage(String nodeId, Resource datasetResource) {
+    List<DctLocation> locations = new ArrayList<DctLocation>();
+    StmtIterator spatialIt = datasetResource.listProperties(DCTerms.spatial);
+    while (spatialIt.hasNext()) {
+      Statement st = spatialIt.next();
+      if (!st.getObject().isResource()) {
+        // Plain literal as dct:spatial (uncommon) — preserve as geographicalIdentifier.
+        String literal = StringUtils.trimToNull(st.getObject().toString());
+        if (literal != null) {
+          locations.add(new DctLocation(DCTerms.spatial.getURI(), literal, null, null, nodeId,
+              null, null));
+        }
+        continue;
+      }
+      Resource spatialResource = st.getResource();
+      DctLocation loc = extractSpatialLocation(nodeId, spatialResource);
+      if (loc != null) {
+        locations.add(loc);
+      }
+    }
+    return locations;
+  }
 
+  private DctLocation extractSpatialLocation(String nodeId, Resource spatialResource) {
+    if (spatialResource == null) {
+      return null;
+    }
     String geographicalIdentifier = null;
     String geographicalName = null;
     String geometry = null;
-    String spatialResourceUri = null;
-    Resource spatialResource = datasetResource.getPropertyResourceValue(DCTerms.spatial);
     String bbox = null;
     String centroid = null;
 
-    if (spatialResource != null) {
-
-      if (spatialResource.hasProperty(ResourceFactory
-          .createProperty("http://www.w3.org/2000/01/rdf-schema#seeAlso"))) {
-        geographicalIdentifier = spatialResource
-            .getProperty(ResourceFactory
-                .createProperty("http://www.w3.org/2000/01/rdf-schema#seeAlso"))
-            .getString();
+    if (spatialResource.hasProperty(ResourceFactory
+        .createProperty("http://www.w3.org/2000/01/rdf-schema#seeAlso"))) {
+      geographicalIdentifier = spatialResource
+          .getProperty(ResourceFactory
+              .createProperty("http://www.w3.org/2000/01/rdf-schema#seeAlso"))
+          .getString();
+    }
+    if (spatialResource
+        .hasProperty(ResourceFactory.createProperty("http://www.w3.org/ns/locn#geometry"))) {
+      geometry = spatialResource
+          .getProperty(ResourceFactory.createProperty("http://www.w3.org/ns/locn#geometry"))
+          .getString();
+    }
+    if (spatialResource.hasProperty(
+        ResourceFactory.createProperty("http://www.w3.org/ns/locn#geographicalName"))) {
+      Resource geoNameResource = spatialResource.getPropertyResourceValue(
+          ResourceFactory.createProperty("http://www.w3.org/ns/locn#geographicalName"));
+      if (geoNameResource != null) {
+        geographicalName = geoNameResource.getURI();
       }
-      if (spatialResource
-          .hasProperty(ResourceFactory.createProperty("http://www.w3.org/ns/locn#geometry"))) {
-        geometry = spatialResource
-            .getProperty(ResourceFactory.createProperty("http://www.w3.org/ns/locn#geometry"))
-            .getString();
-      }
-
-      if (spatialResource.hasProperty(
-          ResourceFactory.createProperty("http://www.w3.org/ns/locn#geographicalName"))) {
-        geographicalName = spatialResource
-            .getPropertyResourceValue(
-                ResourceFactory.createProperty("http://www.w3.org/ns/locn#geographicalName"))
-            .getURI();
-      }
-
-      // Handle geographical Identifier as resource URI
-      if (StringUtils.isBlank(geographicalIdentifier)
-          && StringUtils.isNotBlank(spatialResourceUri = spatialResource.getURI())) {
-        geographicalIdentifier = (spatialResourceUri.startsWith(GEO_BASE_URI)
-            || spatialResourceUri.startsWith(GEO_BASE_URI_ALT)) ? spatialResourceUri : "";
-      }
-
-      if (spatialResource.hasProperty(DCAT.bbox)) {
-        try {
-          bbox = spatialResource.getProperty(DCAT.bbox).getString();
-        } catch (LiteralRequiredException e) {
-          bbox = spatialResource.getProperty(DCAT.bbox).getResource().getURI();
-        }
-      }
-
-      if (spatialResource.hasProperty(DCAT.centroid)) {
-        try {
-          centroid = spatialResource.getProperty(DCAT.centroid).getString();
-        } catch (LiteralRequiredException e) {
-          centroid = spatialResource.getProperty(DCAT.centroid).getResource().getURI();
-        }
-      }
-
-      return new DctLocation(DCTerms.spatial.getURI(), geographicalIdentifier, geographicalName,
-          geometry, nodeId, bbox, centroid);
     }
 
-    return null;
+    // Accept ANY URI as geographicalIdentifier instead of restricting to the older
+    // GEO_BASE_URI / GEO_BASE_URI_ALT authority bases. Modern DCAT-AP-Stat dumps use
+    // http://publications.europa.eu/resource/authority/country/* and many other URIs
+    // that don't match the legacy prefixes.
+    if (StringUtils.isBlank(geographicalIdentifier)) {
+      String spatialResourceUri = spatialResource.getURI();
+      if (StringUtils.isNotBlank(spatialResourceUri)) {
+        geographicalIdentifier = spatialResourceUri;
+      }
+    }
+
+    if (spatialResource.hasProperty(DCAT.bbox)) {
+      try {
+        bbox = spatialResource.getProperty(DCAT.bbox).getString();
+      } catch (LiteralRequiredException e) {
+        bbox = spatialResource.getProperty(DCAT.bbox).getResource().getURI();
+      }
+    }
+    if (spatialResource.hasProperty(DCAT.centroid)) {
+      try {
+        centroid = spatialResource.getProperty(DCAT.centroid).getString();
+      } catch (LiteralRequiredException e) {
+        centroid = spatialResource.getProperty(DCAT.centroid).getResource().getURI();
+      }
+    }
+
+    // Skip locations that carry no information.
+    if (StringUtils.isBlank(geographicalIdentifier)
+        && StringUtils.isBlank(geographicalName)
+        && StringUtils.isBlank(geometry)
+        && StringUtils.isBlank(bbox)
+        && StringUtils.isBlank(centroid)) {
+      return null;
+    }
+    return new DctLocation(DCTerms.spatial.getURI(), geographicalIdentifier, geographicalName,
+        geometry, nodeId, bbox, centroid);
   }
 
   /**
@@ -861,16 +915,22 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       Statement st = othIdIt.next();
 
       try {
-        if (st.getString() != null) {
-          otherIdentifier.add(st.getString());
+        String literal = st.getString();
+        if (StringUtils.isNotBlank(literal)) {
+          otherIdentifier.add(literal);
         }
-
       } catch (LiteralRequiredException e) {
         Resource othIdResource = st.getResource();
-        if (othIdResource != null) {
-          if (othIdResource.hasProperty(SKOS.notation)) {
-            otherIdentifier.add(othIdResource.getProperty(SKOS.notation).getString());
-          }
+        if (othIdResource == null) {
+          continue;
+        }
+        // Prefer the explicit SKOS notation when present (legacy DCAT-AP convention),
+        // otherwise fall back to the resource URI itself — this is how DCAT-AP v3
+        // dumps express DOI/handle identifiers (e.g. adms:Identifier rdf:about="https://doi.org/...").
+        if (othIdResource.hasProperty(SKOS.notation)) {
+          otherIdentifier.add(othIdResource.getProperty(SKOS.notation).getString());
+        } else if (StringUtils.isNotBlank(othIdResource.getURI())) {
+          otherIdentifier.add(othIdResource.getURI());
         }
       }
 
