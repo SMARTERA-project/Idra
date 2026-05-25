@@ -33,7 +33,6 @@ import it.eng.idra.beans.dcat.Relationship;
 import it.eng.idra.beans.dcat.SkosConcept;
 import it.eng.idra.beans.dcat.SkosConceptStatus;
 import it.eng.idra.beans.dcat.SkosConceptTheme;
-import it.eng.idra.beans.dcat.SkosPrefLabel;
 import it.eng.idra.beans.dcat.SpdxChecksum;
 import it.eng.idra.beans.dcat.VcardOrganization;
 import it.eng.idra.beans.odms.OdmsCatalogue;
@@ -47,10 +46,10 @@ import it.eng.idra.utils.DcatDetailsUtil;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.PropertyManager;
+import it.eng.idra.utils.SkosConceptFactory;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -591,29 +590,15 @@ public class SocrataConnector implements IodmsConnector {
   protected <T extends SkosConcept> List<T> deserializeConcept(JSONObject obj, String fieldName,
       Property property, String nodeId, Class<T> type) throws JSONException {
 
-    List<T> result = new ArrayList<T>();
     JSONArray conceptArray = obj.optJSONArray(fieldName);
-
-    if (conceptArray != null) {
-      for (int i = 0; i < conceptArray.length(); i++) {
-
-        String label = conceptArray.getString(i);
-        if (StringUtils.isNotBlank(label)) {
-
-          List<SkosPrefLabel> prefLabelList = Arrays.asList(new SkosPrefLabel(null, FederationCore.getEnglishDcatTheme(label), nodeId));
-          try {
-            result.add(type.getDeclaredConstructor(SkosConcept.class)
-                .newInstance(new SkosConcept(property.getURI(), null, prefLabelList, nodeId)));
-          } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-              | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-            // TODO Auto-generated catch block
-            logger.error(e.getMessage(), e);
-          }
-        }
-      }
+    if (conceptArray == null) {
+      return new ArrayList<T>();
     }
-
-    return result;
+    List<String> entries = new ArrayList<String>(conceptArray.length());
+    for (int i = 0; i < conceptArray.length(); i++) {
+      entries.add(conceptArray.getString(i));
+    }
+    return SkosConceptFactory.build(property.getURI(), entries, type, nodeId);
   }
 
   /*

@@ -37,10 +37,21 @@ import org.apache.logging.log4j.Logger;
  * mapping ({@link FederationCore#getEnglishDcatTheme(String)}) on the URI's last
  * segment so DCAT-AP authority codes (ENVI, ECON, TRAN, …) keep their friendly
  * label.
+ *
+ * <p>From 2026-05-22, when the entry is a free-text label that matches a term of
+ * the EU {@code data-theme} authority in any supported language (e.g.
+ * {@code "Trasporti"} → {@code TRAN}), the canonical URI
+ * {@code http://publications.europa.eu/resource/authority/data-theme/<ID>} is
+ * reconstructed via {@link FederationCore#getDcatThemeIdentifier(String)} and the
+ * preflabel is tagged with {@code language="en"} (because the chosen label is the
+ * English form of the authority term). Entries outside the EU vocabulary keep
+ * the previous behavior: empty {@code resourceUri} and untagged preflabel.
  */
 public final class SkosConceptFactory {
 
   private static final Logger logger = LogManager.getLogger(SkosConceptFactory.class);
+
+  private static final String EU_DATA_THEME_BASE = "http://publications.europa.eu/resource/authority/data-theme/";
 
   private SkosConceptFactory() {
   }
@@ -69,19 +80,30 @@ public final class SkosConceptFactory {
       String trimmed = entry.trim();
       String resourceUri = "";
       String label;
+      String labelLang = "";
       if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
         resourceUri = trimmed;
         int slash = trimmed.lastIndexOf('/');
         String segment = slash >= 0 && slash + 1 < trimmed.length()
             ? trimmed.substring(slash + 1) : trimmed;
         label = FederationCore.getEnglishDcatTheme(segment);
+        if (label != null) {
+          labelLang = "en";
+        }
       } else {
         label = FederationCore.getEnglishDcatTheme(trimmed);
+        if (label != null) {
+          labelLang = "en";
+          String identifier = FederationCore.getDcatThemeIdentifier(trimmed);
+          if (StringUtils.isNotBlank(identifier)) {
+            resourceUri = EU_DATA_THEME_BASE + identifier;
+          }
+        }
       }
       try {
         result.add(type.getDeclaredConstructor(SkosConcept.class).newInstance(new SkosConcept(
             propertyUri, resourceUri,
-            Arrays.asList(new SkosPrefLabel("", label, nodeId)), nodeId)));
+            Arrays.asList(new SkosPrefLabel(labelLang, label, nodeId)), nodeId)));
       } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
           | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         logger.error(e.getMessage(), e);

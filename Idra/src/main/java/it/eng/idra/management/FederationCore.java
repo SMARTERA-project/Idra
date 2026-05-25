@@ -1135,6 +1135,43 @@ public class FederationCore {
   }
 
   /**
+   * Gets the DCAT theme authority identifier (e.g. {@code TRAN}, {@code ECON},
+   * {@code ENVI}) for any language input. Mirrors {@link #getEnglishDcatTheme(String)}
+   * but returns the EU vocabulary identifier rather than the English label,
+   * so callers can rebuild the canonical authority URI
+   * {@code http://publications.europa.eu/resource/authority/data-theme/<ID>}.
+   *
+   * @param value the theme value (URI, English label, or any other supported language)
+   * @return the EU authority identifier if found, otherwise null
+   */
+  public static String getDcatThemeIdentifier(String value) {
+    String identifierFromLink = (value != null && (value.startsWith("http://") || value.startsWith("https://"))) ? value.substring(value.lastIndexOf("/") + 1) : null;
+    for (DcatThemes x : dcatThemes) {
+      if (x.getIdentifier().equalsIgnoreCase(value) || x.getIdentifier().equalsIgnoreCase(identifierFromLink)
+          || x.getEn().equalsIgnoreCase(value)) {
+        return x.getIdentifier();
+      }
+    }
+    for (DcatThemes x : dcatThemes) {
+      if (fixEncoding(x.getIt()).equalsIgnoreCase(value) || fixEncoding(x.getDa()).equalsIgnoreCase(value)
+          || fixEncoding(x.getBg()).equalsIgnoreCase(value) || fixEncoding(x.getCs()).equalsIgnoreCase(value)
+          || fixEncoding(x.getDe()).equalsIgnoreCase(value) || fixEncoding(x.getEl()).equalsIgnoreCase(value)
+          || fixEncoding(x.getEs()).equalsIgnoreCase(value) || fixEncoding(x.getFr()).equalsIgnoreCase(value)
+          || fixEncoding(x.getHu()).equalsIgnoreCase(value) || fixEncoding(x.getLt()).equalsIgnoreCase(value)
+          || fixEncoding(x.getLv()).equalsIgnoreCase(value) || fixEncoding(x.getNl()).equalsIgnoreCase(value)
+          || fixEncoding(x.getPl()).equalsIgnoreCase(value) || fixEncoding(x.getPt()).equalsIgnoreCase(value)
+          || fixEncoding(x.getRo()).equalsIgnoreCase(value) || fixEncoding(x.getSk()).equalsIgnoreCase(value)
+          || fixEncoding(x.getSl()).equalsIgnoreCase(value) || fixEncoding(x.getSv()).equalsIgnoreCase(value)
+          || fixEncoding(x.getEt()).equalsIgnoreCase(value) || fixEncoding(x.getFi()).equalsIgnoreCase(value)
+          || fixEncoding(x.getGa()).equalsIgnoreCase(value) || fixEncoding(x.getHr()).equalsIgnoreCase(value)
+          || fixEncoding(x.getMt()).equalsIgnoreCase(value) || fixEncoding(x.getNo()).equalsIgnoreCase(value)) {
+        return x.getIdentifier();
+      }
+    }
+    return null;
+  }
+
+  /**
    * Gets the logger.
    *
    * @return the logger
