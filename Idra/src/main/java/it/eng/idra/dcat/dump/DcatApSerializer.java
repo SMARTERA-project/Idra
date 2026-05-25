@@ -110,7 +110,7 @@ public class DcatApSerializer {
   public static final String FREQUENCY_BASE_URI = "http://publications.europa.eu/resource/authority/frequency/";
 
   /** The Constant LANGUAGE_BASE_URI. */
-  public static final String LANGUAGE_BASE_URI = "http://publications.europa.eu/mdr/authority/language/";
+  public static final String LANGUAGE_BASE_URI = "http://publications.europa.eu/resource/authority/language/";
 
   /** The Constant GEO_BASE_URI. */
   public static final String GEO_BASE_URI = "http://publications.europa.eu/mdr/authority/place/";
@@ -677,9 +677,13 @@ public class DcatApSerializer {
         try {
           datasetResource.addProperty(lang.getProperty(),
               model.createResource(iriFactory.construct(lang.getValue()).toURI().toString()));
-        } catch (URISyntaxException e) {
+        } catch (Exception e) {
+          // iriFactory throws IRIException (not URISyntaxException) when the value
+          // is a bare ISO 639 code like "eng"/"ukr"/"enc" — common from Zenodo and
+          // other sources that store language codes rather than full IRIs. Fall back
+          // to the EU authority vocabulary, which uses uppercase 3-letter codes.
           datasetResource.addProperty(lang.getProperty(),
-              model.createResource(LANGUAGE_BASE_URI + lang.getValue()));
+              model.createResource(LANGUAGE_BASE_URI + lang.getValue().toUpperCase()));
         }
       });
     }
