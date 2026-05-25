@@ -54,6 +54,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
@@ -139,7 +140,8 @@ public class OpenDataSoftConnector implements IodmsConnector {
    * @param node       the node
    * @return the dcat distribution
    */
-  public DcatDistribution distributionToDcat(Link datasource, String license, OdmsCatalogue node) {
+  public DcatDistribution distributionToDcat(Link datasource, String license, String licenseUrl,
+      OdmsCatalogue node) {
     String format = datasource.getRel();
 
     if ("self".equalsIgnoreCase(format)) {
@@ -157,6 +159,9 @@ public class OpenDataSoftConnector implements IodmsConnector {
     dcatDistrib.setTitle(format);
 
     dcatDistrib.setLicense_name(license);
+    if (licenseUrl != null && !licenseUrl.isEmpty()) {
+      dcatDistrib.setLicense_uri(licenseUrl);
+    }
     dcatDistrib.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(format, null));
 
     return dcatDistrib;
@@ -173,8 +178,13 @@ public class OpenDataSoftConnector implements IodmsConnector {
 
     Dataset ds = (Dataset) dataset;
     InnerDatasetMetaDefault metadata = ds.getDataset().getMetas().get_default();
+    Map<String, Object> dcatMeta = ds.getDataset().getMetas().getDcat();
+    if (dcatMeta == null) {
+      dcatMeta = Collections.emptyMap();
+    }
 
     String license = metadata.getLicense();
+    String licenseUrl = metadata.getLicenseUrl();
 
     List<DcatDistribution> distributionList = new ArrayList<DcatDistribution>();
     for (Link link : ds.getLinks()) {
@@ -184,7 +194,7 @@ public class OpenDataSoftConnector implements IodmsConnector {
             DatasourceDto.class);
         datasourcesDto.getLinks().forEach(l -> {
           Optional<DcatDistribution> optDcatDistrib = Optional
-              .ofNullable(distributionToDcat(l, license, node));
+              .ofNullable(distributionToDcat(l, license, licenseUrl, node));
           if (optDcatDistrib.isPresent()) {
             distributionList.add(optDcatDistrib.get());
           }
@@ -202,53 +212,151 @@ public class OpenDataSoftConnector implements IodmsConnector {
     String landingPage = node.getHost().concat("/explore/dataset/").concat(identifier);
 
     // Get update Date
-    String updateDate = CommonUtil.fixBadUtcDate(metadata.getModified());
+    String updateDate = safeFixDate(metadata.getModified());
 
-    // Extract languages
+    // Extract languages: prefer the metadata_languages list when available
     List<String> languages = new ArrayList<String>();
-    Optional<String> lang = Optional.ofNullable(metadata.getLanguage());
-    if (lang.isPresent()) {
-      languages.add(lang.get());
+    if (metadata.getMetadataLanguages() != null && !metadata.getMetadataLanguages().isEmpty()) {
+      languages.addAll(metadata.getMetadataLanguages());
+    } else {
+      Optional.ofNullable(metadata.getLanguage()).ifPresent(languages::add);
     }
 
+    // metas.dcat block: rich DCAT-AP fields not present in metas.default
+    String dcatCreator = asString(dcatMeta.get("creator"));
+    String dcatContributor = asString(dcatMeta.get("contributor"));
+    String dcatContactName = asString(dcatMeta.get("contact_name"));
+    String dcatContactEmail = asString(dcatMeta.get("contact_email"));
+    String dcatAccrualPeriodicity = asString(dcatMeta.get("accrualperiodicity"));
+    String dcatSpatial = asString(dcatMeta.get("spatial"));
+    String dcatTemporal = asString(dcatMeta.get("temporal"));
+    String dcatPublisherType = asString(dcatMeta.get("publisher_type"));
+    String dcatConformsTo = asString(dcatMeta.get("conforms_to"));
+    String dcatTemporalStart = asString(dcatMeta.get("temporal_coverage_start"));
+    String dcatTemporalEnd = asString(dcatMeta.get("temporal_coverage_end"));
+    String dcatAccessRights = asString(dcatMeta.get("accessRights"));
+    String dcatRelation = asString(dcatMeta.get("relation"));
+    String dcatCreated = asString(dcatMeta.get("created"));
+    String dcatIssued = asString(dcatMeta.get("issued"));
+
+    // Contact point: build a VcardOrganization when at least an email or name is present
     List<VcardOrganization> contactPointList = new ArrayList<VcardOrganization>();
-    String accessRights = null;
+    if ((dcatContactEmail != null && !dcatContactEmail.isEmpty())
+        || (dcatContactName != null && !dcatContactName.isEmpty())) {
+      contactPointList.add(new VcardOrganization(DCAT.contactPoint.getURI(), null,
+          dcatContactName, dcatContactEmail, null, null, null, nodeId));
+    }
+
+    String accessRights = dcatAccessRights;
+
+    // Conforms to: a single dct:Standard entry when conforms_to is set
     List<DctStandard> conformsTo = new ArrayList<DctStandard>();
+    if (dcatConformsTo != null && !dcatConformsTo.isEmpty()) {
+      conformsTo.add(new DctStandard(dcatConformsTo, null, null, null,
+          new ArrayList<String>(), nodeId));
+    }
+
     List<String> documentation = new ArrayList<String>();
-    String frequency = null;
+
+    // Frequency: prefer metas.dcat.accrualperiodicity, fall back to metas.default.update_frequency
+    // (which may be a String or a list of strings)
+    String frequency = (dcatAccrualPeriodicity != null && !dcatAccrualPeriodicity.isEmpty())
+        ? dcatAccrualPeriodicity
+        : asFirstString(metadata.getUpdateFrequency());
+
     List<String> hasVersion = new ArrayList<String>();
     List<String> isVersionOf = new ArrayList<String>();
 
     List<String> provenance = new ArrayList<String>();
+
+    // Release date: prefer dcat.issued, fall back to dcat.created
     String releaseDate = null;
+    if (dcatIssued != null && !dcatIssued.isEmpty()) {
+      releaseDate = safeFixDate(dcatIssued);
+    } else if (dcatCreated != null && !dcatCreated.isEmpty()) {
+      releaseDate = safeFixDate(dcatCreated);
+    }
 
     List<String> sample = new ArrayList<String>();
     List<String> source = new ArrayList<String>();
+
+    // Spatial coverage: each geographic_reference code becomes a DctLocation (identifier),
+    // labels come from territory (positional pairing). bbox feeds the first location's geometry.
     List<DctLocation> spatialCoverage = new ArrayList<DctLocation>();
+    List<String> geoRefs = metadata.getGeographicReference();
+    List<String> territories = metadata.getTerritory();
+    if (geoRefs != null) {
+      for (int i = 0; i < geoRefs.size(); i++) {
+        String code = geoRefs.get(i);
+        String label = (territories != null && i < territories.size()) ? territories.get(i) : null;
+        spatialCoverage.add(new DctLocation(null, code, label, null, nodeId, null, null));
+      }
+    } else if (territories != null) {
+      for (String label : territories) {
+        spatialCoverage.add(new DctLocation(null, null, label, null, nodeId, null, null));
+      }
+    }
+    if (dcatSpatial != null && !dcatSpatial.isEmpty()) {
+      spatialCoverage.add(new DctLocation(null, dcatSpatial, null, null, nodeId, null, null));
+    }
+    String bboxGeoJson = bboxToGeoJson(metadata.getBbox());
+    if (bboxGeoJson != null && !spatialCoverage.isEmpty()) {
+      DctLocation first = spatialCoverage.get(0);
+      first.getGeometry().setValue(bboxGeoJson);
+    } else if (bboxGeoJson != null) {
+      spatialCoverage.add(new DctLocation(null, null, null, bboxGeoJson, nodeId, null, null));
+    }
+
+    // Temporal coverage: start/end as ISO strings, optional dct:temporal as URI on the period
     List<DctPeriodOfTime> temporalCoverage = new ArrayList<DctPeriodOfTime>();
+    if ((dcatTemporalStart != null && !dcatTemporalStart.isEmpty())
+        || (dcatTemporalEnd != null && !dcatTemporalEnd.isEmpty())) {
+      temporalCoverage.add(new DctPeriodOfTime(dcatTemporal,
+          safeFixDate(dcatTemporalStart),
+          safeFixDate(dcatTemporalEnd), nodeId, null, null));
+    }
+
     String type = null;
     String version = null;
     List<String> versionNotes = new ArrayList<String>();
     FoafAgent rightsHolder = null;
     List<SkosConceptSubject> subjectList = new ArrayList<SkosConceptSubject>();
+
+    // Related resources: dct:relation if available
     List<String> relatedResources = new ArrayList<String>();
+    if (dcatRelation != null && !dcatRelation.isEmpty()) {
+      relatedResources.add(dcatRelation);
+    }
+    if (metadata.getReferences() != null && !metadata.getReferences().isEmpty()) {
+      relatedResources.add(metadata.getReferences());
+    }
 
     String title = metadata.getTitle();
     String description = metadata.getDescription();
 
     List<SkosConceptTheme> datasetTheme = extractConceptList(DCAT.theme.getURI(),
         metadata.getTheme(), SkosConceptTheme.class);
-    Optional<String> publisherName = Optional.ofNullable(metadata.getPublisher());
-    Optional<String> publisherUri = Optional.empty();
-    Optional<String> publisherMbox = Optional.empty();
-    Optional<String> publisherHomepage = Optional.empty();
-    Optional<String> publisherType = Optional.empty();
-    Optional<String> publisherIdentifier = Optional.empty();
 
-    FoafAgent publisher = new FoafAgent(DCTerms.publisher.getURI(), publisherUri.orElse(null),
+    // Publisher: name from metas.default.publisher, type enriched from metas.dcat.publisher_type
+    Optional<String> publisherName = Optional.ofNullable(metadata.getPublisher());
+    FoafAgent publisher = new FoafAgent(DCTerms.publisher.getURI(), null,
         publisherName.map(Collections::singletonList).orElse(Collections.emptyList()),
-        publisherMbox.orElse(null), publisherHomepage.orElse(null),
-        publisherType.orElse(null), publisherIdentifier.orElse(null), nodeId);
+        null, null, dcatPublisherType, null, nodeId);
+
+    // Creator: distinct FoafAgent when metas.dcat.creator is set; otherwise reuse publisher
+    FoafAgent creator;
+    if (dcatCreator != null && !dcatCreator.isEmpty()) {
+      creator = new FoafAgent(DCTerms.creator.getURI(), null,
+          Collections.singletonList(dcatCreator), null, null, null, null, nodeId);
+    } else {
+      creator = publisher;
+    }
+
+    // Rights holder: map metas.dcat.contributor as rightsHolder fallback
+    if (dcatContributor != null && !dcatContributor.isEmpty()) {
+      rightsHolder = new FoafAgent(DCTerms.rightsHolder.getURI(), null,
+          Collections.singletonList(dcatContributor), null, null, null, null, nodeId);
+    }
 
     List<String> keywords = metadata.getKeyword();
 
@@ -264,7 +372,7 @@ public class OpenDataSoftConnector implements IodmsConnector {
         datasetTheme, publisher, contactPointList, keywords, accessRights, conformsTo,
         documentation, frequency, hasVersion, isVersionOf, landingPage, languages, provenance,
         releaseDate, updateDate, otherIdentifier, sample, source, spatialCoverage, temporalCoverage,
-        type, version, versionNotes, rightsHolder, publisher, subjectList, relatedResources, applicableLegislation,
+        type, version, versionNotes, rightsHolder, creator, subjectList, relatedResources, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
@@ -363,6 +471,100 @@ public class OpenDataSoftConnector implements IodmsConnector {
   private <T extends SkosConcept> List<T> extractConceptList(String propertyUri,
       List<String> concepts, Class<T> type) {
     return it.eng.idra.utils.SkosConceptFactory.build(propertyUri, concepts, type, nodeId);
+  }
+
+  /**
+   * Safely convert a raw JSON-decoded value to a trimmed String, returning null when
+   * the value is null/empty/not a String.
+   */
+  private static String asString(Object value) {
+    if (value == null) {
+      return null;
+    }
+    String s = value.toString().trim();
+    return s.isEmpty() ? null : s;
+  }
+
+  /**
+   * Null-safe wrapper around CommonUtil.fixBadUtcDate that also promotes a bare
+   * YYYY-MM-DD value to the ISO instant 'YYYY-MM-DDT00:00:00Z' expected by Solr.
+   * The underlying regex matcher NPEs when handed a null input.
+   */
+  private static String safeFixDate(String value) {
+    if (value == null || value.isEmpty()) {
+      return null;
+    }
+    if (value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+      return value + "T00:00:00Z";
+    }
+    return CommonUtil.fixBadUtcDate(value);
+  }
+
+  /**
+   * Resolve a value that may be a scalar String or a list to the first non-empty entry.
+   */
+  private static String asFirstString(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof List<?>) {
+      for (Object element : (List<?>) value) {
+        String s = asString(element);
+        if (s != null) {
+          return s;
+        }
+      }
+      return null;
+    }
+    return asString(value);
+  }
+
+  /**
+   * Reduce the OpenDataSoft bbox structure (GeoJSON Feature with a Polygon geometry) to a
+   * compact "minLon,minLat,maxLon,maxLat" envelope that fits into the dct:Location
+   * geometry varchar(255) column. Returns null when the structure cannot be parsed.
+   */
+  private static String bboxToGeoJson(Object bbox) {
+    if (!(bbox instanceof Map)) {
+      return null;
+    }
+    try {
+      Object geom = ((Map<?, ?>) bbox).get("geometry");
+      if (!(geom instanceof Map)) {
+        return null;
+      }
+      Object coords = ((Map<?, ?>) geom).get("coordinates");
+      if (!(coords instanceof List)) {
+        return null;
+      }
+      double minLon = Double.POSITIVE_INFINITY;
+      double minLat = Double.POSITIVE_INFINITY;
+      double maxLon = Double.NEGATIVE_INFINITY;
+      double maxLat = Double.NEGATIVE_INFINITY;
+      List<?> rings = (List<?>) coords;
+      for (Object ring : rings) {
+        if (!(ring instanceof List)) {
+          continue;
+        }
+        for (Object pt : (List<?>) ring) {
+          if (!(pt instanceof List) || ((List<?>) pt).size() < 2) {
+            continue;
+          }
+          double lon = ((Number) ((List<?>) pt).get(0)).doubleValue();
+          double lat = ((Number) ((List<?>) pt).get(1)).doubleValue();
+          if (lon < minLon) minLon = lon;
+          if (lat < minLat) minLat = lat;
+          if (lon > maxLon) maxLon = lon;
+          if (lat > maxLat) maxLat = lat;
+        }
+      }
+      if (minLon == Double.POSITIVE_INFINITY) {
+        return null;
+      }
+      return minLon + "," + minLat + "," + maxLon + "," + maxLat;
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**

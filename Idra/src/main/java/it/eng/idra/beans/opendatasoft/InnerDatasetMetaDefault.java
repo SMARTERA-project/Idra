@@ -39,6 +39,28 @@ public class InnerDatasetMetaDefault {
   /** The license. */
   private String license;
 
+  /** The license URL. */
+  @SerializedName(value = "license_url")
+  private String licenseUrl;
+
+  /** The metadata languages. */
+  @SerializedName(value = "metadata_languages")
+  private List<String> metadataLanguages;
+
+  /** The geographic reference (list of administrative codes, e.g. INSEE). */
+  @SerializedName(value = "geographic_reference")
+  private List<String> geographicReference;
+
+  /** The territory (list of place labels). */
+  private List<String> territory;
+
+  /** The bbox (GeoJSON Feature with polygon geometry). */
+  private Object bbox;
+
+  /** The update frequency (may be a String or a list of strings). */
+  @SerializedName(value = "update_frequency")
+  private Object updateFrequency;
+
   /** The records count. */
   @SerializedName(value = "records_count")
   private Integer recordsCount;
@@ -186,6 +208,114 @@ public class InnerDatasetMetaDefault {
    */
   public void setLicense(String license) {
     this.license = license;
+  }
+
+  /**
+   * Gets the license URL.
+   *
+   * @return the license URL
+   */
+  public String getLicenseUrl() {
+    return licenseUrl;
+  }
+
+  /**
+   * Sets the license URL.
+   *
+   * @param licenseUrl the new license URL
+   */
+  public void setLicenseUrl(String licenseUrl) {
+    this.licenseUrl = licenseUrl;
+  }
+
+  /**
+   * Gets the metadata languages.
+   *
+   * @return the metadata languages
+   */
+  public List<String> getMetadataLanguages() {
+    return metadataLanguages;
+  }
+
+  /**
+   * Sets the metadata languages.
+   *
+   * @param metadataLanguages the new metadata languages
+   */
+  public void setMetadataLanguages(List<String> metadataLanguages) {
+    this.metadataLanguages = metadataLanguages;
+  }
+
+  /**
+   * Gets the geographic reference.
+   *
+   * @return the geographic reference
+   */
+  public List<String> getGeographicReference() {
+    return geographicReference;
+  }
+
+  /**
+   * Sets the geographic reference.
+   *
+   * @param geographicReference the new geographic reference
+   */
+  public void setGeographicReference(List<String> geographicReference) {
+    this.geographicReference = geographicReference;
+  }
+
+  /**
+   * Gets the territory.
+   *
+   * @return the territory
+   */
+  public List<String> getTerritory() {
+    return territory;
+  }
+
+  /**
+   * Sets the territory.
+   *
+   * @param territory the new territory
+   */
+  public void setTerritory(List<String> territory) {
+    this.territory = territory;
+  }
+
+  /**
+   * Gets the bbox.
+   *
+   * @return the bbox
+   */
+  public Object getBbox() {
+    return bbox;
+  }
+
+  /**
+   * Sets the bbox.
+   *
+   * @param bbox the new bbox
+   */
+  public void setBbox(Object bbox) {
+    this.bbox = bbox;
+  }
+
+  /**
+   * Gets the update frequency.
+   *
+   * @return the update frequency
+   */
+  public Object getUpdateFrequency() {
+    return updateFrequency;
+  }
+
+  /**
+   * Sets the update frequency.
+   *
+   * @param updateFrequency the new update frequency
+   */
+  public void setUpdateFrequency(Object updateFrequency) {
+    this.updateFrequency = updateFrequency;
   }
 
   /**
