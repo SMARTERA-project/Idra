@@ -1025,6 +1025,50 @@ import java.nio.file.Paths;
         .build();
   }
 
+  /**
+   * getRemoteCatalogueDatasetCount.
+   * Probes a remote catalogue by instantiating an in-memory OdmsCatalogue and
+   * delegating to the appropriate IodmsConnector#countDatasets(). Designed for
+   * the "Remote Catalogues" admin panel to compare live remote counts against
+   * the locally federated ones.
+   *
+   * @param url      the catalogue host URL
+   * @param nodeType the OdmsCatalogueType name (CKAN, DKAN, SOCRATA, ...)
+   * @param apiKey   optional API key for catalogues that require it
+   * @return JSON {"count": &lt;number&gt;|null}
+   */
+  @GET
+  @Secured
+  @RequiresPermission("admin.catalogue.read")
+  @Path("/remoteCatalogue/datasetCount")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getRemoteCatalogueDatasetCount(@QueryParam("url") String url,
+      @QueryParam("nodeType") String nodeType,
+      @QueryParam("apiKey") String apiKey) {
+    JSONObject body = new JSONObject();
+    if (url == null || url.trim().isEmpty() || nodeType == null || nodeType.trim().isEmpty()) {
+      return Response.status(Response.Status.OK).entity(body.put("count", JSONObject.NULL).toString()).build();
+    }
+    try {
+      OdmsCatalogueType type = OdmsCatalogueType.valueOf(nodeType.trim().toUpperCase());
+      OdmsCatalogue probe = new OdmsCatalogue();
+      probe.setHost(url.trim());
+      probe.setNodeType(type);
+      probe.setApiKey(apiKey == null ? "" : apiKey);
+      int count = OdmsManager.getOdmsCatalogueConnector(probe).countDatasets();
+      if (count < 0) {
+        body.put("count", JSONObject.NULL);
+      } else {
+        body.put("count", count);
+      }
+    } catch (Exception e) {
+      logger.warn("getRemoteCatalogueDatasetCount failed for url=" + url
+          + " nodeType=" + nodeType + ": " + e.getMessage());
+      body.put("count", JSONObject.NULL);
+    }
+    return Response.status(Response.Status.OK).entity(body.toString()).build();
+  }
+
    /**
     * deleteRemCat.
     *
