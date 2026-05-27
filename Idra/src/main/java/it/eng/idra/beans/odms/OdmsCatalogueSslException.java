@@ -15,22 +15,18 @@
 
 package it.eng.idra.beans.odms;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class OdmsCatalogueSslException.
- */
-public class OdmsCatalogueSslException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class OdmsCatalogueSslException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new odms catalogue ssl exception.
-   *
-   * @param message the message
-   */
   public OdmsCatalogueSslException(String message) {
-    super(message);
+    super(ErrorCode.ERR_CATALOGUE_SSL, message);
   }
 
+  public OdmsCatalogueSslException(String message, Throwable cause) {
+    super(ErrorCode.ERR_CATALOGUE_SSL, message, cause);
+  }
 }

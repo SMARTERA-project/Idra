@@ -20,6 +20,8 @@ import java.util.HashSet;
 import java.util.Set;
 import javax.ws.rs.ApplicationPath;
 import javax.ws.rs.core.Application;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -27,6 +29,8 @@ import javax.ws.rs.core.Application;
  */
 @ApplicationPath("/api/v1")
 public class ApplicationConfig extends Application {
+
+  private static final Logger logger = LoggerFactory.getLogger(ApplicationConfig.class);
 
   /*
    * (non-Javadoc)
@@ -45,10 +49,12 @@ public class ApplicationConfig extends Application {
     resources.add(it.eng.idra.api.CorsResponseFilter.class);
     resources.add(it.eng.idra.api.CorsPreflightFilter.class);
     resources.add(it.eng.idra.authentication.filters.PermissionFilter.class);
+    resources.add(it.eng.idra.exception.CorrelationIdFilter.class);
+    resources.add(it.eng.idra.exception.GlobalExceptionMapper.class);
     try {
       resources.add(AuthenticationManager.getActiveAuthenticationManager().getFilterClass());
     } catch (ClassNotFoundException e) {
-      e.printStackTrace();
+      logger.error("Authentication filter class not found, auth disabled", e);
     }
 
     return resources;

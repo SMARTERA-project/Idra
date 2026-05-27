@@ -39,6 +39,8 @@ import it.eng.idra.beans.dcat.VcardOrganization;
 import it.eng.idra.beans.exception.DatasetNotFoundException;
 import it.eng.idra.beans.exception.DistributionNotFoundException;
 import it.eng.idra.beans.exception.EuroVocTranslationNotFoundException;
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 import it.eng.idra.beans.odms.OdmsCatalogue;
 import it.eng.idra.beans.odms.OdmsCatalogueNotFoundException;
 import it.eng.idra.beans.odms.OdmsCatalogueType;
@@ -174,17 +176,9 @@ public class ClientApi {
   @Produces({ "application/rdf+xml", MediaType.APPLICATION_JSON })
   public Response getCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
-      @PathParam("nodeID") String nodeIdentifier) {
-
-    try {
-
-      return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, false))
-          .build();
-
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-    }
-
+      @PathParam("nodeID") String nodeIdentifier) throws Exception {
+    return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, false))
+        .build();
   }
 
   /**
@@ -202,23 +196,15 @@ public class ClientApi {
   public Response downloadCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier,
       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
-      @DefaultValue("false") @QueryParam("zip") Boolean returnZip) {
-
-    try {
-
-      return Response
-          .ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, returnZip),
-              MediaType.APPLICATION_OCTET_STREAM)
-          .header("content-disposition", "attachment; filename = "
-              + DcatApDumpManager.globalDumpFileName
-              + (StringUtils.isBlank(nodeIdentifier) ? "" : new String("_node_" + nodeIdentifier))
-              + (returnZip ? ".zip" : ""))
-          .build();
-
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-    }
-
+      @DefaultValue("false") @QueryParam("zip") Boolean returnZip) throws Exception {
+    return Response
+        .ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, returnZip),
+            MediaType.APPLICATION_OCTET_STREAM)
+        .header("content-disposition", "attachment; filename = "
+            + DcatApDumpManager.globalDumpFileName
+            + (StringUtils.isBlank(nodeIdentifier) ? "" : new String("_node_" + nodeIdentifier))
+            + (returnZip ? ".zip" : ""))
+        .build();
   }
 
   /**
@@ -533,7 +519,12 @@ public class ClientApi {
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces({ MediaType.APPLICATION_JSON, "application/n-triples", "application/rdf+xml",
       "text/turtle", "text/n3" })
-  public Response searchDataset(@Context HttpServletRequest httpRequest, final String input) {
+  public Response searchDataset(@Context HttpServletRequest httpRequest, final String input)
+      throws Exception {
+    // Errors flow to GlobalExceptionMapper:
+    //   GsonUtilException -> 400 ERR_JSON_PARSE
+    //   EuroVocTranslationNotFoundException -> 404 ERR_EUROVOC_NOT_FOUND
+    //   other -> 500 ERR_INTERNAL
 
     SearchRequest request = null;
     Boolean liveSearch = null;
@@ -542,9 +533,7 @@ public class ClientApi {
     SearchDateFilter issued = null;
     SearchDateFilter modified = null;
 
-    try {
-
-      request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
+    request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
 
       // Gets the source IP address from HTTPRequest
       String ipAddress = null;
@@ -688,23 +677,14 @@ public class ClientApi {
           return Response.status(Response.Status.OK)
               .entity(GsonUtil.obj2Json(result, GsonUtil.searchResultType)).build();
         } catch (GsonUtilException e) {
-          return handleErrorResponse500(e);
+          // Server-side serialization failure: surface as 500, not 400.
+          throw new AppException(ErrorCode.ERR_INTERNAL,
+              "Failed to serialize search result", e);
         }
-
       } else {
-        return handleBadRequestErrorResponse(
-            new Exception("The filters array must contain at least one element"));
+        throw new AppException(ErrorCode.ERR_VALIDATION_FAILED,
+            "The filters array must contain at least one element");
       }
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-
-    } catch (EuroVocTranslationNotFoundException e) {
-      return handleEuroVocNotFound(e);
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-    }
-
   }
 
   /**
@@ -724,7 +704,8 @@ public class ClientApi {
 
   public Response searchDatasetDcatAp(@Context HttpServletRequest httpRequest, final String input,
       @DefaultValue("RDFXML") @QueryParam("format") DcatApFormat format,
-      @DefaultValue("DCATAP") @QueryParam("profile") DcatApProfile profile) {
+      @DefaultValue("DCATAP") @QueryParam("profile") DcatApProfile profile) throws Exception {
+    // Errors flow to GlobalExceptionMapper (see searchDataset).
 
     SearchRequest request = null;
     Boolean liveSearch = null;
@@ -733,9 +714,7 @@ public class ClientApi {
     SearchDateFilter issued = null;
     SearchDateFilter modified = null;
 
-    try {
-
-      request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
+    request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
 
       // Gets the source IP address from HTTPRequest
       String ipAddress = null;
@@ -827,27 +806,12 @@ public class ClientApi {
         // Adds search statistics
         StatisticsManager.searchStatistics(ipAddress, liveSearch ? "live" : "cache");
 
-        // try {
         return Response.status(Response.Status.OK).type(format.mediaType()).entity(dcatResult)
             .build();
-        // } catch (GsonUtilException e) {
-        // return handleErrorResponse500(e);
-        // }
-
       } else {
-        return handleBadRequestErrorResponse(
-            new Exception("The filters array must contain at least one element"));
+        throw new AppException(ErrorCode.ERR_VALIDATION_FAILED,
+            "The filters array must contain at least one element");
       }
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-
-    } catch (EuroVocTranslationNotFoundException e) {
-      return handleEuroVocNotFound(e);
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-    }
-
   }
 
   /**
@@ -861,7 +825,8 @@ public class ClientApi {
   @Path("/countDataset")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response countDataset(@Context HttpServletRequest httpRequest, final String input) {
+  public Response countDataset(@Context HttpServletRequest httpRequest, final String input)
+      throws Exception {
 
     SearchRequest request = null;
     Boolean liveSearch = null;
@@ -870,9 +835,7 @@ public class ClientApi {
     SearchDateFilter issued = null;
     SearchDateFilter modified = null;
 
-    try {
-
-      request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
+    request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
 
       // If the filters list is not empty, start to build the parameters
       // HashMap, to be passed to FederatesSearch
@@ -970,19 +933,10 @@ public class ClientApi {
         JSONObject res = new JSONObject();
         res.put("count", result);
         return Response.status(Response.Status.OK).entity(res.toString()).build();
-
       } else {
-        return handleBadRequestErrorResponse(
-            new Exception("The filters array must contain at least one element"));
+        throw new AppException(ErrorCode.ERR_VALIDATION_FAILED,
+            "The filters array must contain at least one element");
       }
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-    }
-
   }
 
   /**
@@ -996,42 +950,26 @@ public class ClientApi {
   @Path("/sparql/query")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response runSparqlQuery(@Context HttpServletRequest httpRequest, final String input) {
-
-    try {
-      // Gets the source IP address from HTTPRequest
-      String ipAddress = null;
-      if (httpRequest.getHeader("X-FORWARDED-FOR") == null) {
-        ipAddress = httpRequest.getRemoteAddr();
-      }
-
-      SparqlSearchRequest request = GsonUtil.json2Obj(input, GsonUtil.sparqlSearchRequestType);
-
-      String queryResult = SparqlFederatedSearch.runQuery(request.getQuery(), request.getFormat());
-
-      // TODO Spostando il content type, non c'è bisogno di un JSON Object
-      // con il campo "result"
-      JSONObject jsonResult = new JSONObject();
-      jsonResult.put("result", queryResult);
-      // TODO Spostare il Content type nell'header
-      jsonResult.put("contentType", request.getFormat());
-
-      // Adds search statistics
-      StatisticsManager.searchStatistics(ipAddress, "sparql");
-
-      return Response.status(Response.Status.OK).entity(jsonResult.toString()).build();
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-
-    } catch (QueryParseException e) {
-      return handleBadQueryErrorResponse(e);
-
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
-
+  public Response runSparqlQuery(@Context HttpServletRequest httpRequest, final String input)
+      throws Exception {
+    // Gets the source IP address from HTTPRequest
+    String ipAddress = null;
+    if (httpRequest.getHeader("X-FORWARDED-FOR") == null) {
+      ipAddress = httpRequest.getRemoteAddr();
     }
 
+    SparqlSearchRequest request = GsonUtil.json2Obj(input, GsonUtil.sparqlSearchRequestType);
+
+    String queryResult = SparqlFederatedSearch.runQuery(request.getQuery(), request.getFormat());
+
+    JSONObject jsonResult = new JSONObject();
+    jsonResult.put("result", queryResult);
+    jsonResult.put("contentType", request.getFormat());
+
+    // Adds search statistics
+    StatisticsManager.searchStatistics(ipAddress, "sparql");
+
+    return Response.status(Response.Status.OK).entity(jsonResult.toString()).build();
   }
 
   /**
@@ -1052,22 +990,21 @@ public class ClientApi {
       @QueryParam("format") String format,
       @QueryParam("downloadFile") @DefaultValue("true") boolean downloadFile,
       @QueryParam("isPreview") @DefaultValue("false") boolean isPreview,
-      @QueryParam("previewMaxMB") Integer previewMaxMB) {
+      @QueryParam("previewMaxMB") Integer previewMaxMB) throws Exception {
+    // DistributionNotFoundException -> 404, IOException -> 500, SolrServerException -> 502
+    // via mapper.
+
+    MetadataCacheManager.getDistribution(distributionId, url);
+
+    logger.info("Download file API: " + downloadFile);
+    String compiledUri = url;
+    int timeout = Integer.parseInt(PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT))
+        * 1000;
+    Client localClient = ClientBuilder.newClient().register(RedirectFilter.class);
+    localClient.property(ClientProperties.CONNECT_TIMEOUT, timeout);
+    localClient.property(ClientProperties.READ_TIMEOUT, timeout);
 
     try {
-      MetadataCacheManager.getDistribution(distributionId, url);
-
-      logger.info("Download file API: " + downloadFile);
-      String compiledUri = url;
-      // client = ClientBuilder.newBuilder().readTimeout(10,
-      // TimeUnit.SECONDS).build();
-      int timeout = Integer.parseInt(PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT))
-          * 1000;
-      Client localClient = ClientBuilder.newClient().register(RedirectFilter.class);
-      localClient.property(ClientProperties.CONNECT_TIMEOUT, timeout);
-      localClient.property(ClientProperties.READ_TIMEOUT, timeout);
-
-      try {
         WebTarget webTarget = localClient.target(compiledUri);
         long previewLimit = resolvePreviewLimitBytes(previewMaxMB);
 
@@ -1135,21 +1072,9 @@ public class ClientApi {
         responseBuilder.encoding("UTF-8");
         return responseBuilder.build();
 
-      } catch (Exception e) {
-        logger.error(e.getMessage(), e);
-        return handleErrorResponse500(e);
-
-      } finally {
-        // request.close();
-        localClient.close();
-      }
-
-    } catch (DistributionNotFoundException | IOException | SolrServerException e1) {
-      // TODO Auto-generated catch block
-      logger.error(e1.getMessage(), e1);
-      return handleErrorResponse500(e1);
+    } finally {
+      localClient.close();
     }
-
   }
 
   private long resolvePreviewLimitBytes(Integer previewMaxMB) {
@@ -1214,11 +1139,10 @@ public class ClientApi {
   public Response createDataletFromDistribution(@Context HttpServletRequest httpRequest,
       final String input, @PathParam("nodeID") String nodeIdentifier,
       @PathParam("datasetID") String datasetIdentifier,
-      @PathParam("distributionID") String distributionIdentifier) {
+      @PathParam("distributionID") String distributionIdentifier) throws Exception {
 
     CachePersistenceManager jpa = new CachePersistenceManager();
     try {
-
       Datalet datalet = GsonUtil.json2Obj(input, GsonUtil.dataletType);
 
       datalet.setId(UUID.randomUUID().toString());
@@ -1268,12 +1192,9 @@ public class ClientApi {
       jpa.jpaPersistAndCommitDatalet(datalet);
 
       return Response.ok().build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       jpa.jpaClose();
     }
-
   }
 
   /**
@@ -1291,19 +1212,16 @@ public class ClientApi {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getDataletByDistribution(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
-      @PathParam("distributionID") String distributionIdentifier) {
+      @PathParam("distributionID") String distributionIdentifier) throws Exception {
 
     CachePersistenceManager jpa = new CachePersistenceManager();
     try {
       List<Datalet> datalets = jpa.jpaGetDataletByTripleId(nodeIdentifier, datasetIdentifier,
           distributionIdentifier);
       return Response.ok(GsonUtil.obj2Json(datalets, GsonUtil.dataletListType)).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       jpa.jpaClose();
     }
-
   }
 
   /**
@@ -1324,11 +1242,10 @@ public class ClientApi {
   public Response updateDataletViews(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
       @PathParam("distributionID") String distributionIdentifier,
-      @PathParam("dataletID") String dataletIdentifier) {
+      @PathParam("dataletID") String dataletIdentifier) throws Exception {
 
     CachePersistenceManager jpa = new CachePersistenceManager();
     try {
-
       Datalet datalet = jpa.jpaGetDataletByIds(nodeIdentifier, datasetIdentifier,
           distributionIdentifier, dataletIdentifier);
       datalet.setLastSeenDate(ZonedDateTime.now());
@@ -1337,12 +1254,9 @@ public class ClientApi {
       jpa.jpaMergeAndCommitDatalet(datalet);
 
       return Response.ok().build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       jpa.jpaClose();
     }
-
   }
 
   /**
@@ -1354,29 +1268,21 @@ public class ClientApi {
   @GET
   @Path("/cataloguesInfo")
   @Produces("application/json")
-  public Response getCataloguesInfo(@Context HttpServletRequest httpRequest) {
-    // LocalTime time1 = LocalTime.now();
-    try {
-      JSONArray result = new JSONArray();
-      List<OdmsCatalogue> nodes = FederationCore.getOdmsCatalogues().stream()
-          .filter(
-              x -> x.isActive() && x.isCacheable() && !x.getSynchLock().equals(OdmsSynchLock.FIRST))
-          .collect(Collectors.toList());
-      Collections.sort(nodes, CommonUtil.nameOrder);
-      for (OdmsCatalogue n : nodes) {
-        JSONObject tmp = new JSONObject();
-        tmp.put("name", n.getName());
-        tmp.put("id", n.getId());
-        tmp.put("federationLevel", n.getFederationLevel());
-        result.put(tmp);
-      }
-      // LocalTime time2 = LocalTime.now();
-      // logger.info("search_catalogues_list " + Duration.between(time1, time2) + "
-      // milliseconds");
-      return Response.ok(result.toString()).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
+  public Response getCataloguesInfo(@Context HttpServletRequest httpRequest) throws Exception {
+    JSONArray result = new JSONArray();
+    List<OdmsCatalogue> nodes = FederationCore.getOdmsCatalogues().stream()
+        .filter(
+            x -> x.isActive() && x.isCacheable() && !x.getSynchLock().equals(OdmsSynchLock.FIRST))
+        .collect(Collectors.toList());
+    Collections.sort(nodes, CommonUtil.nameOrder);
+    for (OdmsCatalogue n : nodes) {
+      JSONObject tmp = new JSONObject();
+      tmp.put("name", n.getName());
+      tmp.put("id", n.getId());
+      tmp.put("federationLevel", n.getFederationLevel());
+      result.put(tmp);
     }
+    return Response.ok(result.toString()).build();
   }
 
   /**
@@ -1400,10 +1306,9 @@ public class ClientApi {
       @QueryParam("orderBy") @DefaultValue("id") String orderBy,
       @QueryParam("rows") @DefaultValue("10") String rows,
       @QueryParam("offset") @DefaultValue("0") String offset, @QueryParam("name") String name,
-      @QueryParam("country") String country) {
+      @QueryParam("country") String country) throws Exception {
 
-    try {
-      List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(
+    List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(
           FederationCore.getOdmsCatalogues(withImage).stream().filter(x -> x.isActive())
               .collect(Collectors.toList()));
 
@@ -1528,15 +1433,9 @@ public class ClientApi {
         nodes = nodes.subList(off, row);
       }
 
-      JSONArray array = new JSONArray(GsonUtil.obj2JsonWithExclude(nodes, GsonUtil.nodeListType));
-      result.put("catalogues", array);
-      return Response.status(Response.Status.OK).entity(result.toString()).build();
-
-    } catch (Exception e) {
-      logger.error("Exception raised " + e.getLocalizedMessage());
-      return handleErrorResponse500(e);
-    }
-
+    JSONArray array = new JSONArray(GsonUtil.obj2JsonWithExclude(nodes, GsonUtil.nodeListType));
+    result.put("catalogues", array);
+    return Response.status(Response.Status.OK).entity(result.toString()).build();
   }
 
   /**
@@ -1553,40 +1452,21 @@ public class ClientApi {
   @Produces("application/json")
   public Response getSingleCatalogue(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier,
-      @QueryParam("withImage") @DefaultValue("true") boolean withImage) {
-
+      @QueryParam("withImage") @DefaultValue("true") boolean withImage) throws Exception {
+    // OdmsManagerException -> 400 ERR_BAD_REQUEST (preserves legacy behavior).
+    // OdmsCatalogueNotFoundException + inactive catalogue -> 404 ERR_CATALOGUE_NOT_FOUND.
+    // NumberFormatException / GsonUtilException -> 400 via mapper.
     try {
       OdmsCatalogue result = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier),
           withImage);
       if (result.isActive()) {
         return Response.status(Response.Status.OK)
             .entity(GsonUtil.obj2JsonWithExclude(result, GsonUtil.nodeType)).build();
-      } else {
-        ErrorResponse err = new ErrorResponse(
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Catalogues with id: " + nodeIdentifier + " not found",
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Catalogues with id: " + nodeIdentifier + " not found");
-        return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
       }
-
-    } catch (NumberFormatException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (OdmsCatalogueNotFoundException e) {
-      // TODO Auto-generated catch block
-      ErrorResponse err = new ErrorResponse(
-          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-          "Catalogues with id: " + nodeIdentifier + " not found",
-          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+      throw new OdmsCatalogueNotFoundException(
           "Catalogues with id: " + nodeIdentifier + " not found");
-      return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
     } catch (OdmsManagerException e) {
-      // TODO Auto-generated catch block
-      return handleBadRequestErrorResponse(e);
+      throw new AppException(ErrorCode.ERR_BAD_REQUEST, e.getMessage(), e);
     }
   }
 
@@ -1606,52 +1486,25 @@ public class ClientApi {
   public Response getCatalogueDatasets(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier,
       @QueryParam("rows") @DefaultValue("1000") int rows,
-      @QueryParam("start") @DefaultValue("0") int start) {
+      @QueryParam("start") @DefaultValue("0") int start) throws Exception {
 
-    try {
+    OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier));
 
-      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier));
+    if (rows > 1000) {
+      ErrorResponse err = new ErrorResponse(
+          String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
+          "Rows maximum value is 1000", String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+          "Rows maximum value is 1000");
+      return Response.status(Response.Status.BAD_REQUEST).entity(err.toJson()).build();
+    }
 
-      if (rows > 1000) {
-        ErrorResponse err = new ErrorResponse(
-            String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
-            "Rows maximum value is 1000", String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Rows maximum value is 1000");
-        return Response.status(Response.Status.BAD_REQUEST).entity(err.toJson()).build();
-      }
-
-      if (cat.isActive()) {
-        SearchResult result = MetadataCacheManager
-            .getAllDatasetsByOdmsCatalogue(Integer.parseInt(nodeIdentifier), rows, start);
-        result.setFacets(null);
-        return Response.status(Response.Status.OK)
-            .entity(GsonUtil.obj2Json(result, GsonUtil.searchResultType)).build();
-      } else {
-        ErrorResponse err = new ErrorResponse(
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Catalogues with id: " + nodeIdentifier + " not found",
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Catalogues with id: " + nodeIdentifier + " not found");
-        return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
-      }
-
-    } catch (NumberFormatException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (DatasetNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (SolrServerException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (OdmsCatalogueNotFoundException e) {
-      // TODO Auto-generated catch block
+    if (cat.isActive()) {
+      SearchResult result = MetadataCacheManager
+          .getAllDatasetsByOdmsCatalogue(Integer.parseInt(nodeIdentifier), rows, start);
+      result.setFacets(null);
+      return Response.status(Response.Status.OK)
+          .entity(GsonUtil.obj2Json(result, GsonUtil.searchResultType)).build();
+    } else {
       ErrorResponse err = new ErrorResponse(
           String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
           "Catalogues with id: " + nodeIdentifier + " not found",
@@ -1675,52 +1528,30 @@ public class ClientApi {
   @Produces("application/json")
   public Response getSingleDataset(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier,
-      @PathParam("datasetID") String datasetIdentifier) {
+      @PathParam("datasetID") String datasetIdentifier) throws Exception {
 
-    try {
-
-      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier));
-      if (cat.isActive()) {
-        DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
-        if (result.getNodeId().equals(nodeIdentifier)) {
-          return Response.status(Response.Status.OK)
-              .entity(GsonUtil.obj2Json(result, GsonUtil.datasetType)).build();
-        } else {
-          ErrorResponse err = new ErrorResponse(
-              String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-              "Dataset with id: " + datasetIdentifier + " not found for catalogue: "
-                  + nodeIdentifier,
-              String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-              "Catalogues with id: " + nodeIdentifier + " not found");
-          return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
-        }
+    OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier));
+    if (cat.isActive()) {
+      DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
+      if (result.getNodeId().equals(nodeIdentifier)) {
+        return Response.status(Response.Status.OK)
+            .entity(GsonUtil.obj2Json(result, GsonUtil.datasetType)).build();
       } else {
         ErrorResponse err = new ErrorResponse(
             String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Catalogues with id: " + nodeIdentifier + " not found",
+            "Dataset with id: " + datasetIdentifier + " not found for catalogue: "
+                + nodeIdentifier,
             String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
             "Catalogues with id: " + nodeIdentifier + " not found");
         return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
       }
-
-    } catch (NumberFormatException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (DatasetNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (SolrServerException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (OdmsCatalogueNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleBadRequestErrorResponse(e);
+    } else {
+      ErrorResponse err = new ErrorResponse(
+          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+          "Catalogues with id: " + nodeIdentifier + " not found",
+          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+          "Catalogues with id: " + nodeIdentifier + " not found");
+      return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
     }
   }
 
@@ -1739,46 +1570,24 @@ public class ClientApi {
   @Produces("application/json")
   public Response getDatasetDistribution(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
-      @PathParam("distributionID") String distributionIdentifier) {
+      @PathParam("distributionID") String distributionIdentifier) throws Exception {
 
-    try {
-      DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
+    DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
+    DcatDistribution distribution = MetadataCacheManager
+        .getDistributionById(distributionIdentifier);
 
-      DcatDistribution distribution = MetadataCacheManager
-          .getDistributionById(distributionIdentifier);
-
-      if ((distribution.getNodeId().equals(nodeIdentifier))
-          && (dataset.getNodeId().equals(nodeIdentifier))) {
-        return Response.status(Response.Status.OK)
-            .entity(GsonUtil.obj2Json(distribution, GsonUtil.distributionType)).build();
-      } else {
-        ErrorResponse err = new ErrorResponse(
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Distribution with id: " + distributionIdentifier + " not found for catalogue: "
-                + nodeIdentifier,
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Dataset with id: " + datasetIdentifier + " not found");
-        return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
-      }
-
-    } catch (NumberFormatException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (DistributionNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (DatasetNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (SolrServerException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
+    if ((distribution.getNodeId().equals(nodeIdentifier))
+        && (dataset.getNodeId().equals(nodeIdentifier))) {
+      return Response.status(Response.Status.OK)
+          .entity(GsonUtil.obj2Json(distribution, GsonUtil.distributionType)).build();
+    } else {
+      ErrorResponse err = new ErrorResponse(
+          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+          "Distribution with id: " + distributionIdentifier + " not found for catalogue: "
+              + nodeIdentifier,
+          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
+          "Dataset with id: " + datasetIdentifier + " not found");
+      return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
     }
   }
 
@@ -1796,30 +1605,12 @@ public class ClientApi {
   @Produces("application/json")
   public Response getDatasetDistributions(@Context HttpServletRequest httpRequest,
       @PathParam("nodeID") String nodeIdentifier,
-      @PathParam("datasetID") String datasetIdentifier) {
+      @PathParam("datasetID") String datasetIdentifier) throws Exception {
 
-    try {
-
-      DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
-
-      List<DcatDistribution> result = dataset.getDistributions();
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(result, GsonUtil.distributionListType)).build();
-
-    } catch (DatasetNotFoundException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (SolrServerException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    }
+    DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
+    List<DcatDistribution> result = dataset.getDistributions();
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(result, GsonUtil.distributionListType)).build();
   }
 
   /**
@@ -1834,35 +1625,14 @@ public class ClientApi {
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
   public Response getDatasetById(@Context HttpServletRequest httpRequest,
-      @PathParam("id") String id) {
-
-    try {
-      try {
-        DcatDataset result = MetadataCacheManager.getDatasetById(id);
-        return Response.status(Response.Status.OK)
-            .entity(GsonUtil.obj2Json(result, GsonUtil.datasetType)).build();
-      } catch (DatasetNotFoundException e) {
-        // TODO Auto-generated catch block
-        ErrorResponse err = new ErrorResponse(
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Dataset with id: " + id + " not found",
-            String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-            "Dataset with id: " + id + " not found");
-        return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
-      }
-    } catch (NumberFormatException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (SolrServerException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      return handleErrorResponse500(e);
-    }
+      @PathParam("id") String id) throws DatasetNotFoundException, IOException,
+      SolrServerException, GsonUtilException {
+    // Errors flow to GlobalExceptionMapper:
+    //   DatasetNotFoundException (AppException) -> 404 ERR_DATASET_NOT_FOUND
+    //   IOException / SolrServerException / GsonUtilException -> 500 ERR_INTERNAL
+    DcatDataset result = MetadataCacheManager.getDatasetById(id);
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(result, GsonUtil.datasetType)).build();
   }
 
   /**
@@ -1879,7 +1649,7 @@ public class ClientApi {
   @Produces("application/json")
   public Response executeOrionQuery(@Context HttpServletRequest httpRequest,
       @PathParam("catalogueID") String nodeIdentifier,
-      @PathParam("cbQueryID") String queryIdentifier) {
+      @PathParam("cbQueryID") String queryIdentifier) throws Exception {
     ErrorResponse err = null;
     if (StringUtils.isBlank(nodeIdentifier)) {
       err = new ErrorResponse(String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -1895,94 +1665,77 @@ public class ClientApi {
           "Missing mandatory query parameter: cbQueryID");
     }
 
-    try {
-      OdmsCatalogue catalogue = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier),
-          false);
-      if (!catalogue.getNodeType().equals(OdmsCatalogueType.ORION)) {
-        err = new ErrorResponse(String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
-            "Catalogue: " + nodeIdentifier + " is not ORION",
-            String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
-            "Catalogue: " + nodeIdentifier + " is not ORION");
-      } else {
-
-        OrionCatalogueConfiguration catalogueConfig = (OrionCatalogueConfiguration) catalogue
-            .getAdditionalConfig();
-        OrionDistributionConfig distributionConfig = MetadataCacheManager
-            .getOrionDistributionConfig(queryIdentifier);
-
-        String compiledUri = (!catalogue.getHost().endsWith("/") ? catalogue.getHost()
-            : catalogue.getHost().substring(0, catalogue.getHost().length() - 1))
-            + (!catalogueConfig.isNgsild() ? "/v2/entities" : "/ngsi-ld/v1/entities") + "?"
-            + distributionConfig.getQuery();
-
-        Client localClient = ClientBuilder.newClient();
-
-        WebTarget webTarget = localClient.target(compiledUri);
-        Invocation.Builder builder = webTarget.request();
-        if (StringUtils.isNotBlank(distributionConfig.getFiwareService())) {
-          builder = builder.header("Fiware-Service", distributionConfig.getFiwareService());
-        }
-
-        if (StringUtils.isNotBlank(distributionConfig.getFiwareServicePath())) {
-          builder = builder.header("Fiware-ServicePath", distributionConfig.getFiwareServicePath());
-        }
-
-        if (catalogueConfig.isNgsild()) {
-          if (StringUtils.isNotBlank(distributionConfig.getContext())) {
-            builder = builder.header("Link", "<" + distributionConfig.getContext() + ">; "
-                + "rel=\"http://www.w3.org/ns/json-ld#context\"; type=\"application/ld+json\"");
-          }
-        }
-
-        if (catalogueConfig.isAuthenticated()) {
-          builder = builder.header("X-Auth-Token", catalogueConfig.getAuthToken());
-        }
-
-        Response request = builder.get();
-        ResponseBuilder responseBuilder = Response.status(request.getStatus());
-        final InputStream responseStream = (InputStream) request.getEntity();
-        StreamingOutput output = new StreamingOutput() {
-          @Override
-          public void write(OutputStream out) throws IOException, WebApplicationException {
-            int length;
-            byte[] buffer = new byte[1024];
-            while ((length = responseStream.read(buffer)) != -1) {
-              out.write(buffer, 0, length);
-            }
-            out.flush();
-            responseStream.close();
-          }
-        };
-
-        responseBuilder.entity(output);
-
-        MultivaluedMap<String, Object> headers = request.getHeaders();
-        Set<String> keys = headers.keySet();
-        // logger.info("Status: " + request.getStatus());
-
-        for (String k : keys) {
-          if (!k.toLowerCase().equals("access-control-allow-origin")) {
-            responseBuilder.header(k, headers.get(k).get(0));
-          }
-        }
-
-        return responseBuilder.build();
-
-      }
-
+    OdmsCatalogue catalogue = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeIdentifier),
+        false);
+    if (!catalogue.getNodeType().equals(OdmsCatalogueType.ORION)) {
+      err = new ErrorResponse(String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
+          "Catalogue: " + nodeIdentifier + " is not ORION",
+          String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()),
+          "Catalogue: " + nodeIdentifier + " is not ORION");
       return Response.status(Response.Status.OK).build();
-    } catch (OdmsCatalogueNotFoundException e) {
-      err = new ErrorResponse(String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-          "Catalogues with id: " + nodeIdentifier + " not found",
-          String.valueOf(Response.Status.NOT_FOUND.getStatusCode()),
-          "Catalogues with id: " + nodeIdentifier + " not found");
-      return Response.status(Response.Status.NOT_FOUND).entity(err.toJson()).build();
-    } catch (NumberFormatException | OdmsManagerException e) {
-      // TODO Auto-generated catch block
-      // e.printStackTrace();
-      return handleErrorResponse500(e);
     }
 
+    OrionCatalogueConfiguration catalogueConfig = (OrionCatalogueConfiguration) catalogue
+        .getAdditionalConfig();
+    OrionDistributionConfig distributionConfig = MetadataCacheManager
+        .getOrionDistributionConfig(queryIdentifier);
+
+    String compiledUri = (!catalogue.getHost().endsWith("/") ? catalogue.getHost()
+        : catalogue.getHost().substring(0, catalogue.getHost().length() - 1))
+        + (!catalogueConfig.isNgsild() ? "/v2/entities" : "/ngsi-ld/v1/entities") + "?"
+        + distributionConfig.getQuery();
+
+    Client localClient = ClientBuilder.newClient();
+
+    WebTarget webTarget = localClient.target(compiledUri);
+    Invocation.Builder builder = webTarget.request();
+    if (StringUtils.isNotBlank(distributionConfig.getFiwareService())) {
+      builder = builder.header("Fiware-Service", distributionConfig.getFiwareService());
+    }
+
+    if (StringUtils.isNotBlank(distributionConfig.getFiwareServicePath())) {
+      builder = builder.header("Fiware-ServicePath", distributionConfig.getFiwareServicePath());
+    }
+
+    if (catalogueConfig.isNgsild()) {
+      if (StringUtils.isNotBlank(distributionConfig.getContext())) {
+        builder = builder.header("Link", "<" + distributionConfig.getContext() + ">; "
+            + "rel=\"http://www.w3.org/ns/json-ld#context\"; type=\"application/ld+json\"");
+      }
+    }
+
+    if (catalogueConfig.isAuthenticated()) {
+      builder = builder.header("X-Auth-Token", catalogueConfig.getAuthToken());
+    }
+
+    Response request = builder.get();
+    ResponseBuilder responseBuilder = Response.status(request.getStatus());
+    final InputStream responseStream = (InputStream) request.getEntity();
+    StreamingOutput output = new StreamingOutput() {
+      @Override
+      public void write(OutputStream out) throws IOException, WebApplicationException {
+        int length;
+        byte[] buffer = new byte[1024];
+        while ((length = responseStream.read(buffer)) != -1) {
+          out.write(buffer, 0, length);
+        }
+        out.flush();
+        responseStream.close();
+      }
+    };
+
+    responseBuilder.entity(output);
+
+    MultivaluedMap<String, Object> headers = request.getHeaders();
+    Set<String> keys = headers.keySet();
+
+    for (String k : keys) {
+      if (!k.toLowerCase().equals("access-control-allow-origin")) {
+        responseBuilder.header(k, headers.get(k).get(0));
+      }
+    }
+
+    return responseBuilder.build();
   }
 
   private static void localizeSearchKeywords(SearchResult result, String preferredLanguage,
@@ -2261,66 +2014,6 @@ public class ClientApi {
       this.value = value;
       this.language = language;
     }
-  }
-
-  /**
-   * Handle error response 500.
-   *
-   * @param e the e
-   * @return the response
-   */
-  private static Response handleErrorResponse500(Exception e) {
-
-    logger.error(e.getMessage(), e);
-    ErrorResponse error = new ErrorResponse(
-        String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
-        e.getClass().getSimpleName(), "An error occurred, please contact the administrator!");
-    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error.toJson()).build();
-  }
-
-  /**
-   * Handle euro voc not found.
-   *
-   * @param e the e
-   * @return the response
-   */
-  private static Response handleEuroVocNotFound(EuroVocTranslationNotFoundException e) {
-
-    logger.error(e.getMessage(), e);
-    ErrorResponse error = new ErrorResponse(
-        String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
-        e.getClass().getSimpleName(), "No results found!");
-    return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
-  }
-
-  /**
-   * Handle bad request error response.
-   *
-   * @param e the e
-   * @return the response
-   */
-  private static Response handleBadRequestErrorResponse(Exception e) {
-
-    logger.error(e.getMessage(), e);
-    ErrorResponse error = new ErrorResponse(
-        String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
-        e.getClass().getSimpleName(), "The request body is not a valid JSON");
-    return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
-  }
-
-  /**
-   * Handle bad query error response.
-   *
-   * @param e the e
-   * @return the response
-   */
-  private static Response handleBadQueryErrorResponse(Exception e) {
-
-    logger.error(e.getMessage(), e);
-    ErrorResponse error = new ErrorResponse(
-        String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
-        e.getClass().getSimpleName(), "Malformed SPARQL query");
-    return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
   }
 
 }

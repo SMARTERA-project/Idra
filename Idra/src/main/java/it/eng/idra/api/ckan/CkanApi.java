@@ -64,43 +64,35 @@ public class CkanApi {
   @Path("/api/{var:(3/?)?}action/package_list")
   @Produces("application/json")
   public Response all_package_list(@Context HttpServletRequest httpRequest,
-      @QueryParam("limit") String l, @QueryParam("offset") String o) {
+      @QueryParam("limit") String l, @QueryParam("offset") String o) throws Exception {
 
-    try {
+    int limit;
+    int offset = 0;
 
-      // TO-DO solo i cataloghi attivi
-
-      int limit = -1;
-      int offset = 0;
-
-      if (StringUtils.isNotBlank(l)) {
-        limit = Integer.parseInt(l);
-      } else {
-        // Default limit a 1000
-        limit = 1000;
-      }
-
-      if (StringUtils.isNotBlank(o)) {
-        offset = Integer.parseInt(o);
-      }
-
-      CkanSuccessResponse<List<String>> res = new CkanSuccessResponse<>();
-      res.setHelp("Return a list of the names of the site's datasets (packages). "
-          + ":param limit: if given, the list of datasets will be broken "
-          + "into pages of at most ``limit`` datasets per "
-          + "page and only one page will be returned at a time "
-          + "(optional) :type limit: int :param offset: when ``limit`` is given, "
-          + "the offset to start returning packages from :type "
-          + "offset: int :rtype: list of strings; Limit default value is 1000 ");
-      res.setSuccess(true);
-      res.setResult(MetadataCacheManager.getAllDatasetsId(limit, offset));
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-    } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    if (StringUtils.isNotBlank(l)) {
+      limit = Integer.parseInt(l);
+    } else {
+      // Default limit a 1000
+      limit = 1000;
     }
 
+    if (StringUtils.isNotBlank(o)) {
+      offset = Integer.parseInt(o);
+    }
+
+    CkanSuccessResponse<List<String>> res = new CkanSuccessResponse<>();
+    res.setHelp("Return a list of the names of the site's datasets (packages). "
+        + ":param limit: if given, the list of datasets will be broken "
+        + "into pages of at most ``limit`` datasets per "
+        + "page and only one page will be returned at a time "
+        + "(optional) :type limit: int :param offset: when ``limit`` is given, "
+        + "the offset to start returning packages from :type "
+        + "offset: int :rtype: list of strings; Limit default value is 1000 ");
+    res.setSuccess(true);
+    res.setResult(MetadataCacheManager.getAllDatasetsId(limit, offset));
+
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
   }
 
   /**
@@ -117,54 +109,49 @@ public class CkanApi {
   @Produces("application/json")
   public Response package_list(@Context HttpServletRequest httpRequest,
       @PathParam("catalogueID") String catalogueIdentifier, @QueryParam("limit") String l,
-      @QueryParam("offset") String o) {
+      @QueryParam("offset") String o) throws Exception {
+
+    int limit = -1;
+    int offset = 0;
+
+    if (StringUtils.isNotBlank(l)) {
+      limit = Integer.parseInt(l);
+    }
+
+    if (StringUtils.isNotBlank(o)) {
+      offset = Integer.parseInt(o);
+    }
 
     try {
-      int limit = -1;
-      int offset = 0;
+      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
+      if (cat.isActive()) {
+        CkanSuccessResponse<List<String>> res = new CkanSuccessResponse<>();
+        res.setHelp("Return a list of the names of the site's datasets (packages). "
+            + ":param limit: if given, the list of datasets will be broken "
+            + "into pages of at most ``limit`` datasets "
+            + "per page and only one page will be returned at a time "
+            + "(optional) :type limit: int :param offset: when ``limit`` is given, "
+            + "the offset to start returning packages "
+            + "from :type offset: int :rtype: list of strings ");
+        res.setSuccess(true);
+        res.setResult(
+            MetadataCacheManager.getAllDatasetsIdByCatalogue(catalogueIdentifier, limit, offset));
 
-      if (StringUtils.isNotBlank(l)) {
-        limit = Integer.parseInt(l);
-      }
-
-      if (StringUtils.isNotBlank(o)) {
-        offset = Integer.parseInt(o);
-      }
-
-      try {
-        OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
-        if (cat.isActive()) {
-          CkanSuccessResponse<List<String>> res = new CkanSuccessResponse<>();
-          res.setHelp("Return a list of the names of the site's datasets (packages). "
-              + ":param limit: if given, the list of datasets will be broken "
-              + "into pages of at most ``limit`` datasets "
-              + "per page and only one page will be returned at a time "
-              + "(optional) :type limit: int :param offset: when ``limit`` is given, "
-              + "the offset to start returning packages "
-              + "from :type offset: int :rtype: list of strings ");
-          res.setSuccess(true);
-          res.setResult(
-              MetadataCacheManager.getAllDatasetsIdByCatalogue(catalogueIdentifier, limit, offset));
-
-          return Response.status(Response.Status.OK)
-              .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-        } else {
-          CkanErrorResponse err = new CkanErrorResponse("",
-              "Catalogue " + catalogueIdentifier + " not found", "Not Found");
-          return Response.status(Response.Status.NOT_FOUND)
-              .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-        }
-      } catch (OdmsCatalogueNotFoundException e) {
+        return Response.status(Response.Status.OK)
+            .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
+      } else {
         CkanErrorResponse err = new CkanErrorResponse("",
             "Catalogue " + catalogueIdentifier + " not found", "Not Found");
         return Response.status(Response.Status.NOT_FOUND)
             .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
       }
-
-    } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    } catch (OdmsCatalogueNotFoundException e) {
+      // CKAN-compat contract: external clients expect this body shape on 404.
+      CkanErrorResponse err = new CkanErrorResponse("",
+          "Catalogue " + catalogueIdentifier + " not found", "Not Found");
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
     }
-
   }
 
   /**
@@ -180,55 +167,45 @@ public class CkanApi {
   @Produces("application/json")
   public Response package_show(@Context HttpServletRequest httpRequest,
       @PathParam("catalogueID") String catalogueIdentifier,
-      @QueryParam("id") String datasetIdentifier) {
+      @QueryParam("id") String datasetIdentifier) throws Exception {
+
+    if (StringUtils.isBlank(datasetIdentifier)) {
+      CkanErrorResponse err = new CkanErrorResponse("", "Missing mandatory parameter id",
+          "Validation error");
+      return Response.status(Response.Status.CONFLICT)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
+    }
+
+    CkanSuccessResponse<Dataset> res = new CkanSuccessResponse<>();
+    res.setHelp("");
 
     try {
-
-      if (StringUtils.isBlank(datasetIdentifier)) {
-        CkanErrorResponse err = new CkanErrorResponse("", "Missing mandatory parameter id",
-            "Validation error");
-        return Response.status(Response.Status.CONFLICT)
-            .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-      }
-
-      CkanSuccessResponse<Dataset> res = new CkanSuccessResponse<>();
-      res.setHelp("");
-
-      try {
-        OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
-        if (cat.isActive()) {
-          DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
-          if (result.getNodeId().equals(catalogueIdentifier)) {
-            res.setResult(CkanUtils.toCkanDataset(result));
-          } else {
-            CkanErrorResponse err = new CkanErrorResponse("",
-                "Package not found for catalogue: " + catalogueIdentifier, "Not Found");
-            return Response.status(Response.Status.NOT_FOUND)
-                .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-          }
+      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
+      if (cat.isActive()) {
+        DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
+        if (result.getNodeId().equals(catalogueIdentifier)) {
+          res.setResult(CkanUtils.toCkanDataset(result));
         } else {
-          CkanErrorResponse err = new CkanErrorResponse("", "Package not found", "Not Found");
+          CkanErrorResponse err = new CkanErrorResponse("",
+              "Package not found for catalogue: " + catalogueIdentifier, "Not Found");
           return Response.status(Response.Status.NOT_FOUND)
               .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
         }
-      } catch (DatasetNotFoundException e) {
-        CkanErrorResponse err = new CkanErrorResponse("",
-            "Catalogue " + catalogueIdentifier + " not found", "Not Found");
-        return Response.status(Response.Status.NOT_FOUND)
-            .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-      } catch (OdmsCatalogueNotFoundException e) {
-        CkanErrorResponse err = new CkanErrorResponse("",
-            "Catalogue " + catalogueIdentifier + " not found", "Not Found");
+      } else {
+        CkanErrorResponse err = new CkanErrorResponse("", "Package not found", "Not Found");
         return Response.status(Response.Status.NOT_FOUND)
             .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
       }
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-    } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    } catch (DatasetNotFoundException | OdmsCatalogueNotFoundException e) {
+      // CKAN-compat contract: external clients expect this body shape on 404.
+      CkanErrorResponse err = new CkanErrorResponse("",
+          "Catalogue " + catalogueIdentifier + " not found", "Not Found");
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
     }
 
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
   }
 
   /**
@@ -242,38 +219,30 @@ public class CkanApi {
   @Path("/api/{var:(3/?)?}action/package_show")
   @Produces("application/json")
   public Response all_package_show(@Context HttpServletRequest httpRequest,
-      @QueryParam("id") String datasetIdentifier) {
+      @QueryParam("id") String datasetIdentifier) throws Exception {
 
-    try {
-
-      if (StringUtils.isBlank(datasetIdentifier)) {
-        CkanErrorResponse err = new CkanErrorResponse("", "Missing mandatory parameter id",
-            "Validation error");
-        return Response.status(Response.Status.CONFLICT)
-            .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-      }
-
-      CkanSuccessResponse<Dataset> res = new CkanSuccessResponse<>();
-      res.setHelp("");
-
-      try {
-
-        DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
-        res.setResult(CkanUtils.toCkanDataset(result));
-
-      } catch (DatasetNotFoundException e) {
-        CkanErrorResponse err = new CkanErrorResponse("", "Package not found", "Not Found");
-        return Response.status(Response.Status.NOT_FOUND)
-            .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-      }
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    if (StringUtils.isBlank(datasetIdentifier)) {
+      CkanErrorResponse err = new CkanErrorResponse("", "Missing mandatory parameter id",
+          "Validation error");
+      return Response.status(Response.Status.CONFLICT)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
     }
 
+    CkanSuccessResponse<Dataset> res = new CkanSuccessResponse<>();
+    res.setHelp("");
+
+    try {
+      DcatDataset result = MetadataCacheManager.getDatasetById(datasetIdentifier);
+      res.setResult(CkanUtils.toCkanDataset(result));
+    } catch (DatasetNotFoundException e) {
+      // CKAN-compat contract: external clients expect this body shape on 404.
+      CkanErrorResponse err = new CkanErrorResponse("", "Package not found", "Not Found");
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
   }
 
   /**
@@ -293,41 +262,34 @@ public class CkanApi {
       @QueryParam("q") @DefaultValue("*:*") String query,
       @QueryParam("start") @DefaultValue("0") String start,
       @QueryParam("rows") @DefaultValue("20") String rows,
-      @QueryParam("sort") @DefaultValue("metadata_modified desc") String sort) {
+      @QueryParam("sort") @DefaultValue("metadata_modified desc") String sort) throws Exception {
 
-    try {
+    int limit = -1;
+    int offset = 0;
 
-      int limit = -1;
-      int offset = 0;
-
-      if (StringUtils.isNotBlank(rows)) {
-        limit = Integer.parseInt(rows);
-      }
-
-      if (StringUtils.isNotBlank(start)) {
-        offset = Integer.parseInt(start);
-      }
-
-      String mappedQuery = CkanUtils.manageQuery(query, " ");
-      String mappedSort = CkanUtils.manageSort(sort);
-      // Adding catalogues ids
-      List<String> ids = FederationCore.getOdmsCatalogues(false).stream().filter(x -> x.isActive())
-          .map(x -> Integer.toString(x.getId())).collect(Collectors.toList());
-
-      SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit, offset,
-          ids);
-
-      CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
-      res.setHelp("");
-      res.setResult(CkanUtils.toCkanSearchResult(result));
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    if (StringUtils.isNotBlank(rows)) {
+      limit = Integer.parseInt(rows);
     }
 
+    if (StringUtils.isNotBlank(start)) {
+      offset = Integer.parseInt(start);
+    }
+
+    String mappedQuery = CkanUtils.manageQuery(query, " ");
+    String mappedSort = CkanUtils.manageSort(sort);
+    // Adding catalogues ids
+    List<String> ids = FederationCore.getOdmsCatalogues(false).stream().filter(x -> x.isActive())
+        .map(x -> Integer.toString(x.getId())).collect(Collectors.toList());
+
+    SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit, offset,
+        ids);
+
+    CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
+    res.setHelp("");
+    res.setResult(CkanUtils.toCkanSearchResult(result));
+
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
   }
 
   /**
@@ -349,54 +311,46 @@ public class CkanApi {
       @QueryParam("q") @DefaultValue("*:*") String query,
       @QueryParam("start") @DefaultValue("0") String start,
       @QueryParam("rows") @DefaultValue("20") String rows,
-      @QueryParam("sort") @DefaultValue("metadata_modified desc") String sort) {
+      @QueryParam("sort") @DefaultValue("metadata_modified desc") String sort) throws Exception {
 
+    int limit = -1;
+    int offset = 0;
+
+    if (StringUtils.isNotBlank(rows)) {
+      limit = Integer.parseInt(rows);
+    }
+
+    if (StringUtils.isNotBlank(start)) {
+      offset = Integer.parseInt(start);
+    }
+
+    String mappedQuery = CkanUtils.manageQuery(query, " ");
+    String mappedSort = CkanUtils.manageSort(sort);
     try {
+      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
+      if (cat.isActive()) {
+        SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit,
+            offset, Arrays.asList(catalogueIdentifier));
 
-      int limit = -1;
-      int offset = 0;
+        CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
+        res.setHelp("");
+        res.setResult(CkanUtils.toCkanSearchResult(result));
 
-      if (StringUtils.isNotBlank(rows)) {
-        limit = Integer.parseInt(rows);
-      }
-
-      if (StringUtils.isNotBlank(start)) {
-        offset = Integer.parseInt(start);
-      }
-
-      String mappedQuery = CkanUtils.manageQuery(query, " ");
-      String mappedSort = CkanUtils.manageSort(sort);
-      // Adding catalogues ids
-      try {
-        OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
-        if (cat.isActive()) {
-          SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit,
-              offset, Arrays.asList(catalogueIdentifier));
-
-          CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
-          res.setHelp("");
-          res.setResult(CkanUtils.toCkanSearchResult(result));
-
-          return Response.status(Response.Status.OK)
-              .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-        } else {
-          CkanErrorResponse err = new CkanErrorResponse("",
-              "Catalogue " + catalogueIdentifier + " not found", "Not Found");
-          return Response.status(Response.Status.NOT_FOUND)
-              .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-        }
-      } catch (OdmsCatalogueNotFoundException e) {
+        return Response.status(Response.Status.OK)
+            .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
+      } else {
         CkanErrorResponse err = new CkanErrorResponse("",
             "Catalogue " + catalogueIdentifier + " not found", "Not Found");
         return Response.status(Response.Status.NOT_FOUND)
             .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
       }
-
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    } catch (OdmsCatalogueNotFoundException e) {
+      // CKAN-compat contract: external clients expect this body shape on 404.
+      CkanErrorResponse err = new CkanErrorResponse("",
+          "Catalogue " + catalogueIdentifier + " not found", "Not Found");
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
     }
-
   }
 
   /**
@@ -410,47 +364,40 @@ public class CkanApi {
   @Path("/api/{var:(3/?)?}action/package_search")
   @Produces("application/json")
   public Response all_package_search_post(@Context HttpServletRequest httpRequest,
-      final String input) {
+      final String input) throws Exception {
 
-    try {
+    JSONObject j = new JSONObject(input);
 
-      JSONObject j = new JSONObject(input);
+    int limit;
+    int offset;
 
-      int limit = -1;
-      int offset = 0;
-
-      if (StringUtils.isNotBlank(j.optString("rows", ""))) {
-        limit = Integer.parseInt(j.optString("rows", ""));
-      } else {
-        limit = 20;
-      }
-
-      if (StringUtils.isNotBlank(j.optString("start", ""))) {
-        offset = Integer.parseInt(j.optString("start", ""));
-      } else {
-        offset = 0;
-      }
-
-      String mappedQuery = CkanUtils.manageQuery(j.optString("q", ""), " ");
-      String mappedSort = CkanUtils.manageSort(j.optString("sort", "metadata_modified desc"));
-      // Adding catalogues ids
-      List<String> ids = FederationCore.getOdmsCatalogues(false).stream().filter(x -> x.isActive())
-          .map(x -> Integer.toString(x.getId())).collect(Collectors.toList());
-
-      SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit, offset,
-          ids);
-
-      CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
-      res.setHelp("");
-      res.setResult(CkanUtils.toCkanSearchResult(result));
-
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    if (StringUtils.isNotBlank(j.optString("rows", ""))) {
+      limit = Integer.parseInt(j.optString("rows", ""));
+    } else {
+      limit = 20;
     }
 
+    if (StringUtils.isNotBlank(j.optString("start", ""))) {
+      offset = Integer.parseInt(j.optString("start", ""));
+    } else {
+      offset = 0;
+    }
+
+    String mappedQuery = CkanUtils.manageQuery(j.optString("q", ""), " ");
+    String mappedSort = CkanUtils.manageSort(j.optString("sort", "metadata_modified desc"));
+    // Adding catalogues ids
+    List<String> ids = FederationCore.getOdmsCatalogues(false).stream().filter(x -> x.isActive())
+        .map(x -> Integer.toString(x.getId())).collect(Collectors.toList());
+
+    SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit, offset,
+        ids);
+
+    CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
+    res.setHelp("");
+    res.setResult(CkanUtils.toCkanSearchResult(result));
+
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
   }
 
   /**
@@ -465,60 +412,52 @@ public class CkanApi {
   @Path("{catalogueID}/api/{var:(3/?)?}action/package_search")
   @Produces("application/json")
   public Response single_package_search_post(@Context HttpServletRequest httpRequest,
-      @PathParam("catalogueID") String catalogueIdentifier, final String input) {
+      @PathParam("catalogueID") String catalogueIdentifier, final String input) throws Exception {
 
+    JSONObject j = new JSONObject(input);
+
+    int limit;
+    int offset;
+
+    if (StringUtils.isNotBlank(j.optString("rows", ""))) {
+      limit = Integer.parseInt(j.optString("rows", ""));
+    } else {
+      limit = 20;
+    }
+
+    if (StringUtils.isNotBlank(j.optString("start", ""))) {
+      offset = Integer.parseInt(j.optString("start", ""));
+    } else {
+      offset = 0;
+    }
+
+    String mappedQuery = CkanUtils.manageQuery(j.optString("q", ""), " ");
+    String mappedSort = CkanUtils.manageSort(j.optString("sort", "metadata_modified desc"));
     try {
+      OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
+      if (cat.isActive()) {
+        SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit,
+            offset, Arrays.asList(catalogueIdentifier));
 
-      JSONObject j = new JSONObject(input);
+        CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
+        res.setHelp("");
+        res.setResult(CkanUtils.toCkanSearchResult(result));
 
-      int limit = -1;
-      int offset = 0;
-
-      if (StringUtils.isNotBlank(j.optString("rows", ""))) {
-        limit = Integer.parseInt(j.optString("rows", ""));
+        return Response.status(Response.Status.OK)
+            .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
       } else {
-        limit = 20;
-      }
-
-      if (StringUtils.isNotBlank(j.optString("start", ""))) {
-        offset = Integer.parseInt(j.optString("start", ""));
-      } else {
-        offset = 0;
-      }
-
-      String mappedQuery = CkanUtils.manageQuery(j.optString("q", ""), " ");
-      String mappedSort = CkanUtils.manageSort(j.optString("sort", "metadata_modified desc"));
-      // Adding catalogues ids
-      try {
-        OdmsCatalogue cat = FederationCore.getOdmsCatalogue(Integer.parseInt(catalogueIdentifier));
-        if (cat.isActive()) {
-          SearchResult result = FederatedSearch.searchByQuery(mappedQuery, mappedSort, limit,
-              offset, Arrays.asList(catalogueIdentifier));
-
-          CkanSuccessResponse<CkanSearchResult> res = new CkanSuccessResponse<>();
-          res.setHelp("");
-          res.setResult(CkanUtils.toCkanSearchResult(result));
-
-          return Response.status(Response.Status.OK)
-              .entity(GsonUtil.obj2Json(res, GsonUtil.ckanSuccType)).build();
-        } else {
-          CkanErrorResponse err = new CkanErrorResponse("",
-              "Catalogue " + catalogueIdentifier + " not found", "Not Found");
-          return Response.status(Response.Status.NOT_FOUND)
-              .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
-        }
-      } catch (OdmsCatalogueNotFoundException e) {
         CkanErrorResponse err = new CkanErrorResponse("",
             "Catalogue " + catalogueIdentifier + " not found", "Not Found");
         return Response.status(Response.Status.NOT_FOUND)
             .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
       }
-
-    } catch (Exception e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    } catch (OdmsCatalogueNotFoundException e) {
+      // CKAN-compat contract: external clients expect this body shape on 404.
+      CkanErrorResponse err = new CkanErrorResponse("",
+          "Catalogue " + catalogueIdentifier + " not found", "Not Found");
+      return Response.status(Response.Status.NOT_FOUND)
+          .entity(GsonUtil.obj2Json(err, GsonUtil.ckanErrType)).build();
     }
-
   }
 
 }

@@ -15,22 +15,18 @@
 
 package it.eng.idra.beans.odms;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class OdmsAlreadyPresentException.
- */
-public class OdmsAlreadyPresentException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class OdmsAlreadyPresentException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new odms already present exception.
-   *
-   * @param message the message
-   */
   public OdmsAlreadyPresentException(String message) {
-    super(message);
+    super(ErrorCode.ERR_CATALOGUE_DUPLICATE, message);
   }
 
+  public OdmsAlreadyPresentException(String message, Throwable cause) {
+    super(ErrorCode.ERR_CATALOGUE_DUPLICATE, message, cause);
+  }
 }

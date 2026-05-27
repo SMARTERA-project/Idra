@@ -15,21 +15,18 @@
 
 package it.eng.idra.beans.exception;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class EuroVocTranslationNotFoundException.
- */
-public class EuroVocTranslationNotFoundException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class EuroVocTranslationNotFoundException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new euro voc translation not found exception.
-   *
-   * @param message the message
-   */
   public EuroVocTranslationNotFoundException(String message) {
-    super(message);
+    super(ErrorCode.ERR_EUROVOC_NOT_FOUND, message);
+  }
+
+  public EuroVocTranslationNotFoundException(String message, Throwable cause) {
+    super(ErrorCode.ERR_EUROVOC_NOT_FOUND, message, cause);
   }
 }

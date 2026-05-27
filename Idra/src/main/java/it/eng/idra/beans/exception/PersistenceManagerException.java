@@ -15,22 +15,18 @@
 
 package it.eng.idra.beans.exception;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class PersistenceManagerException.
- */
-public class PersistenceManagerException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class PersistenceManagerException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new persistence manager exception.
-   *
-   * @param message the message
-   */
   public PersistenceManagerException(String message) {
-    super(message);
+    super(ErrorCode.ERR_PERSISTENCE, message);
   }
 
+  public PersistenceManagerException(String message, Throwable cause) {
+    super(ErrorCode.ERR_PERSISTENCE, message, cause);
+  }
 }

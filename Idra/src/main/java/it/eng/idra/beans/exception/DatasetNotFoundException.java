@@ -15,21 +15,18 @@
 
 package it.eng.idra.beans.exception;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class DatasetNotFoundException.
- */
-public class DatasetNotFoundException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class DatasetNotFoundException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new dataset not found exception.
-   *
-   * @param message the message
-   */
   public DatasetNotFoundException(String message) {
-    super(message);
+    super(ErrorCode.ERR_DATASET_NOT_FOUND, message);
+  }
+
+  public DatasetNotFoundException(String message, Throwable cause) {
+    super(ErrorCode.ERR_DATASET_NOT_FOUND, message, cause);
   }
 }

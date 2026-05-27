@@ -15,22 +15,18 @@
 
 package it.eng.idra.beans.odms;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class OdmsManagerException.
- */
-public class OdmsManagerException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class OdmsManagerException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new odms manager exception.
-   *
-   * @param message the message
-   */
   public OdmsManagerException(String message) {
-    super(message);
+    super(ErrorCode.ERR_CATALOGUE_MANAGER, message);
   }
 
+  public OdmsManagerException(String message, Throwable cause) {
+    super(ErrorCode.ERR_CATALOGUE_MANAGER, message, cause);
+  }
 }

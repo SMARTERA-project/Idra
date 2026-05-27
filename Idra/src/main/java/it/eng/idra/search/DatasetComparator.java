@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.LoggerFactory;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -121,8 +122,8 @@ public enum DatasetComparator implements Comparator<DcatDataset> {
         date1.setTime(sdf.parse(o1.getReleaseDate().getValue()));
         date2.setTime(sdf.parse(o2.getReleaseDate().getValue()));
       } catch (ParseException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LoggerFactory.getLogger(DatasetComparator.class).warn(
+            "Unable to parse release date for sort, using fallback order: {}", e.getMessage());
       }
 
       return date1.compareTo(date2);
@@ -144,8 +145,8 @@ public enum DatasetComparator implements Comparator<DcatDataset> {
         date1.setTime(sdf.parse(o1.getUpdateDate().getValue()));
         date2.setTime(sdf.parse(o2.getUpdateDate().getValue()));
       } catch (ParseException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LoggerFactory.getLogger(DatasetComparator.class).warn(
+            "Unable to parse update date for sort, using fallback order: {}", e.getMessage());
       }
 
       return date1.compareTo(date2);

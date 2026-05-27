@@ -15,22 +15,18 @@
 
 package it.eng.idra.beans.odms;
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class OdmsCatalogueChangeActiveStateException.
- */
-public class OdmsCatalogueChangeActiveStateException extends Exception {
+import it.eng.idra.exception.AppException;
+import it.eng.idra.exception.ErrorCode;
 
-  /** The Constant serialVersionUID. */
+public class OdmsCatalogueChangeActiveStateException extends AppException {
+
   private static final long serialVersionUID = 1L;
 
-  /**
-   * Instantiates a new odms catalogue change active state exception.
-   *
-   * @param message the message
-   */
   public OdmsCatalogueChangeActiveStateException(String message) {
-    super(message);
+    super(ErrorCode.ERR_CATALOGUE_STATE_CHANGE, message);
   }
 
+  public OdmsCatalogueChangeActiveStateException(String message, Throwable cause) {
+    super(ErrorCode.ERR_CATALOGUE_STATE_CHANGE, message, cause);
+  }
 }

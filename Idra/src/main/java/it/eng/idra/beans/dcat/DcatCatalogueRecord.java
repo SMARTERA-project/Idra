@@ -9,6 +9,8 @@ import org.apache.jena.vocabulary.RDFS;
 import org.apache.jena.vocabulary.SKOS;
 import org.apache.solr.common.SolrInputDocument;
 import org.hibernate.annotations.GenericGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.hibernate.annotations.LazyCollection;
 import org.hibernate.annotations.LazyCollectionOption;
 import com.google.gson.annotations.SerializedName;
@@ -36,6 +38,8 @@ import javax.persistence.Transient;
 @Entity
 @Table(name = "dcat_catalogue_record")
 public class DcatCatalogueRecord implements Serializable {
+
+    private static final Logger logger = LoggerFactory.getLogger(DcatCatalogueRecord.class);
 
     private static final long serialVersionUID = 1L;
 
@@ -288,7 +292,7 @@ public class DcatCatalogueRecord implements Serializable {
             try {
                 doc.addField("applicationProfile", GsonUtil.obj2Json(applicationProfile, GsonUtil.stdListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize applicationProfile for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -296,7 +300,7 @@ public class DcatCatalogueRecord implements Serializable {
             try {
                 doc.addField("title", GsonUtil.obj2Json(title, GsonUtil.detailsListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize title for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -304,7 +308,7 @@ public class DcatCatalogueRecord implements Serializable {
             try {
                 doc.addField("description", GsonUtil.obj2Json(description, GsonUtil.detailsListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize description for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -312,7 +316,7 @@ public class DcatCatalogueRecord implements Serializable {
             try {
                 doc.addField("language", GsonUtil.obj2Json(language, GsonUtil.detailsListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize language for Solr doc: {}", e.getMessage());
             }
         }
 

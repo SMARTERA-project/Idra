@@ -46,6 +46,8 @@
  import it.eng.idra.cache.CachePersistenceManager;
  import it.eng.idra.cache.MetadataCacheManager;
  import it.eng.idra.dcat.dump.DcatApDumpManager;
+ import it.eng.idra.exception.AppException;
+ import it.eng.idra.exception.ErrorCode;
  import it.eng.idra.management.FederationCore;
  import it.eng.idra.management.OdmsManager;
  import it.eng.idra.management.RdfPrefixManager;
@@ -161,12 +163,16 @@ import java.nio.file.Paths;
   @Consumes({ MediaType.MULTIPART_FORM_DATA })
   @Produces("application/json")
   public Response registerOdmsCatalogue(@FormDataParam("dump") InputStream fileInputStream,
-       @FormDataParam("file") FormDataContentDisposition cdh,
-       @FormDataParam("node") String nodeString) {
-     OdmsCatalogue node = null;
-     try {
- 
-       node = GsonUtil.json2Obj(nodeString, GsonUtil.nodeType);
+      @FormDataParam("file") FormDataContentDisposition cdh,
+      @FormDataParam("node") String nodeString) throws Exception {
+    // Errors mapped by GlobalExceptionMapper:
+    //   GsonUtilException                  -> 400 ERR_JSON_PARSE
+    //   IOException                        -> 500 ERR_FILE_IO
+    //   OdmsAlreadyPresentException        -> 409 ERR_CATALOGUE_DUPLICATE  (was 400)
+    //   OdmsCatalogueNotFoundException     -> 404 ERR_CATALOGUE_NOT_FOUND
+    //   OdmsCatalogueForbiddenException    -> 403 ERR_CATALOGUE_FORBIDDEN
+    //   OdmsCatalogueOfflineException      -> 503 ERR_CATALOGUE_OFFLINE    (was 403)
+    OdmsCatalogue node = GsonUtil.json2Obj(nodeString, GsonUtil.nodeType);
  
        // If the node type is DCATDUMP, if the dump URL is blank, try to get the
        // dump from the uploaded file
@@ -291,31 +297,9 @@ import java.nio.file.Paths;
          FederationCore.registerInactiveOdmsCatalogue(node);
        }
  
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (GsonUtilException | IOException e) {
- 
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (OdmsAlreadyPresentException e) {
- 
-       logger.info(e.getMessage());
-       ErrorResponse error = new ErrorResponse(
-           String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
-           e.getClass().getSimpleName(), "The node is already present in the federation!");
-       return Response.status(Response.Status.BAD_REQUEST).entity(error.toJson()).build();
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeHostNotFoundErrorResponse(e, node.getHost());
-     } catch (OdmsCatalogueForbiddenException e) {
-       return handleNodeForbiddenErrorResponse(e, node.getHost());
-     } catch (OdmsCatalogueOfflineException e) {
-       return handleNodeOfflineErrorResponse(e, node.getHost());
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
- 
+    return Response.status(Response.Status.OK).build();
+  }
+
    /**
     * getOdmsCatalogues.
     *
@@ -327,31 +311,23 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.read")
   @Path("/catalogues")
   @Produces("application/json")
-  public Response getOdmsCatalogues(@QueryParam("withImage") boolean withImage) {
- 
-     try {
-       List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(
-           FederationCore.getOdmsCatalogues(withImage));
- 
-       try {
-         HashMap<Integer, Long> messages = FederationCore.getAllOdmsMessagesCount();
-         nodes.stream().forEach(node -> node.setMessageCount(messages.get(node.getId())));
-       } catch (Exception e) {
-         logger.error(e.getMessage(), e);
-         nodes.stream().forEach(node -> node.setMessageCount(0L));
-       }
- 
-       nodes.sort((n1, n2) -> n1.getId() - n2.getId());
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(nodes, GsonUtil.nodeListType)).build();
- 
-     } catch (Exception e) {
-       logger.error("Exception raised " + e.getLocalizedMessage());
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getOdmsCatalogues(@QueryParam("withImage") boolean withImage) throws Exception {
+    List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(
+        FederationCore.getOdmsCatalogues(withImage));
+
+    try {
+      HashMap<Integer, Long> messages = FederationCore.getAllOdmsMessagesCount();
+      nodes.stream().forEach(node -> node.setMessageCount(messages.get(node.getId())));
+    } catch (Exception e) {
+      // Non-fatal: list catalogues even if message-count aggregation fails.
+      logger.error(e.getMessage(), e);
+      nodes.stream().forEach(node -> node.setMessageCount(0L));
+    }
+
+    nodes.sort((n1, n2) -> n1.getId() - n2.getId());
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(nodes, GsonUtil.nodeListType)).build();
+  }
  
    /**
     * activateOdmsCatalogue.
@@ -364,11 +340,10 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.activate")
   @Path("/catalogues/{id}/activate")
   @Produces("application/json")
-  public Response activateOdmsCatalogue(@PathParam("id") String id) {
-     OdmsCatalogue node = null;
-     try {
- 
-       node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
+  public Response activateOdmsCatalogue(@PathParam("id") String id) throws Exception {
+    OdmsCatalogue node = null;
+    try {
+      node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
  
        if (node.isActive()) {
          logger.error("Node " + node.getHost() + " already active");
@@ -421,18 +396,13 @@ import java.nio.file.Paths;
          }
        }
 
-       FederationCore.activateOdmsCatalogue(node);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (OdmsCatalogueChangeActiveStateException e) {
-       logger.error("Node " + node.getHost() + " raised: " + e.getLocalizedMessage());
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       logger.error("Node " + node.getHost() + " raised: " + e.getLocalizedMessage());
-       return handleErrorResponse500(e);
-     }
-   }
+      FederationCore.activateOdmsCatalogue(node);
+      return Response.status(Response.Status.OK).build();
+    } catch (OdmsCatalogueChangeActiveStateException e) {
+      // Preserve legacy 400 (more correct than the default 409 mapping).
+      throw new AppException(ErrorCode.ERR_BAD_REQUEST, e.getMessage(), e);
+    }
+  }
  
    /**
     * deactivateOdmsCatalogue.
@@ -447,11 +417,10 @@ import java.nio.file.Paths;
   @Path("/catalogues/{id}/deactivate")
   @Produces("application/json")
   public Response deactivateOdmsCatalogue(@PathParam("id") String id,
-      @QueryParam("keepDatasets") @DefaultValue("false") Boolean keepDatasets) {
-     OdmsCatalogue node = null;
-     try {
- 
-       node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
+      @QueryParam("keepDatasets") @DefaultValue("false") Boolean keepDatasets) throws Exception {
+    OdmsCatalogue node = null;
+    try {
+      node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
        if (!node.isActive()) {
          logger.error("Node " + node.getHost() + " already inactive");
          throw new OdmsCatalogueChangeActiveStateException(
@@ -508,18 +477,14 @@ import java.nio.file.Paths;
          logger.info("Context Broker NOT enabled");
        }
  
-       FederationCore.deactivateOdmsCatalogue(node, keepDatasets);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (OdmsCatalogueChangeActiveStateException e) {
-       logger.error("Node " + node.getHost() + " raised: " + e.getLocalizedMessage());
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       logger.error("Node " + node.getHost() + " raised: " + e.getLocalizedMessage());
-       return handleErrorResponse500(e);
-     }
-   }
+      FederationCore.deactivateOdmsCatalogue(node, keepDatasets);
+      return Response.status(Response.Status.OK).build();
+    } catch (OdmsCatalogueChangeActiveStateException e) {
+      // Preserve legacy 400 (more correct than the default 409 mapping for an
+      // "already in target state" precondition).
+      throw new AppException(ErrorCode.ERR_BAD_REQUEST, e.getMessage(), e);
+    }
+  }
  
    /**
     * getOdmsCatalogue.
@@ -534,11 +499,9 @@ import java.nio.file.Paths;
   @Path("/catalogues/{nodeId}")
   @Produces("application/json")
   public Response getOdmsCatalogue(@PathParam("nodeId") String nodeId,
-      @QueryParam("withImage") boolean withImage) {
- 
-     try {
- 
-       OdmsCatalogue node = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId), withImage);
+      @QueryParam("withImage") boolean withImage) throws Exception {
+    try {
+      OdmsCatalogue node = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId), withImage);
  
        if (node.getNodeType().equals(OdmsCatalogueType.DCATDUMP)) {
          if (StringUtils.isBlank(node.getDumpString())) {
@@ -583,23 +546,14 @@ import java.nio.file.Paths;
          }
        }
  
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(node, GsonUtil.nodeType).toString()).build();
- 
-     } catch (NumberFormatException e) {
-       logger.error("NumberFormatException with parameter " + nodeId);
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (OdmsCatalogueNotFoundException | NullPointerException e) {
-       logger.error("Exception " + e.getLocalizedMessage());
-       return handleNodeNotFoundErrorResponse(e, nodeId);
- 
-     } catch (Exception e) {
-       logger.error("Exception " + e.getLocalizedMessage());
-       return handleErrorResponse500(e);
- 
-     }
-   }
+      return Response.status(Response.Status.OK)
+          .entity(GsonUtil.obj2Json(node, GsonUtil.nodeType).toString()).build();
+    } catch (NullPointerException e) {
+      // Legacy: NPE on missing remote artifact was returned as 404 node-not-found.
+      throw new AppException(ErrorCode.ERR_CATALOGUE_NOT_FOUND,
+          "ODMS node does not exist in the federation: " + nodeId, e);
+    }
+  }
  
    /**
     * updateOdmsCatalogue.
@@ -619,14 +573,12 @@ import java.nio.file.Paths;
   @Consumes({ MediaType.MULTIPART_FORM_DATA })
   @Produces("application/json")
   public Response updateOdmsCatalogue(@PathParam("nodeId") String nodeId,
-       @FormDataParam("dump") InputStream fileInputStream,
-       @FormDataParam("file") FormDataContentDisposition cdh,
-       @FormDataParam("node") String nodeString) throws JSONException, ParseException {
- 
-     try {
- 
-       OdmsCatalogue requestNode = GsonUtil.json2Obj(nodeString, GsonUtil.nodeType);
-       OdmsCatalogue currentNode = OdmsManager.getOdmsCatalogue(Integer.parseInt(nodeId));
+      @FormDataParam("dump") InputStream fileInputStream,
+      @FormDataParam("file") FormDataContentDisposition cdh,
+      @FormDataParam("node") String nodeString) throws Exception {
+    try {
+      OdmsCatalogue requestNode = GsonUtil.json2Obj(nodeString, GsonUtil.nodeType);
+      OdmsCatalogue currentNode = OdmsManager.getOdmsCatalogue(Integer.parseInt(nodeId));
  
        if (!requestNode.getNodeType().equals(currentNode.getNodeType())) {
          logger.error("Update node " + currentNode.getHost() + " type is not allowed");
@@ -715,18 +667,12 @@ import java.nio.file.Paths;
          throw new GsonUtilException("The request body is empty");
        }
  
-     } catch (GsonUtilException | NumberFormatException
-         | OdmsCatalogueChangeActiveStateException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
- 
+    } catch (OdmsCatalogueChangeActiveStateException e) {
+      // Preserve legacy 400 (more correct than the default 409 mapping).
+      throw new AppException(ErrorCode.ERR_BAD_REQUEST, e.getMessage(), e);
+    }
+  }
+
    /**
     * unregisterOdmsCatalogue.
     *
@@ -738,12 +684,10 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.delete")
   @Path("/catalogues/{nodeId}")
   @Produces("application/json")
-  public Response unregisterOdmsCatalogue(@PathParam("nodeId") String nodeId) {
- 
-     OdmsCatalogue node = null;
-     try {
- 
-       node = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId));
+  public Response unregisterOdmsCatalogue(@PathParam("nodeId") String nodeId) throws Exception {
+    OdmsCatalogue node = null;
+    try {
+      node = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId));
        logger.info("Deleting ODMS catalogue with host: " + node.getHost() + " and id " + nodeId
            + " - START");
  
@@ -830,20 +774,14 @@ import java.nio.file.Paths;
  
  
        }
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException | OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
- 
+      return Response.status(Response.Status.OK).build();
+    } catch (NullPointerException e) {
+      // Legacy: NPE on missing remote artifact was returned as 404 node-not-found.
+      throw new AppException(ErrorCode.ERR_CATALOGUE_NOT_FOUND,
+          "ODMS node does not exist in the federation: " + nodeId, e);
+    }
+  }
+
    /**
     * startOdmsCatalogueSynch.
     *
@@ -855,24 +793,15 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.activate")
   @Path("/catalogues/{nodeId}/synchronize")
   @Produces("application/json")
-  public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId) {
- 
-     int nodeIdentifier = Integer.parseInt(nodeId);
- 
-     try {
-       logger.info("Forcing the synchronization for node " + nodeId);
-       FederationCore.startOdmsCatalogueSynch(nodeIdentifier);
-       
-       logger.info("Fine funzione sync");
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (OdmsManagerException e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId) throws Exception {
+    // OdmsCatalogueNotFoundException -> ERR_CATALOGUE_NOT_FOUND (404) via mapper.
+    // OdmsManagerException -> ERR_CATALOGUE_MANAGER (500) via mapper.
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    logger.info("Forcing the synchronization for node " + nodeId);
+    FederationCore.startOdmsCatalogueSynch(nodeIdentifier);
+    logger.info("Fine funzione sync");
+    return Response.status(Response.Status.OK).build();
+  }
  
    /**
     * setSettings.
@@ -886,23 +815,11 @@ import java.nio.file.Paths;
   @Path("/configuration")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response setSettings(final String input) {
- 
-     HashMap<String, String> map = null;
- 
-     try {
-       map = GsonUtil.json2Obj(input, GsonUtil.configurationType);
-       FederationCore.setSettings(map);
- 
-       return Response.ok().build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response setSettings(final String input) throws Exception {
+    HashMap<String, String> map = GsonUtil.json2Obj(input, GsonUtil.configurationType);
+    FederationCore.setSettings(map);
+    return Response.ok().build();
+  }
  
    /**
     * getSettings.
@@ -914,20 +831,11 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.settings.read")
   @Path("/configuration")
   @Produces("application/json")
-  public Response getSettings() {
- 
-     try {
- 
-       HashMap<String, String> conf = FederationCore.getSettings();
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(conf, GsonUtil.configurationType)).build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getSettings() throws Exception {
+    HashMap<String, String> conf = FederationCore.getSettings();
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(conf, GsonUtil.configurationType)).build();
+  }
  
    /**
     * setRemoteCatalogues.
@@ -941,27 +849,16 @@ import java.nio.file.Paths;
   @Path("/remoteCatalogue")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response setRemoteCatalogues(final String input) {
- 
-     try {
-       RemoteCatalogue remCat = GsonUtil.json2Obj(input, GsonUtil.remCatType);
-       if (remCat.getPassword() != null) {
-         // encrypt password
-         String ecrPassword = CommonUtil.encrypt(remCat.getPassword());
-         remCat.setPassword(ecrPassword);
-       }
- 
-       FederationCore.setRemoteCatalogue(remCat);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response setRemoteCatalogues(final String input) throws Exception {
+    // GsonUtilException -> ERR_JSON_PARSE (400) via mapper; other -> ERR_INTERNAL (500).
+    RemoteCatalogue remCat = GsonUtil.json2Obj(input, GsonUtil.remCatType);
+    if (remCat.getPassword() != null) {
+      String ecrPassword = CommonUtil.encrypt(remCat.getPassword());
+      remCat.setPassword(ecrPassword);
+    }
+    FederationCore.setRemoteCatalogue(remCat);
+    return Response.status(Response.Status.OK).build();
+  }
  
    /**
     * getRemoteCatalogue.
@@ -973,18 +870,11 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.read")
   @Path("/remoteCatalogue")
   @Produces("application/json")
-  public Response getRemoteCatalogue() {
-     try {
- 
-       List<RemoteCatalogue> conf = FederationCore.getAllRemCatalogues();
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(conf, GsonUtil.remCatListType)).build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getRemoteCatalogue() throws Exception {
+    List<RemoteCatalogue> conf = FederationCore.getAllRemCatalogues();
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(conf, GsonUtil.remCatListType)).build();
+  }
  
    /**
     * checkRemoteCatalogueHealth.
@@ -1079,26 +969,15 @@ import java.nio.file.Paths;
   @Secured
   @RequiresPermission("admin.catalogue.write")
   @Path("/remoteCatalogue/{rmId}")
-  public Response deleteRemCat(@PathParam("rmId") String rmId) {
- 
-     try {
- 
-       FederationCore.deleteRemCat(Integer.parseInt(rmId));
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException e) {
-       return handlePrefixNotFoundErrorResponse(e, rmId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
- 
-     }
- 
-   }
+  public Response deleteRemCat(@PathParam("rmId") String rmId) throws Exception {
+    try {
+      FederationCore.deleteRemCat(Integer.parseInt(rmId));
+      return Response.status(Response.Status.OK).build();
+    } catch (NullPointerException e) {
+      throw new AppException(ErrorCode.ERR_NOT_FOUND,
+          "Remote catalogue not found: " + rmId, e);
+    }
+  }
  
    /**
     * updateRemoteCat.
@@ -1113,41 +992,29 @@ import java.nio.file.Paths;
   @Path("/remoteCatalogue/{rmId}")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response updateRemoteCat(@PathParam("rmId") String rmId, final String input) {
- 
-     try {
- 
-       RemoteCatalogue rm = GsonUtil.json2Obj(input, GsonUtil.remCatType);
- 
-       RemoteCatalogue oldRem = FederationCore.getRemCat(Integer.parseInt(rmId));
-       logger.debug("passw old: " + oldRem.getPassword() + " pssw dopo la update del nome: "
-           + rm.getPassword());
-       if (((oldRem.getPassword() != null && rm.getPassword() != null)
-           && (!(oldRem.getPassword().equals(rm.getPassword()))))
-           || (oldRem.getPassword() == null && rm.getPassword() != null)) {
-         // encrypt pssw
-         logger.debug("encrypt password");
-         String ecrPassword = CommonUtil.encrypt(rm.getPassword());
-         rm.setPassword(ecrPassword);
-       }
- 
-       rm.setId(Integer.parseInt(rmId));
- 
-       FederationCore.updateRemCat(rm);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException e) {
-       return handlePrefixNotFoundErrorResponse(e, rmId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response updateRemoteCat(@PathParam("rmId") String rmId, final String input)
+      throws Exception {
+    try {
+      RemoteCatalogue rm = GsonUtil.json2Obj(input, GsonUtil.remCatType);
+
+      RemoteCatalogue oldRem = FederationCore.getRemCat(Integer.parseInt(rmId));
+      logger.debug("passw old: " + oldRem.getPassword() + " pssw dopo la update del nome: "
+          + rm.getPassword());
+      if (((oldRem.getPassword() != null && rm.getPassword() != null)
+          && (!(oldRem.getPassword().equals(rm.getPassword()))))
+          || (oldRem.getPassword() == null && rm.getPassword() != null)) {
+        String ecrPassword = CommonUtil.encrypt(rm.getPassword());
+        rm.setPassword(ecrPassword);
+      }
+
+      rm.setId(Integer.parseInt(rmId));
+      FederationCore.updateRemCat(rm);
+      return Response.status(Response.Status.OK).build();
+    } catch (NullPointerException e) {
+      throw new AppException(ErrorCode.ERR_NOT_FOUND,
+          "Remote catalogue not found: " + rmId, e);
+    }
+  }
  
    /**
     * authRemoteCatalogue.
@@ -1161,33 +1028,35 @@ import java.nio.file.Paths;
   @Path("/remoteCatalogue/auth/{id}")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("text/plain")
-  public Response authRemoteCatalogue(@PathParam("id") String id) {
- 
-     try {
-       // Utenze in Idra
-       RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
-       String username = remCatalogue.getUsername();
-       String password = CommonUtil.decrypt(remCatalogue.getPassword()); // Decrypt password
-       String basePath = remCatalogue.getUrl();
- 
-       // POST
-       client = ClientBuilder.newClient();
-       String compiledUri = basePath + "Idra/api/v1/administration/login";
-       WebTarget webTarget = client.target(compiledUri);
-       Invocation.Builder builderLogin = webTarget.request();
- 
-       builderLogin = builderLogin.header("Content-Type", "application/json");
- 
-       Response responseLogin = builderLogin
-           .post(Entity.entity("{username: " + username + ", password: " + password + "}",
-               MediaType.APPLICATION_JSON_TYPE));
- 
-       StatusType statusLogin = responseLogin.getStatusInfo();
-       if (statusLogin.getStatusCode() == 200) {
-         logger.debug("Status POST LOGIN: 200 OK");
-       } else {
-         throw new Exception("Status code POST LOGIN: " + statusLogin.getStatusCode());
-       }
+  public Response authRemoteCatalogue(@PathParam("id") String id) throws Exception {
+    // Utenze in Idra
+    RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
+    String username = remCatalogue.getUsername();
+    String password = CommonUtil.decrypt(remCatalogue.getPassword());
+    String basePath = remCatalogue.getUrl();
+
+    // POST
+    client = ClientBuilder.newClient();
+    String compiledUri = basePath + "Idra/api/v1/administration/login";
+    WebTarget webTarget = client.target(compiledUri);
+    Invocation.Builder builderLogin = webTarget.request();
+
+    builderLogin = builderLogin.header("Content-Type", "application/json");
+
+    Response responseLogin = builderLogin
+        .post(Entity.entity("{username: " + username + ", password: " + password + "}",
+            MediaType.APPLICATION_JSON_TYPE));
+
+    StatusType statusLogin = responseLogin.getStatusInfo();
+    if (statusLogin.getStatusCode() == 200) {
+      logger.debug("Status POST LOGIN: 200 OK");
+    } else if (statusLogin.getStatusCode() == 401) {
+      throw new AppException(ErrorCode.ERR_UNAUTHORIZED,
+          "Remote catalogue rejected credentials");
+    } else {
+      throw new AppException(ErrorCode.ERR_UPSTREAM_UNAVAILABLE,
+          "Status code POST LOGIN: " + statusLogin.getStatusCode());
+    }
  
        String responseEntity = responseLogin.readEntity(String.class);// part of bearer token
  
@@ -1219,45 +1088,35 @@ import java.nio.file.Paths;
  
        Response response = builder.get();
  
-       StatusType status = response.getStatusInfo();
-       if (status.getStatusCode() == 200) {
-         logger.debug("Status GET: 200 OK");
-       } else {
-         throw new Exception("Status code GET: " + status.getStatusCode());
-       }
- 
-       logger.debug(response);
-       ResponseBuilder responseBuilder2 = Response.status(response.getStatus());
-       final InputStream responseStream2 = (InputStream) response.getEntity();
-       StreamingOutput output2 = new StreamingOutput() {
-         @Override
-         public void write(OutputStream out) throws IOException, WebApplicationException {
-           int length;
-           byte[] buffer = new byte[1024];
-           while ((length = responseStream2.read(buffer)) != -1) {
-             out.write(buffer, 0, length);
-           }
-           out.flush();
-           responseStream2.close();
-         }
-       };
- 
-       logger.debug("Response Login: " + responseBuilder2.entity(output2).build());
- 
-       return responseBuilder2.entity(output2).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (NullPointerException e) {
-       return handleErrorResponseLogin(e);
-     } catch (Exception e) {
-       if (e.getMessage().contains("401")) {
-         return handleUnauthorizedErrorResponse(e);
-       }
-       return handleErrorResponse500(e);
-     }
- 
-   }
+    StatusType status = response.getStatusInfo();
+    if (status.getStatusCode() == 200) {
+      logger.debug("Status GET: 200 OK");
+    } else if (status.getStatusCode() == 401) {
+      throw new AppException(ErrorCode.ERR_UNAUTHORIZED,
+          "Remote catalogue rejected token on GET catalogues");
+    } else {
+      throw new AppException(ErrorCode.ERR_UPSTREAM_UNAVAILABLE,
+          "Status code GET: " + status.getStatusCode());
+    }
+
+    logger.debug(response);
+    ResponseBuilder responseBuilder2 = Response.status(response.getStatus());
+    final InputStream responseStream2 = (InputStream) response.getEntity();
+    StreamingOutput output2 = new StreamingOutput() {
+      @Override
+      public void write(OutputStream out) throws IOException, WebApplicationException {
+        int length;
+        byte[] buffer = new byte[1024];
+        while ((length = responseStream2.read(buffer)) != -1) {
+          out.write(buffer, 0, length);
+        }
+        out.flush();
+        responseStream2.close();
+      }
+    };
+
+    return responseBuilder2.entity(output2).build();
+  }
  
    /**
     * authRemoteCatalogueIdm.
@@ -1271,10 +1130,9 @@ import java.nio.file.Paths;
   @Path("/remoteCatalogue/authIDM/{id}")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("text/plain")
-  public Response authRemoteCatalogueIdm(@PathParam("id") String id) {
-     try {
-      logger.debug(" -------------------------- Remote catalogue IDM login");
-       RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
+  public Response authRemoteCatalogueIdm(@PathParam("id") String id) throws Exception {
+    logger.debug(" -------------------------- Remote catalogue IDM login");
+    RemoteCatalogue remCatalogue = FederationCore.getRemCat(Integer.parseInt(id));
        String clientId = remCatalogue.getClientId();
        String clientSecret = remCatalogue.getClientSecret();
        // decrypt password
@@ -1347,19 +1205,10 @@ import java.nio.file.Paths;
          }
        };
  
-       responseBuilder.entity(output);
-       return responseBuilder.build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (NullPointerException e) {
-       return handleErrorResponseLogin(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
- 
+    responseBuilder.entity(output);
+    return responseBuilder.build();
+  }
+
    /**
     * getPrefixes.
     *
@@ -1370,16 +1219,11 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.prefix.read")
   @Path("/prefixes")
   @Produces("application/json")
-  public Response getPrefixes() {
- 
-     try {
-       List<RdfPrefix> prefixes = RdfPrefixManager.getAllPrefixes();
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(prefixes, GsonUtil.prefixListType)).build();
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getPrefixes() throws Exception {
+    List<RdfPrefix> prefixes = RdfPrefixManager.getAllPrefixes();
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(prefixes, GsonUtil.prefixListType)).build();
+  }
  
    /**
     * getPrefix.
@@ -1392,25 +1236,16 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.prefix.read")
   @Path("/prefixes/{prefixId}")
   @Produces("application/json")
-  public Response getPrefix(@PathParam("prefixId") String prefixId) {
- 
-     try {
- 
-       RdfPrefix prefix = RdfPrefixManager.getPrefix(Integer.parseInt(prefixId));
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(prefix, GsonUtil.prefixType)).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException e) {
-       return handlePrefixNotFoundErrorResponse(e, prefixId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getPrefix(@PathParam("prefixId") String prefixId) throws Exception {
+    try {
+      RdfPrefix prefix = RdfPrefixManager.getPrefix(Integer.parseInt(prefixId));
+      return Response.status(Response.Status.OK)
+          .entity(GsonUtil.obj2Json(prefix, GsonUtil.prefixType)).build();
+    } catch (NullPointerException e) {
+      throw new AppException(ErrorCode.ERR_NOT_FOUND,
+          "Prefix not found: " + prefixId, e);
+    }
+  }
  
    /**
     * deletePrefix.
@@ -1423,28 +1258,15 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.prefix.write")
   @Path("/prefixes/{prefixId}")
   // @Produces("application/json")
-  public Response deletePrefix(@PathParam("prefixId") String prefixId) {
- 
-     // logger.info("DELETE " + prefixId);
- 
-     try {
- 
-       RdfPrefixManager.deletePrefix(Integer.parseInt(prefixId));
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException e) {
-       return handlePrefixNotFoundErrorResponse(e, prefixId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
- 
-     }
- 
-   }
+  public Response deletePrefix(@PathParam("prefixId") String prefixId) throws Exception {
+    try {
+      RdfPrefixManager.deletePrefix(Integer.parseInt(prefixId));
+      return Response.status(Response.Status.OK).build();
+    } catch (NullPointerException e) {
+      throw new AppException(ErrorCode.ERR_NOT_FOUND,
+          "Prefix not found: " + prefixId, e);
+    }
+  }
  
    /**
     * updatePrefix.
@@ -1459,28 +1281,18 @@ import java.nio.file.Paths;
   @Path("/prefixes/{prefixId}")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response updatePrefix(@PathParam("prefixId") String prefixId, final String input) {
- 
-     try {
- 
-       RdfPrefix prefix = GsonUtil.json2Obj(input, GsonUtil.prefixType);
-       prefix.setId(Integer.parseInt(prefixId));
- 
-       RdfPrefixManager.updatePrefix(prefix);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
- 
-     } catch (NullPointerException e) {
-       return handlePrefixNotFoundErrorResponse(e, prefixId);
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response updatePrefix(@PathParam("prefixId") String prefixId, final String input)
+      throws Exception {
+    try {
+      RdfPrefix prefix = GsonUtil.json2Obj(input, GsonUtil.prefixType);
+      prefix.setId(Integer.parseInt(prefixId));
+      RdfPrefixManager.updatePrefix(prefix);
+      return Response.status(Response.Status.OK).build();
+    } catch (NullPointerException e) {
+      throw new AppException(ErrorCode.ERR_NOT_FOUND,
+          "Prefix not found: " + prefixId, e);
+    }
+  }
  
    /**
     * addPrefix.
@@ -1494,22 +1306,11 @@ import java.nio.file.Paths;
   @Path("/prefixes")
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces("application/json")
-  public Response addPrefix(final String input) {
- 
-     try {
- 
-       RdfPrefix prefix = GsonUtil.json2Obj(input, GsonUtil.prefixType);
-       RdfPrefixManager.addPrefix(prefix);
- 
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response addPrefix(final String input) throws Exception {
+    RdfPrefix prefix = GsonUtil.json2Obj(input, GsonUtil.prefixType);
+    RdfPrefixManager.addPrefix(prefix);
+    return Response.status(Response.Status.OK).build();
+  }
  
    /**
     * loginGet.
@@ -1523,42 +1324,31 @@ import java.nio.file.Paths;
    @Consumes({ MediaType.APPLICATION_JSON })
    @Produces("text/plain")
   public Response loginGet(@DefaultValue("") @QueryParam("code") String code,
-      @Context HttpServletRequest httpRequest) {
+      @Context HttpServletRequest httpRequest) throws Exception {
+    AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+    if (StringUtils.isBlank(code)) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
 
-    try {
-      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
-      if (StringUtils.isBlank(code)) {
-        return Response.status(Response.Status.BAD_REQUEST).build();
-      }
+    Token k = (Token) authInstance.login(null, null, code);
+    KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
+        .getUserInfo(k.getAccessToken());
 
-      Token k = (Token) authInstance.login(null, null, code);
-      KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
-          .getUserInfo(k.getAccessToken());
+    String token = k.getAccessToken();
+    String refreshToken = k.getRefreshToken();
 
-      String token = k.getAccessToken();
-      String refreshToken = k.getRefreshToken();
+    if (StringUtils.isNotBlank(token)) {
+      return Response.seeOther(URI.create(
+          PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
+          .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
+          .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
+          .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
+              "/", "", "comment", 100, true))
+          .build();
+    }
 
-      if (StringUtils.isNotBlank(token)) {
-        return Response.seeOther(URI.create(
-            PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-            .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
-            .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
-            .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
-                "/", "", "comment", 100, true))
-            .build();
-      }
-
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-     } catch (NullPointerException e) {
-       return handleErrorResponseLogin(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+  }
  
    /**
     * loginPost.
@@ -1570,43 +1360,32 @@ import java.nio.file.Paths;
    @Path("/login")
    @Consumes({ MediaType.APPLICATION_JSON })
    @Produces("text/plain")
-  public Response loginPost(@Context HttpServletRequest httpRequest) {
+  public Response loginPost(@Context HttpServletRequest httpRequest) throws Exception {
+    AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+    String code = httpRequest.getParameter("code");
+    if (StringUtils.isBlank(code)) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
 
-    try {
-      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
-      String code = httpRequest.getParameter("code");
-      if (StringUtils.isBlank(code)) {
-        return Response.status(Response.Status.BAD_REQUEST).build();
-      }
+    Token k = (Token) authInstance.login(null, null, code);
+    KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
+        .getUserInfo(k.getAccessToken());
 
-      Token k = (Token) authInstance.login(null, null, code);
-      KeycloakUser keycloakUser = KeycloakAuthenticationManager.getInstance()
-          .getUserInfo(k.getAccessToken());
+    String token = k.getAccessToken();
+    String refreshToken = k.getRefreshToken();
 
-      String token = k.getAccessToken();
-      String refreshToken = k.getRefreshToken();
+    if (StringUtils.isNotBlank(token)) {
+      return Response.seeOther(URI.create(
+          PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
+          .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
+          .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
+          .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
+              "/", "", "comment", 100, true))
+          .build();
+    }
 
-      if (StringUtils.isNotBlank(token)) {
-        return Response.seeOther(URI.create(
-            PropertyManager.getProperty(IdraProperty.IDRA_CATALOGUE_BASEPATH)))
-            .cookie(new NewCookie("loggedin", token, "/", "", "comment", 100, true))
-            .cookie(new NewCookie("refresh_token", refreshToken, "/", "", "comment", 100, true))
-            .cookie(new NewCookie("username", keycloakUser.getPreferredUsername(),
-                "/", "", "comment", 100, true))
-            .build();
-      }
-
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-
-    } catch (GsonUtilException e) {
-      return handleBadRequestErrorResponse(e);
-     } catch (NullPointerException e) {
-       return handleErrorResponseLogin(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+  }
  
    /**
     * logout.
@@ -1619,21 +1398,10 @@ import java.nio.file.Paths;
    @Secured
    @Consumes({ MediaType.APPLICATION_JSON })
    @Produces("application/json")
-   public Response logout(@Context HttpServletRequest httpRequest) {
- 
-     try {
- 
-      AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
-
-      return authInstance.logout(httpRequest);
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response logout(@Context HttpServletRequest httpRequest) throws Exception {
+    AuthenticationManager authInstance = AuthenticationManager.getActiveAuthenticationManager();
+    return authInstance.logout(httpRequest);
+  }
  
    /**
     * verifyToken.
@@ -1660,22 +1428,13 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/countries")
   @Produces("application/json")
-  public Response getAllCountries() {
- 
-     // TODO Sostituire DateTime con ZonedDateTime e JsonObject di gson e non
-     // JSONObject
-     try {
-       List<String> countries = StatisticsManager.getAllCountries();
-       JSONObject j = new JSONObject();
-       j.put("countries", GsonUtil.obj2Json(countries, GsonUtil.stringListType));
-       j.put("minDate", StatisticsManager.getMinDateSearchStatistics());
-       return Response.status(Response.Status.OK).entity(j.toString()).build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getAllCountries() throws Exception {
+    List<String> countries = StatisticsManager.getAllCountries();
+    JSONObject j = new JSONObject();
+    j.put("countries", GsonUtil.obj2Json(countries, GsonUtil.stringListType));
+    j.put("minDate", StatisticsManager.getMinDateSearchStatistics());
+    return Response.status(Response.Status.OK).entity(j.toString()).build();
+  }
  
    /**
     * getMinDateCataloguesStat.
@@ -1687,20 +1446,11 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/cataloguesStatMinDate")
   @Produces("application/json")
-  public Response getMinDateCataloguesStat() {
- 
-     // TODO Sostituire DateTime con ZonedDateTime e JsonObject di gson e non
-     // JSONObject
- 
-     try {
-       JSONObject j = new JSONObject();
-       j.put("minDate", StatisticsManager.getMinDateNodesStatistics());
-       return Response.status(Response.Status.OK).entity(j.toString()).build();
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getMinDateCataloguesStat() throws Exception {
+    JSONObject j = new JSONObject();
+    j.put("minDate", StatisticsManager.getMinDateNodesStatistics());
+    return Response.status(Response.Status.OK).entity(j.toString()).build();
+  }
  
    /**
     * getOdmsCataloguesStatistics.
@@ -1713,24 +1463,13 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/statistics/catalogues")
   @Produces("application/json")
-  public Response getOdmsCataloguesStatistics(final String input) {
- 
-     try {
- 
-       StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
- 
-       // TODO sostituire JSONObject con bean per le statistiche aggregate
-       // per più nodi
-       JSONObject res = StatisticsManager.getNodesStatistics(request.getNodesId(),
-           request.getAggregationLevel(), request.getStartDate(), request.getEndDate());
-       return Response.status(Response.Status.OK).entity(res.toString()).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getOdmsCataloguesStatistics(final String input) throws Exception {
+    // GsonUtilException -> ERR_JSON_PARSE (400) via mapper; other -> ERR_INTERNAL (500).
+    StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
+    JSONObject res = StatisticsManager.getNodesStatistics(request.getNodesId(),
+        request.getAggregationLevel(), request.getStartDate(), request.getEndDate());
+    return Response.status(Response.Status.OK).entity(res.toString()).build();
+  }
  
    /**
     * Gets the search statistics.
@@ -1743,25 +1482,12 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/statistics/search")
   @Produces("application/json")
-  public Response getSearchStatistics(final String input) {
- 
-     try {
- 
-       StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
- 
-       // TODO sostituire JSONObject con bean per le statistiche aggregate
-       // per più nodi
-       JSONObject res = StatisticsManager.getSearchStatistics(request.getCountries(),
-           request.getAggregationLevel(), request.getStartDate(), request.getEndDate());
-       return Response.status(Response.Status.OK).entity(res.toString()).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getSearchStatistics(final String input) throws Exception {
+    StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
+    JSONObject res = StatisticsManager.getSearchStatistics(request.getCountries(),
+        request.getAggregationLevel(), request.getStartDate(), request.getEndDate());
+    return Response.status(Response.Status.OK).entity(res.toString()).build();
+  }
  
    /**
     * Gets the keyword statistics.
@@ -1774,20 +1500,11 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/statistics/keyword")
   @Produces("application/json")
-  public Response getKeywordStatistics(final String input) {
- 
-     try {
- 
-       String out = GsonUtil.obj2Json(StatisticsManager.getKeywordStatistics(),
-           GsonUtil.keywordStatisticsResultListType);
- 
-       return Response.status(Response.Status.OK).entity(out).build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getKeywordStatistics(final String input) throws Exception {
+    String out = GsonUtil.obj2Json(StatisticsManager.getKeywordStatistics(),
+        GsonUtil.keywordStatisticsResultListType);
+    return Response.status(Response.Status.OK).entity(out).build();
+  }
  
    /**
     * Gets the odms catalogues statistics details.
@@ -1800,23 +1517,12 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/statistics/catalogues/details")
   @Produces("application/json")
-  public Response getOdmsCataloguesStatisticsDetails(final String input) {
-     try {
- 
-       StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
- 
-       // TODO sostituire JSONObject con bean
-       JSONObject res = StatisticsManager.getNodeStatisticsDetails(request.getNodesId(),
-           request.getAggregationLevel(), request.getStartDate());
- 
-       return Response.status(Response.Status.OK).entity(res.toString()).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getOdmsCataloguesStatisticsDetails(final String input) throws Exception {
+    StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
+    JSONObject res = StatisticsManager.getNodeStatisticsDetails(request.getNodesId(),
+        request.getAggregationLevel(), request.getStartDate());
+    return Response.status(Response.Status.OK).entity(res.toString()).build();
+  }
  
    /**
     * Gets the statistics details.
@@ -1829,23 +1535,12 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.stats.read")
   @Path("/statistics/search/details")
   @Produces("application/json")
-  public Response getStatisticsDetails(final String input) {
- 
-     try {
- 
-       StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
- 
-       // TODO sostituire JSONObject con bean
-       JSONObject res = StatisticsManager.getSearchStatisticsDetails(request.getCountries(),
-           request.getAggregationLevel(), request.getStartDate());
-       return Response.status(Response.Status.OK).entity(res.toString()).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getStatisticsDetails(final String input) throws Exception {
+    StatisticsRequest request = GsonUtil.json2Obj(input, GsonUtil.statisticsRequestType);
+    JSONObject res = StatisticsManager.getSearchStatisticsDetails(request.getCountries(),
+        request.getAggregationLevel(), request.getStartDate());
+    return Response.status(Response.Status.OK).entity(res.toString()).build();
+  }
  
    /**
     * Gets the odms catalogue messages.
@@ -1858,21 +1553,15 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.messages.read")
   @Path("/catalogues/{nodeId}/messages")
   @Produces("application/json")
-  public Response getOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
- 
-     int nodeIdentifier = Integer.parseInt(nodeId);
-     try {
-       OdmsManager.getOdmsCatalogue(nodeIdentifier);
-       List<OdmsCatalogueMessage> messageList = FederationCore.getOdmsMessages(nodeIdentifier);
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(messageList, GsonUtil.messageListType).toString()).build();
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response getOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) throws Exception {
+    // OdmsCatalogueNotFoundException -> ERR_CATALOGUE_NOT_FOUND (404) via mapper.
+    // NumberFormatException -> ERR_BAD_REQUEST (400).
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    OdmsManager.getOdmsCatalogue(nodeIdentifier);
+    List<OdmsCatalogueMessage> messageList = FederationCore.getOdmsMessages(nodeIdentifier);
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(messageList, GsonUtil.messageListType).toString()).build();
+  }
  
    /**
     * Gets the odms catalogue message.
@@ -1887,26 +1576,15 @@ import java.nio.file.Paths;
   @Path("/catalogues/{nodeId}/messages/{messageID}")
   @Produces("application/json")
   public Response getOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
-      @PathParam("messageID") String messageId) {
- 
-     try {
-       int nodeIdentifier = Integer.parseInt(nodeId);
-       int messageIdentifier = Integer.parseInt(messageId);
-       OdmsManager.getOdmsCatalogue(nodeIdentifier);
-       OdmsCatalogueMessage message = FederationCore.getOdmsMessage(nodeIdentifier,
-           messageIdentifier);
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(message, GsonUtil.messageType).toString()).build();
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+      @PathParam("messageID") String messageId) throws Exception {
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    int messageIdentifier = Integer.parseInt(messageId);
+    OdmsManager.getOdmsCatalogue(nodeIdentifier);
+    OdmsCatalogueMessage message = FederationCore.getOdmsMessage(nodeIdentifier,
+        messageIdentifier);
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(message, GsonUtil.messageType).toString()).build();
+  }
  
    /**
     * Delete odms catalogue message.
@@ -1921,23 +1599,13 @@ import java.nio.file.Paths;
   @Path("/catalogues/{nodeId}/messages/{messageID}")
   @Produces("application/json")
   public Response deleteOdmsCatalogueMessage(@PathParam("nodeId") String nodeId,
-      @PathParam("messageID") String messageId) {
- 
-     try {
-       int nodeIdentifier = Integer.parseInt(nodeId);
-       int messageIdentifier = Integer.parseInt(messageId);
-       OdmsManager.getOdmsCatalogue(nodeIdentifier);
-       FederationCore.deleteOdmsMessage(nodeIdentifier, messageIdentifier);
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (NumberFormatException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+      @PathParam("messageID") String messageId) throws Exception {
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    int messageIdentifier = Integer.parseInt(messageId);
+    OdmsManager.getOdmsCatalogue(nodeIdentifier);
+    FederationCore.deleteOdmsMessage(nodeIdentifier, messageIdentifier);
+    return Response.status(Response.Status.OK).build();
+  }
  
    /**
     * Delete odms catalogue messages.
@@ -1950,21 +1618,12 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.messages.delete")
   @Path("/catalogues/{nodeId}/messages")
   @Produces("application/json")
-  public Response deleteOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) {
- 
-     int nodeIdentifier = Integer.parseInt(nodeId);
-     try {
- 
-       OdmsManager.getOdmsCatalogue(nodeIdentifier);
-       FederationCore.deleteAllOdmsMessage(nodeIdentifier);
-       return Response.status(Response.Status.OK).build();
- 
-     } catch (OdmsCatalogueNotFoundException e) {
-       return handleNodeNotFoundErrorResponse(e, nodeId);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
-   }
+  public Response deleteOdmsCatalogueMessages(@PathParam("nodeId") String nodeId) throws Exception {
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    OdmsManager.getOdmsCatalogue(nodeIdentifier);
+    FederationCore.deleteAllOdmsMessage(nodeIdentifier);
+    return Response.status(Response.Status.OK).build();
+  }
  
    /**
     * Gets the logs.
@@ -1977,24 +1636,13 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.logs.read")
   @Path("/logs")
   @Produces("application/json")
-  public Response getLogs(final String input) {
- 
-     try {
- 
-       LogsRequest request = GsonUtil.json2Obj(input, GsonUtil.logRequestType);
-       List<Log> logs = FederationCore.getLogs(request.getLevelList(), request.getStartDate(),
-           request.getEndDate());
- 
-       return Response.status(Response.Status.OK)
-           .entity(GsonUtil.obj2Json(logs, GsonUtil.logsListType)).build();
- 
-     } catch (GsonUtilException e) {
-       return handleBadRequestErrorResponse(e);
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getLogs(final String input) throws Exception {
+    LogsRequest request = GsonUtil.json2Obj(input, GsonUtil.logRequestType);
+    List<Log> logs = FederationCore.getLogs(request.getLevelList(), request.getStartDate(),
+        request.getEndDate());
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(logs, GsonUtil.logsListType)).build();
+  }
  
    /**
     * Download global dcat ap dump.
@@ -2010,23 +1658,15 @@ import java.nio.file.Paths;
   @Path("/dcat-ap/dump/download")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   public Response downloadGlobalDcatApDump(@Context HttpServletRequest httpRequest,
-       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
-       @DefaultValue("false") @QueryParam("zip") Boolean returnZip) {
- 
-     try {
- 
-       return Response
-           .ok(DcatApDumpManager.getDatasetDumpFromFile(null, forceDump, returnZip),
-               MediaType.APPLICATION_OCTET_STREAM)
-           .header("content-disposition", "attachment; filename = "
-               + DcatApDumpManager.globalDumpFileName + (returnZip ? ".zip" : ""))
-           .build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+      @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
+      @DefaultValue("false") @QueryParam("zip") Boolean returnZip) throws Exception {
+    return Response
+        .ok(DcatApDumpManager.getDatasetDumpFromFile(null, forceDump, returnZip),
+            MediaType.APPLICATION_OCTET_STREAM)
+        .header("content-disposition", "attachment; filename = "
+            + DcatApDumpManager.globalDumpFileName + (returnZip ? ".zip" : ""))
+        .build();
+  }
  
    /**
     * Gets the global dcat ap dump.
@@ -2041,17 +1681,9 @@ import java.nio.file.Paths;
   @Path("/dcat-ap/dump")
   @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
   public Response getGlobalDcatApDump(@Context HttpServletRequest httpRequest,
-       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump) {
- 
-     try {
- 
-       return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(null, forceDump, false)).build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+      @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump) throws Exception {
+    return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(null, forceDump, false)).build();
+  }
  
    /**
     * Download catalogue dcat ap dump.
@@ -2068,26 +1700,18 @@ import java.nio.file.Paths;
   @Path("/dcat-ap/dump/download/{nodeID}")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   public Response downloadCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
-       @PathParam("nodeID") String nodeIdentifier,
-       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
-       @DefaultValue("false") @QueryParam("zip") Boolean returnZip) {
- 
-     try {
- 
-       return Response
-           .ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, returnZip),
-               MediaType.APPLICATION_OCTET_STREAM)
-           .header("content-disposition", "attachment; filename = "
-               + DcatApDumpManager.globalDumpFileName
-               + (StringUtils.isBlank(nodeIdentifier) ? "" : new String("_node_" + nodeIdentifier))
-               + (returnZip ? ".zip" : ""))
-           .build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+      @PathParam("nodeID") String nodeIdentifier,
+      @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
+      @DefaultValue("false") @QueryParam("zip") Boolean returnZip) throws Exception {
+    return Response
+        .ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, returnZip),
+            MediaType.APPLICATION_OCTET_STREAM)
+        .header("content-disposition", "attachment; filename = "
+            + DcatApDumpManager.globalDumpFileName
+            + (StringUtils.isBlank(nodeIdentifier) ? "" : new String("_node_" + nodeIdentifier))
+            + (returnZip ? ".zip" : ""))
+        .build();
+  }
  
    /**
     * Gets the catalogue dcat ap dump.
@@ -2103,19 +1727,11 @@ import java.nio.file.Paths;
   @Path("/dcat-ap/dump/{nodeID}")
   @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
   public Response getCatalogueDcatApDump(@Context HttpServletRequest httpRequest,
-       @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
-       @PathParam("nodeID") String nodeIdentifier) {
- 
-     try {
- 
-       return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, false))
-           .build();
- 
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+      @DefaultValue("false") @QueryParam("forceDump") Boolean forceDump,
+      @PathParam("nodeID") String nodeIdentifier) throws Exception {
+    return Response.ok(DcatApDumpManager.getDatasetDumpFromFile(nodeIdentifier, forceDump, false))
+        .build();
+  }
  
    /**
     * Delete datalet from distribution.
@@ -2135,36 +1751,32 @@ import java.nio.file.Paths;
   @Consumes({ MediaType.APPLICATION_JSON })
   @Produces(MediaType.APPLICATION_JSON)
   public Response deleteDataletFromDistribution(@Context HttpServletRequest httpRequest,
-       @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
-       @PathParam("distributionID") String distributionIdentifier,
-       @PathParam("dataletID") String dataletIdentifier) {
- 
-     CachePersistenceManager jpa = new CachePersistenceManager();
-     try {
- 
-       Datalet toRemove = jpa.jpaGetDataletByIds(nodeIdentifier, datasetIdentifier,
-           distributionIdentifier, dataletIdentifier);
-       if (toRemove != null) {
-         jpa.jpaDeleteDatalet(toRemove);
-       }
- 
-       List<Datalet> remainingDatalet = jpa.jpaGetDataletByDistributionId(distributionIdentifier);
-       if (remainingDatalet.size() == 0) {
-         DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
-         dataset.getDistributions().stream().filter(x -> x.getId().equals(distributionIdentifier))
-             .findFirst().get().setHasDatalets(false);
-         MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset,
-             distributionIdentifier, false);
-       }
- 
-       return Response.ok().build();
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     } finally {
-       jpa.jpaClose();
-     }
- 
-   }
+      @PathParam("nodeID") String nodeIdentifier, @PathParam("datasetID") String datasetIdentifier,
+      @PathParam("distributionID") String distributionIdentifier,
+      @PathParam("dataletID") String dataletIdentifier) throws Exception {
+
+    CachePersistenceManager jpa = new CachePersistenceManager();
+    try {
+      Datalet toRemove = jpa.jpaGetDataletByIds(nodeIdentifier, datasetIdentifier,
+          distributionIdentifier, dataletIdentifier);
+      if (toRemove != null) {
+        jpa.jpaDeleteDatalet(toRemove);
+      }
+
+      List<Datalet> remainingDatalet = jpa.jpaGetDataletByDistributionId(distributionIdentifier);
+      if (remainingDatalet.size() == 0) {
+        DcatDataset dataset = MetadataCacheManager.getDatasetById(datasetIdentifier);
+        dataset.getDistributions().stream().filter(x -> x.getId().equals(distributionIdentifier))
+            .findFirst().get().setHasDatalets(false);
+        MetadataCacheManager.updateDatasetInsertDatalet(Integer.parseInt(nodeIdentifier), dataset,
+            distributionIdentifier, false);
+      }
+
+      return Response.ok().build();
+    } finally {
+      jpa.jpaClose();
+    }
+  }
  
    /**
     * Gets the all datalet.
@@ -2177,18 +1789,13 @@ import java.nio.file.Paths;
   @Secured
   @RequiresPermission("admin.datalet.read")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getAllDatalet(@Context HttpServletRequest httpRequest) {
- 
-     try {
-       CachePersistenceManager jpa = new CachePersistenceManager();
-       List<Datalet> datalets = jpa.jpaGetAllDatalets();
-       datalets.sort((n1, n2) -> n1.getId().compareTo(n2.getId()));
-       return Response.ok(GsonUtil.obj2Json(datalets, GsonUtil.dataletListType)).build();
-     } catch (Exception e) {
-       return handleErrorResponse500(e);
-     }
- 
-   }
+  public Response getAllDatalet(@Context HttpServletRequest httpRequest) throws Exception {
+    // Errors flow to GlobalExceptionMapper -> 500 ERR_INTERNAL.
+    CachePersistenceManager jpa = new CachePersistenceManager();
+    List<Datalet> datalets = jpa.jpaGetAllDatalets();
+    datalets.sort((n1, n2) -> n1.getId().compareTo(n2.getId()));
+    return Response.ok(GsonUtil.obj2Json(datalets, GsonUtil.dataletListType)).build();
+  }
 
   /**
    * Returns current authenticated user information (Idra RBAC).
@@ -2197,34 +1804,30 @@ import java.nio.file.Paths;
   @Path("/me")
   @Secured
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getMe(@Context ContainerRequestContext requestContext) {
+  public Response getMe(@Context ContainerRequestContext requestContext) throws Exception {
+    String sub = (String) requestContext.getProperty(RbacService.CTX_SUB);
+    String email = (String) requestContext.getProperty(RbacService.CTX_EMAIL);
+    String username = (String) requestContext.getProperty(RbacService.CTX_USERNAME);
+
+    JSONObject out = new JSONObject();
+    out.put("sub", sub);
+    out.put("email", email);
+    out.put("username", username);
+
+    SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
-      String sub = (String) requestContext.getProperty(RbacService.CTX_SUB);
-      String email = (String) requestContext.getProperty(RbacService.CTX_EMAIL);
-      String username = (String) requestContext.getProperty(RbacService.CTX_USERNAME);
-
-      JSONObject out = new JSONObject();
-      out.put("sub", sub);
-      out.put("email", email);
-      out.put("username", username);
-
-      SecurityPersistenceManager pm = new SecurityPersistenceManager();
-      try {
-        AppUser u = pm.findUserBySub(sub);
-        if (u != null) {
-          out.put("id", u.getId());
-          out.put("enabled", u.getEnabled() != null ? u.getEnabled() : true);
-          out.put("roles", new JSONArray(pm.getUserRoleCodes(u.getId())));
-          out.put("permissions", new JSONArray(pm.getPermissionsBySub(sub)));
-        }
-      } finally {
-        pm.close();
+      AppUser u = pm.findUserBySub(sub);
+      if (u != null) {
+        out.put("id", u.getId());
+        out.put("enabled", u.getEnabled() != null ? u.getEnabled() : true);
+        out.put("roles", new JSONArray(pm.getUserRoleCodes(u.getId())));
+        out.put("permissions", new JSONArray(pm.getPermissionsBySub(sub)));
       }
-
-      return Response.ok(out.toString()).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
+    } finally {
+      pm.close();
     }
+
+    return Response.ok(out.toString()).build();
   }
 
   /**
@@ -2235,7 +1838,7 @@ import java.nio.file.Paths;
   @Secured
   @RequiresPermission("admin.users.manage")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response listUsers(@Context ContainerRequestContext requestContext) {
+  public Response listUsers(@Context ContainerRequestContext requestContext) throws Exception {
     SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
       JSONArray arr = new JSONArray();
@@ -2250,8 +1853,6 @@ import java.nio.file.Paths;
         arr.put(o);
       }
       return Response.ok(arr.toString()).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       pm.close();
     }
@@ -2265,7 +1866,7 @@ import java.nio.file.Paths;
   @Secured
   @RequiresPermission("admin.users.manage")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response listRoles() {
+  public Response listRoles() throws Exception {
     SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
       JSONArray arr = new JSONArray();
@@ -2277,8 +1878,6 @@ import java.nio.file.Paths;
         arr.put(o);
       });
       return Response.ok(arr.toString()).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       pm.close();
     }
@@ -2292,7 +1891,7 @@ import java.nio.file.Paths;
   @Secured
   @RequiresPermission("admin.users.manage")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response listPermissions() {
+  public Response listPermissions() throws Exception {
     SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
       JSONArray arr = new JSONArray();
@@ -2304,8 +1903,6 @@ import java.nio.file.Paths;
         arr.put(o);
       });
       return Response.ok(arr.toString()).build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       pm.close();
     }
@@ -2322,7 +1919,8 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.users.manage")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  public Response replaceUserRoles(@PathParam("id") String userId, final String input) {
+  public Response replaceUserRoles(@PathParam("id") String userId, final String input)
+      throws Exception {
     SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
       int id = Integer.parseInt(userId);
@@ -2336,8 +1934,6 @@ import java.nio.file.Paths;
       }
       pm.replaceUserRolesByCodes(id, roleCodes);
       return Response.ok().build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       pm.close();
     }
@@ -2354,7 +1950,8 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.users.manage")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  public Response setUserEnabled(@PathParam("id") String userId, final String input) {
+  public Response setUserEnabled(@PathParam("id") String userId, final String input)
+      throws Exception {
     SecurityPersistenceManager pm = new SecurityPersistenceManager();
     try {
       int id = Integer.parseInt(userId);
@@ -2362,169 +1959,10 @@ import java.nio.file.Paths;
       boolean enabled = body.optBoolean("enabled", true);
       pm.setUserEnabled(id, enabled);
       return Response.ok().build();
-    } catch (Exception e) {
-      return handleErrorResponse500(e);
     } finally {
       pm.close();
     }
   }
  
-   /**
-    * Handle error response login.
-    *
-    * @param e the e
-    * @return the response
-    */
-   private static Response handleErrorResponseLogin(Exception e) {
- 
-     logger.error(e.getMessage(), e);
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), e.getMessage());
-     return Response.status(Response.Status.INTERNAL_SERVER_ERROR).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle error response 500.
-    *
-    * @param e the e
-    * @return the response
-    */
-   private static Response handleErrorResponse500(Exception e) {
- 
-     logger.error(e.getMessage(), e);
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "An error occurred, please contact the administrator!");
-     return Response.status(Response.Status.INTERNAL_SERVER_ERROR).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle bad request error response.
-    *
-    * @param e the e
-    * @return the response
-    */
-   private static Response handleBadRequestErrorResponse(Exception e) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("Exception " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.BAD_REQUEST.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "The request body is not a valid JSON");
-     return Response.status(Response.Status.BAD_REQUEST).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-     /**
-    * Handle Unauthorized error response.
-    *
-    * @param e the e
-    * @return the response
-    */
-   private static Response handleUnauthorizedErrorResponse(Exception e) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("Exception " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.UNAUTHORIZED.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "User needs to log in or authenticate(token) to access the page");
-     return Response.status(Response.Status.UNAUTHORIZED).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle prefix not found error response.
-    *
-    * @param e        the e
-    * @param prefixId the prefix id
-    * @return the response
-    */
-   private static Response handlePrefixNotFoundErrorResponse(Exception e, String prefixId) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("Prefix " + prefixId + " raised exception " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.NOT_FOUND.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "No prefix found with id: " + prefixId);
-     return Response.status(Response.Status.NOT_FOUND).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle node not found error response.
-    *
-    * @param e      the e
-    * @param nodeId the node id
-    * @return the response
-    */
-   private static Response handleNodeNotFoundErrorResponse(Exception e, String nodeId) {
- 
-     logger.error("NodeID " + nodeId + " not found: " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.NOT_FOUND.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "The ODMS node does not exist in the federation: " + nodeId);
-     return Response.status(Response.Status.NOT_FOUND).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle node host not found error response.
-    *
-    * @param e        the e
-    * @param nodeHost the node host
-    * @return the response
-    */
-   private static Response handleNodeHostNotFoundErrorResponse(Exception e, String nodeHost) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("NodeHost " + nodeHost + " not found: " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.NOT_FOUND.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(),
-         "The ODMS node with host URL: " + nodeHost + " does not exist");
-     return Response.status(Response.Status.NOT_FOUND).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle node forbidden error response.
-    *
-    * @param e        the e
-    * @param nodeHost the node host
-    * @return the response
-    */
-   private static Response handleNodeForbiddenErrorResponse(Exception e, String nodeHost) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("NodeHost " + nodeHost + " forbidden: " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.FORBIDDEN.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(),
-         "The ODMS node with host URL: " + nodeHost + " is forbidden!");
-     return Response.status(Response.Status.FORBIDDEN).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
-   /**
-    * Handle node offline error response.
-    *
-    * @param e        the e
-    * @param nodeHost the node host
-    * @return the response
-    */
-   private static Response handleNodeOfflineErrorResponse(Exception e, String nodeHost) {
- 
-     logger.error(e.getMessage(), e);
-     logger.error("NodeHost " + nodeHost + " offline: " + e.getLocalizedMessage());
-     ErrorResponse error = new ErrorResponse(
-         String.valueOf(Response.Status.FORBIDDEN.getStatusCode()), e.getMessage(),
-         e.getClass().getSimpleName(), "The ODMS node with host URL: " + nodeHost + " is offline!");
-     return Response.status(Response.Status.FORBIDDEN).type(MediaType.APPLICATION_JSON)
-         .entity(error.toJson()).build();
-   }
- 
- }
+}
  

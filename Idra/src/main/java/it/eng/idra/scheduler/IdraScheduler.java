@@ -86,6 +86,9 @@ public class IdraScheduler {
     StdSchedulerFactory factory = (StdSchedulerFactory) ctx.getAttribute(QUARTZ_FACTORY_KEY);
     try {
       idraScheduler = new IdraScheduler(factory.getScheduler());
+      // Propagate a correlationId into MDC for every job execution so connector
+      // sync logs are traceable. Mirrors CorrelationIdFilter for the HTTP path.
+      scheduler.getListenerManager().addJobListener(new CorrelationIdJobListener());
       idraScheduler.startDeleteLogsJob();
       idraScheduler.startCataloguesDumpJob(dumpOnStart);
       idraScheduler.initSynchScheduler(synchOnStart);

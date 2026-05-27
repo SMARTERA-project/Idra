@@ -17,12 +17,16 @@ package it.eng.idra.beans;
 
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // TODO: Auto-generated Javadoc
 /**
  * The Class ErrorResponse.
  */
 public class ErrorResponse {
+
+  private static final Logger logger = LoggerFactory.getLogger(ErrorResponse.class);
 
   /** The status code. */
   private String statusCode;
@@ -36,21 +40,26 @@ public class ErrorResponse {
   /** The user message. */
   private String userMessage;
 
+  /** Correlation id for tracing this response in server logs. */
+  private String correlationId;
+
   /**
-   * Instantiates a new error response.
-   *
-   * @param statusCode       the status code
-   * @param technicalMessage the technical message
-   * @param errorCode        the error code
-   * @param userMessage      the user message
+   * Legacy 4-arg constructor. New code should use the 5-arg form with correlationId.
    */
+  @Deprecated
   public ErrorResponse(String statusCode, String technicalMessage, String errorCode,
       String userMessage) {
+    this(statusCode, technicalMessage, errorCode, userMessage, null);
+  }
+
+  public ErrorResponse(String statusCode, String technicalMessage, String errorCode,
+      String userMessage, String correlationId) {
     super();
     this.statusCode = statusCode;
     this.technicalMessage = technicalMessage;
     this.errorCode = errorCode;
     this.userMessage = userMessage;
+    this.correlationId = correlationId;
   }
 
   /**
@@ -125,15 +134,19 @@ public class ErrorResponse {
     this.userMessage = userMessage;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#toString()
-   */
+  public String getCorrelationId() {
+    return correlationId;
+  }
+
+  public void setCorrelationId(String correlationId) {
+    this.correlationId = correlationId;
+  }
+
   @Override
   public String toString() {
     return "\nErrorResponse [statusCode=" + statusCode + ", technicalMessage=" + technicalMessage
-        + ", errorCode=" + errorCode + "userMessage=" + userMessage + "]\n";
+        + ", errorCode=" + errorCode + ", userMessage=" + userMessage
+        + ", correlationId=" + correlationId + "]\n";
   }
 
   /**
@@ -145,10 +158,9 @@ public class ErrorResponse {
     try {
       return GsonUtil.obj2Json(this, ErrorResponse.class);
     } catch (GsonUtilException e) {
-      e.printStackTrace();
+      logger.error("Failed to serialize ErrorResponse to JSON: {}", e.getMessage(), e);
       return null;
     }
-
   }
 
 }

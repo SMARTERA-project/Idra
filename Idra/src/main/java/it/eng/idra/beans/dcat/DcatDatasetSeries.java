@@ -10,6 +10,8 @@ import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.LazyCollection;
 import org.hibernate.annotations.LazyCollectionOption;
 import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.gson.annotations.SerializedName;
 import it.eng.idra.cache.CacheContentType;
 import it.eng.idra.utils.GsonUtil;
@@ -40,6 +42,8 @@ import javax.persistence.Table;
 public class DcatDatasetSeries implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(DcatDatasetSeries.class);
 
     /** The id. */
     private String datasetSeriesId;
@@ -340,7 +344,7 @@ public class DcatDatasetSeries implements Serializable {
             try {
                 doc.addField("title", GsonUtil.obj2Json(title, GsonUtil.detailsListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize title for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -348,7 +352,7 @@ public class DcatDatasetSeries implements Serializable {
             try {
                 doc.addField("description", GsonUtil.obj2Json(description, GsonUtil.detailsListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize description for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -356,7 +360,7 @@ public class DcatDatasetSeries implements Serializable {
             try {
                 doc.addField("contactPoint", GsonUtil.obj2Json(contactPoint, GsonUtil.vcardListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize contactPoint for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -365,7 +369,7 @@ public class DcatDatasetSeries implements Serializable {
                 doc.addField("geographicalCoverage",
                         GsonUtil.obj2Json(geographicalCoverage, GsonUtil.locationListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize geographicalCoverage for Solr doc: {}", e.getMessage());
             }
         }
 
@@ -373,7 +377,7 @@ public class DcatDatasetSeries implements Serializable {
             try {
                 doc.addField("temporalCoverage", GsonUtil.obj2Json(temporalCoverage, GsonUtil.periodOfTimeListType));
             } catch (GsonUtilException e) {
-                e.printStackTrace();
+                logger.warn("Failed to serialize temporalCoverage for Solr doc: {}", e.getMessage());
             }
         }
 

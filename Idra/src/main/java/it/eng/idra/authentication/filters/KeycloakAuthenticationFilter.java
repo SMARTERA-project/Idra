@@ -32,6 +32,8 @@ import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -41,6 +43,8 @@ import javax.ws.rs.ext.Provider;
 @Provider
 @Priority(1)
 public class KeycloakAuthenticationFilter implements ContainerRequestFilter {
+
+  private static final Logger logger = LoggerFactory.getLogger(KeycloakAuthenticationFilter.class);
 
   /*
    * (non-Javadoc)
@@ -134,10 +138,10 @@ public class KeycloakAuthenticationFilter implements ContainerRequestFilter {
       requestContext.abortWith(Response.status(Response.Status.FORBIDDEN).build());
     } catch (RuntimeException e) {
       // DB / internal errors should not be masked as 401 (makes debugging impossible).
-      e.printStackTrace();
+      logger.error("Internal error in Keycloak auth filter", e);
       requestContext.abortWith(Response.status(Response.Status.INTERNAL_SERVER_ERROR).build());
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.warn("Keycloak auth filter rejecting request: {}", e.getMessage());
       requestContext.abortWith(Response.status(Response.Status.UNAUTHORIZED).build());
     }
   }

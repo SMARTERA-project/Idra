@@ -44,33 +44,25 @@ public class FederationApiMockup {
   @POST
   @Path("/odf/odms/search")
   @Produces("application/json")
-  public Response nativeSearch(final String input) {
-
-    try {
-
-      JSONObject json = new JSONObject(
-          "{\"count\":\"1\",\"results\":[{\"title\": \"eee\",\"description\": \"eee\","
-              + "\"identifier\": \"eee\",\"altIndentifier\": \"eee\","
-              + "\"issued\": \"2015-10-12T12:03:22Z\"," + "\"modified\": \"2015-10-12T12:03:22Z\","
-              + "\"versionInfo\":\"ddd\",\"versionNotes\":\"eeee\","
-              + "\"landingPage\":\"baseUrl/datasets/identifier\",\"accrualPeriodicity\":\"eee\","
-              + "\"spatial\":\"eee\",\"temporal\":\"eee\","
-              + "\"language\":\"english\",\"licenseTitle\":\"eee\","
-              + "\"keyword\":[\"pollution\",\"metro\"],"
-              + "\"publisher\":{\"name\":\"eee\",\"mbox\":\"eee\","
-              + "\"homepage\":\"rrr\",\"type\":\"eee\"},"
-              + "\"contactPoint\": {\"fn\":\"eee\",\"hasEmail\":\"eeee\"},"
-              + "\"distribution\":[{\"title\":\"ee\","
-              + "\"accessURL\": \"eee\",\"description\": \"ddd\","
-              + "\"mediaType\":\"eee\",\"format\": \"eee\",\"license\": \"eee\","
-              + "\"issued\": \"2015-10-12T12:03:14Z\","
-              + "\"modified\": \"2015-10-12T12:03:14Z\",\"byteSize\":\"1024\"}]}]}");
-      return Response.status(Response.Status.OK).entity(json.toString()).build();
-    } catch (JSONException e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
+  public Response nativeSearch(final String input) throws JSONException {
+    JSONObject json = new JSONObject(
+        "{\"count\":\"1\",\"results\":[{\"title\": \"eee\",\"description\": \"eee\","
+            + "\"identifier\": \"eee\",\"altIndentifier\": \"eee\","
+            + "\"issued\": \"2015-10-12T12:03:22Z\"," + "\"modified\": \"2015-10-12T12:03:22Z\","
+            + "\"versionInfo\":\"ddd\",\"versionNotes\":\"eeee\","
+            + "\"landingPage\":\"baseUrl/datasets/identifier\",\"accrualPeriodicity\":\"eee\","
+            + "\"spatial\":\"eee\",\"temporal\":\"eee\","
+            + "\"language\":\"english\",\"licenseTitle\":\"eee\","
+            + "\"keyword\":[\"pollution\",\"metro\"],"
+            + "\"publisher\":{\"name\":\"eee\",\"mbox\":\"eee\","
+            + "\"homepage\":\"rrr\",\"type\":\"eee\"},"
+            + "\"contactPoint\": {\"fn\":\"eee\",\"hasEmail\":\"eeee\"},"
+            + "\"distribution\":[{\"title\":\"ee\","
+            + "\"accessURL\": \"eee\",\"description\": \"ddd\","
+            + "\"mediaType\":\"eee\",\"format\": \"eee\",\"license\": \"eee\","
+            + "\"issued\": \"2015-10-12T12:03:14Z\","
+            + "\"modified\": \"2015-10-12T12:03:14Z\",\"byteSize\":\"1024\"}]}]}");
+    return Response.status(Response.Status.OK).entity(json.toString()).build();
   }
 
   /**
@@ -82,10 +74,8 @@ public class FederationApiMockup {
   @GET
   @Path("/odf/odms/datasets/{id}")
   @Produces("application/json")
-  public Response getNativeDataset(@PathParam("id") String datasetId) {
-
-    try {
-      JSONObject json = new JSONObject();
+  public Response getNativeDataset(@PathParam("id") String datasetId) throws JSONException {
+    JSONObject json = new JSONObject();
       json.put("title", "title");
       json.put("description", "description");
       json.put("identifier", "identifier");
@@ -126,14 +116,8 @@ public class FederationApiMockup {
       dist1.put("byteSize", "1024");
       JSONArray distributions = new JSONArray();
       distributions.put(dist1);
-      json.put("distribution", distributions);
-      // System.out.println(json.toString());
-      return Response.status(Response.Status.OK).entity(json.toString()).build();
-    } catch (JSONException e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
+    json.put("distribution", distributions);
+    return Response.status(Response.Status.OK).entity(json.toString()).build();
   }
 
   /**
@@ -144,18 +128,10 @@ public class FederationApiMockup {
   @GET
   @Path("/odf/odms/datasets/info")
   @Produces("application/json")
-  public Response getNativeDatasetsIdentifier() {
-
-    try {
-
-      JSONArray json = new JSONArray("[{\"identifier\":\"agid:D.300-90\","
-          + "\"issued\":\"2015-10-12T12:03:14Z\",\"modified\":\"2015-10-12T12:03:14Z\"}]");
-      return Response.status(Response.Status.OK).entity(json.toString()).build();
-    } catch (JSONException e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
+  public Response getNativeDatasetsIdentifier() throws JSONException {
+    JSONArray json = new JSONArray("[{\"identifier\":\"agid:D.300-90\","
+        + "\"issued\":\"2015-10-12T12:03:14Z\",\"modified\":\"2015-10-12T12:03:14Z\"}]");
+    return Response.status(Response.Status.OK).entity(json.toString()).build();
   }
 
   /**
@@ -169,11 +145,8 @@ public class FederationApiMockup {
   @Path("/odf/odms/datasets")
   @Produces("application/json")
   public Response getNativeDatasets(@QueryParam("rows") String rows,
-      @QueryParam("offset") String offset) {
-
-    try {
-
-      String json = "[{\"id\":\"agid:D.301-2\",\"nodeID\":\"2\","
+      @QueryParam("offset") String offset) throws JSONException {
+    String json = "[{\"id\":\"agid:D.301-2\",\"nodeID\":\"2\","
           + "\"hasStoredRDF\":false,\"title\":\"Contratti del Sistema Pubblico di Connettività\","
           + "\"description\":\"Il dataset LOD che contiene i contratti SPC del Lotto 1 (2007)\","
           + "\"distributions\":[{\"id\":\"4e581d9d-20d3-4802-80a0-55f9b660d227\""
@@ -234,14 +207,8 @@ public class FederationApiMockup {
           + "{\"resourceUri\":\"http://eurovoc.europa.eu/1810\","
           + "\"propertyUri\":\"http://purl.org/dc/terms/subject\","
           + "\"prefLabel\":[{\"language\":\"it\"," + "\"value\":\"appalto pubblico\"}]}],"
-          + "\"legacyIdentifier\":\"\"}]";
-
-      return Response.status(Response.Status.OK).entity(json.toString()).build();
-    } catch (JSONException e) {
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
-
+        + "\"legacyIdentifier\":\"\"}]";
+    return Response.status(Response.Status.OK).entity(json.toString()).build();
   }
 
 }

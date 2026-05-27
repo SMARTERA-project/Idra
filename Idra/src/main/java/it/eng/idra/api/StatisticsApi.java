@@ -54,30 +54,20 @@ public class StatisticsApi {
   @Produces("application/json")
   public Response getGlobalStatistics(@Context HttpServletRequest httpRequest,
       @QueryParam("catalogueID") @DefaultValue("") String catalogueId,
-      @QueryParam("startDate") String startDate, @QueryParam("endDate") String endDate) {
+      @QueryParam("startDate") String startDate, @QueryParam("endDate") String endDate)
+      throws GsonUtilException {
 
-    try {
-
-      // CatalogueID -> comma separated values of ids
-      // if (StringUtils.isNotBlank(catalogueId)){}
-
-      if (StringUtils.isBlank(endDate)) {
-        ZonedDateTime end = ZonedDateTime.now();
-        ZonedDateTime start = end.minusDays(7);
-        endDate = end.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME).toString();
-        startDate = start.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME).toString();
-        ;
-      }
-
-      PlatformStatistcs stat = PlatformStatisticsManager.getCatalogueStatistics(catalogueId,
-          startDate, endDate);
-      return Response.status(Response.Status.OK)
-          .entity(GsonUtil.obj2Json(stat, GsonUtil.platformStatsType)).build();
-    } catch (GsonUtilException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+    if (StringUtils.isBlank(endDate)) {
+      ZonedDateTime end = ZonedDateTime.now();
+      ZonedDateTime start = end.minusDays(7);
+      endDate = end.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME).toString();
+      startDate = start.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME).toString();
     }
+
+    PlatformStatistcs stat = PlatformStatisticsManager.getCatalogueStatistics(catalogueId,
+        startDate, endDate);
+    return Response.status(Response.Status.OK)
+        .entity(GsonUtil.obj2Json(stat, GsonUtil.platformStatsType)).build();
   }
 
 }
