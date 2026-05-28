@@ -40,6 +40,9 @@ public class ErrorResponse {
   /** The user message. */
   private String userMessage;
 
+  /** i18n key resolved by the frontend (e.g. "ERR.AUTH.UNAUTHORIZED"). */
+  private String userMessageKey;
+
   /** Correlation id for tracing this response in server logs. */
   private String correlationId;
 
@@ -134,6 +137,14 @@ public class ErrorResponse {
     this.userMessage = userMessage;
   }
 
+  public String getUserMessageKey() {
+    return userMessageKey;
+  }
+
+  public void setUserMessageKey(String userMessageKey) {
+    this.userMessageKey = userMessageKey;
+  }
+
   public String getCorrelationId() {
     return correlationId;
   }
@@ -146,6 +157,7 @@ public class ErrorResponse {
   public String toString() {
     return "\nErrorResponse [statusCode=" + statusCode + ", technicalMessage=" + technicalMessage
         + ", errorCode=" + errorCode + ", userMessage=" + userMessage
+        + ", userMessageKey=" + userMessageKey
         + ", correlationId=" + correlationId + "]\n";
   }
 

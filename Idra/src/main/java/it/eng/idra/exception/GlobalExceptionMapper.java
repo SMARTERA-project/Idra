@@ -74,6 +74,7 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
         code.name(),
         null,
         correlationId);
+    body.setUserMessageKey(code.userMessageKey());
 
     return Response.status(code.httpStatus())
         .entity(body.toJson())
