@@ -27,10 +27,8 @@ services:
         networks:
             idra_main:
         environment:
-            - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/my_secret_data
-            - MYSQL_DATABASE=idra_db
-        secrets:
-            - my_secret_data 
+            - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+            - MYSQL_DATABASE=${MYSQL_DATABASE}
 
         command: --lower_case_table_names=1
 
@@ -38,9 +36,9 @@ services:
             image: postgres:16
             restart: always
             environment:
-                - POSTGRES_DB=keycloak
-                - POSTGRES_USER=keycloak
-                - POSTGRES_PASSWORD=keycloak
+                - POSTGRES_DB=${POSTGRES_DB}
+                - POSTGRES_USER=${POSTGRES_USER}
+                - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             volumes:
                 - ./opt/keycloak/postgres-data:/var/lib/postgresql/data
             networks:
@@ -54,16 +52,24 @@ services:
             ports:
                 - 8180:8080
             environment:
-                - KEYCLOAK_ADMIN=admin
-                - KEYCLOAK_ADMIN_PASSWORD=admin
+                - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+                - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
                 - KC_DB=postgres
                 - KC_DB_URL_HOST=keycloak-db
-                - KC_DB_URL_DATABASE=keycloak
-                - KC_DB_USERNAME=keycloak
-                - KC_DB_PASSWORD=keycloak
+                - KC_DB_URL_DATABASE=${POSTGRES_DB}
+                - KC_DB_USERNAME=${POSTGRES_USER}
+                - KC_DB_PASSWORD=${KC_DB_PASSWORD}
                 # Keep the legacy "/auth" base path to match existing Portal config.
                 - KC_HTTP_RELATIVE_PATH=/auth
                 - KC_HOSTNAME_STRICT=false
+                # Pin the token issuer to the PUBLIC (browser-facing) URL so tokens
+                # minted via the browser and refreshed via the Idra BFF (which reaches
+                # Keycloak internally at keycloak:8080) validate against the same `iss`.
+                # Without this the refresh returns 400 invalid_grant "Invalid token issuer".
+                - KC_HOSTNAME=${KEYCLOAK_HOSTNAME_URL}
+                # Let backchannel callers (the Idra container) keep using the internal
+                # keycloak:8080 host for connectivity while the issuer stays pinned above.
+                - KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true
             command: ["start-dev", "--import-realm", "--http-port=8080"]
             volumes:
                 - ./keycloak/realm-smartera-local.json:/opt/keycloak/data/import/realm-smartera-local.json:ro
@@ -124,13 +130,13 @@ services:
             - "8000:8000"
         environment:
             - PORT=8000
-            - MONGO_INITDB_ROOT_USERNAME=root
-            - MONGO_INITDB_DATABASE=admin
-            - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
-            - MINIO_URL=play.min.io
-            - MINIO_ACCESS_KEY=Q3AM3UQ867SPQQA43P2F
-            - MINIO_SECRET_KEY=zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG
-            - MINIO_ACTIVE=false
+            - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+            - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+            - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+            - MINIO_URL=${MINIO_URL}
+            - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+            - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+            - MINIO_ACTIVE=${MINIO_ACTIVE}
         networks:
             idra_main:
 
@@ -140,9 +146,9 @@ services:
         image: mongo:4.4
         command: mongod --port 27020
         environment:
-            - MONGO_INITDB_ROOT_USERNAME=root
-            - MONGO_INITDB_DATABASE=admin
-            - MONGO_INITDB_ROOT_PASSWORD=BeOpen2023!
+            - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+            - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+            - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
         ports:
             - "27020:27020"
         volumes:
@@ -176,41 +182,37 @@ services:
         command: ["./wait-for-it.sh", "db:3306", "--timeout=0", "--", "catalina.sh", "run"]
 
         environment:
-            - idra.db.host=jdbc:mysql://db:3306/idra_db?allowPublicKeyRetrieval=true&serverTimezone=UTC&useLegacyDatetimeCode=false&useEncoding=true&characterEncoding=UTF-8&useSSL=false
-            - idra.db.host.min=jdbc:mysql://db:3306
-            - idra.db.user_FILE=/run/secrets/my_secret_data
-            - idra.db.password_FILE=/run/secrets/my_secret_data
-            #- idra.db.user=root
-            #- idra.db.password=root
-            - idra.db.name=idra_db
+            - idra.db.host=${IDRA_DB_HOST}
+            - idra.db.host.min=${IDRA_DB_HOST_MIN}
+            - idra.db.user=${IDRA_DB_USER}
+            - idra.db.password=${IDRA_DB_PASSWORD}
+            - idra.db.name=${IDRA_DB_NAME}
             - idra.cache.loadfromdb=true
             - idra.synch.onstart=true
             - idra.odms.dump.file.path=/opt/idra/dump/
             - idra.dump.file.path=/opt/idra/dump/
             - idra.lod.enable=true
             - idra.lod.repo.name=Idra
-            - idra.lod.server.uri=http://rdf4j:8080/rdf4j-server/repositories/
-            - idra.lod.server.uri.query=http://rdf4j:8080/rdf4j-workbench/repositories/Idra/query
+            - idra.lod.server.uri=${IDRA_LOD_SERVER_URI}
+            - idra.lod.server.uri.query=${IDRA_LOD_SERVER_URI_QUERY}
             - idra.orion.orionDumpFilePath=/opt/idra/dump/
-            - idra.orion.orionInternalAPI=http://localhost:8080/Idra/api/v1/client/executeOrionQuery
-            - DATALET_ENABLED=true
-            - DATALET_URL=https://your-domain.it/deep/deep-components/demo.html
-            - JAVA_OPTS=-Xms1024m -Xmx3g -Didra.cors.allowed.origins=http://mqa-score,http://rdf4j,http://deep,http://ngsi-broker,http://localhost,http://localhost:4200,https://dx-lab.it
-            - idra.orion.manager.url=http://ngsi-broker:8082/
-            - idra.orion.cb.url=http://orion-ld-SMARTERA-final:1026/
+            - idra.orion.orionInternalAPI=${IDRA_ORION_INTERNAL_API}
+            - DATALET_ENABLED=${DATALET_ENABLED}
+            - DATALET_URL=${DATALET_URL}
+            - JAVA_OPTS=${JAVA_OPTS}
+            - idra.orion.manager.url=${IDRA_ORION_MANAGER_URL}
+            - idra.orion.cb.url=${IDRA_ORION_CB_URL}
         # env variables for KEYCLOAK authentication
-            - idra.authentication.method=KEYCLOAK
-            - idm.protocol=http
-            - idm.host=keycloak:8080/auth/realms/smartera/protocol/openid-connect
-            - idm.path.base=
-            - idm.client.id=data-platform
-            - idm.client.secret=
-            - idm.redirecturi=http://localhost:8080/Idra/api/v1/administration/login
-            - idm.logout.callback=http://localhost:4200
-            - idra.server.baseurl=http://localhost:8080/
-            - idm.admin.role.name=IDRA_ADMIN
-        secrets:
-            - my_secret_data           
+            - idra.authentication.method=${IDRA_AUTH_METHOD}
+            - idm.protocol=${IDM_PROTOCOL}
+            - idm.host=${IDM_HOST}
+            - idm.path.base=${IDM_PATH_BASE}
+            - idm.client.id=${IDM_CLIENT_ID}
+            - idm.client.secret=${IDM_CLIENT_SECRET}
+            - idm.redirecturi=${IDM_REDIRECTURI}
+            - idm.logout.callback=${IDM_LOGOUT_CALLBACK}
+            - idra.server.baseurl=${IDRA_SERVER_BASEURL}
+            - idm.admin.role.name=${IDM_ADMIN_ROLE_NAME}
         volumes:
             - ./opt/idra/dump:/opt/idra/dump
             - /dev/urandom:/dev/random
@@ -227,8 +229,24 @@ services:
         restart: always
         ports:
             - "4200:80"
-        volumes:
-            - ./config.json:/usr/share/nginx/html/assets/config.json:ro
+        # Runtime config: rendered into assets/env.js at container startup
+        # (no config.json volume). Empty values fall back to localhost defaults.
+        environment:
+            - PORTAL_ENABLE_AUTHENTICATION=${PORTAL_ENABLE_AUTHENTICATION}
+            - PORTAL_AUTHENTICATION_METHOD=${PORTAL_AUTHENTICATION_METHOD}
+            - PORTAL_KEYCLOAK_BASE_URL=${PORTAL_KEYCLOAK_BASE_URL}
+            - PORTAL_KEYCLOAK_REALM=${PORTAL_KEYCLOAK_REALM}
+            - PORTAL_DASHBOARD_BASE_URL=${PORTAL_DASHBOARD_BASE_URL}
+            - PORTAL_CLIENT_ID=${PORTAL_CLIENT_ID}
+            - PORTAL_AUTH_PROFILE=${PORTAL_AUTH_PROFILE}
+            - PORTAL_IDRA_BASE_URL=${PORTAL_IDRA_BASE_URL}
+            - PORTAL_ENABLE_DATALET=${PORTAL_ENABLE_DATALET}
+            - PORTAL_DATALET_BASE_URL=${PORTAL_DATALET_BASE_URL}
+            - PORTAL_MQA_BASE_URL=${PORTAL_MQA_BASE_URL}
+            - PORTAL_IDRA_DOCKER_URL=${PORTAL_IDRA_DOCKER_URL}
+            - PORTAL_LANGUAGES=${PORTAL_LANGUAGES}
+            - PORTAL_ORION_MANAGER_ENABLED=${PORTAL_ORION_MANAGER_ENABLED}
+            - PORTAL_TRANSLATIONS_BASE_URL=${PORTAL_TRANSLATIONS_BASE_URL}
         networks:
             idra_main:
 
@@ -241,10 +259,13 @@ services:
         ports:
         - 8082:8082
         environment:
-        - SERVER_DEBUG=true
-        - IDRA_BASE_PATH=http://idra:8080
-        - HOST_ORION=http://orion-ld-SMARTERA-final
-        - PORT_ORION=1026
+        - SERVER_DEBUG=${NGSI_SERVER_DEBUG}
+        - IDRA_BASE_PATH=${NGSI_IDRA_BASE_PATH}
+        - HOST_ORION=${NGSI_HOST_ORION}
+        - PORT_ORION=${NGSI_PORT_ORION}
+        # Context Broker hosts exempt from the SSRF private-address check
+        # (the internal Orion broker lives on the docker network → private IP).
+        - CB_URL_ALLOWLIST=${NGSI_CB_URL_ALLOWLIST}
         networks:
             idra_main:
 
@@ -284,7 +305,3 @@ services:
 networks:
     idra_main:
           driver: bridge
-          
-secrets:
-  my_secret_data:
-    file: ./secrets.txt
