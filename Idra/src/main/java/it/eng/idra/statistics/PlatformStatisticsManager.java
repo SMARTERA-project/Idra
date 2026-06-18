@@ -29,12 +29,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 // TODO: Auto-generated Javadoc
 /**
  * The Class PlatformStatisticsManager.
  */
 public class PlatformStatisticsManager {
+
+  /** The logger. */
+  private static Logger logger = LogManager.getLogger(PlatformStatisticsManager.class);
 
   /**
    * Instantiates a new platform statistics manager.
@@ -139,7 +144,7 @@ public class PlatformStatisticsManager {
 
       result.setCatalogues(ctlgStat);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e.getMessage(), e);
     }
 
     return result;

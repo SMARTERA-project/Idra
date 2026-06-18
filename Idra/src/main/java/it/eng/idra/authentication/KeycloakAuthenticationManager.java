@@ -136,6 +136,18 @@ public class KeycloakAuthenticationManager extends AuthenticationManager {
     return connector.getToken(code);
   }
 
+  /**
+   * BFF token exchange: forwards the SPA's OAuth2 token request to Keycloak with
+   * the confidential client credentials added server-side.
+   *
+   * @param formData the x-www-form-urlencoded body forwarded from the SPA
+   * @return a 2-element array: [0] = HTTP status code, [1] = response body JSON
+   * @throws Exception the exception
+   */
+  public String[] exchangeToken(String formData) throws Exception {
+    return connector.exchangeToken(formData);
+  }
+
   /*
    * (non-Javadoc)
    * 

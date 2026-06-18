@@ -65,6 +65,7 @@
  import java.io.InputStream;
  import java.io.OutputStream;
  import java.net.URI;
+ import java.net.URLEncoder;
  import java.nio.charset.Charset;
  import java.nio.charset.StandardCharsets;
  import java.nio.file.Files;
@@ -80,6 +81,7 @@ import java.nio.file.Paths;
  import javax.ws.rs.DELETE;
  import javax.ws.rs.DefaultValue;
  import javax.ws.rs.GET;
+ import javax.ws.rs.HeaderParam;
  import javax.ws.rs.POST;
  import javax.ws.rs.PUT;
  import javax.ws.rs.Path;
@@ -934,6 +936,7 @@ import java.nio.file.Paths;
   @Produces(MediaType.APPLICATION_JSON)
   public Response getRemoteCatalogueDatasetCount(@QueryParam("url") String url,
       @QueryParam("nodeType") String nodeType,
+      @HeaderParam("X-Catalogue-ApiKey") String apiKeyHeader,
       @QueryParam("apiKey") String apiKey) {
     JSONObject body = new JSONObject();
     if (url == null || url.trim().isEmpty() || nodeType == null || nodeType.trim().isEmpty()) {
@@ -944,7 +947,11 @@ import java.nio.file.Paths;
       OdmsCatalogue probe = new OdmsCatalogue();
       probe.setHost(url.trim());
       probe.setNodeType(type);
-      probe.setApiKey(apiKey == null ? "" : apiKey);
+      // Prefer the API key from the header (kept out of URLs/logs); fall back to the
+      // legacy query param for backward compatibility.
+      String effectiveApiKey = (apiKeyHeader != null && !apiKeyHeader.isEmpty())
+          ? apiKeyHeader : apiKey;
+      probe.setApiKey(effectiveApiKey == null ? "" : effectiveApiKey);
       int count = OdmsManager.getOdmsCatalogueConnector(probe).countDatasets();
       if (count < 0) {
         body.put("count", JSONObject.NULL);
@@ -1387,6 +1394,105 @@ import java.nio.file.Paths;
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
   }
  
+   /**
+    * BFF OAuth2 token proxy. The SPA posts its token request (authorization_code or
+    * refresh_token grant) here instead of calling Keycloak directly, so the
+    * confidential client_secret stays server-side. Idra adds the client credentials
+    * and forwards the request to Keycloak, relaying the response verbatim.
+    *
+    * @param form the x-www-form-urlencoded token request from the SPA
+    * @return the Keycloak token endpoint response (status + JSON body)
+    */
+   @POST
+   @Path("/oauth/token")
+   @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+   @Produces(MediaType.APPLICATION_JSON)
+  public Response oauthTokenProxy(MultivaluedMap<String, String> form) throws Exception {
+    String grantType = form != null ? form.getFirst("grant_type") : null;
+    if (!"authorization_code".equals(grantType) && !"refresh_token".equals(grantType)) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("{\"error\":\"unsupported_grant_type\"}").build();
+    }
+
+    StringBuilder data = new StringBuilder();
+    appendFormParam(data, "grant_type", grantType);
+
+    if ("authorization_code".equals(grantType)) {
+      String code = form.getFirst("code");
+      String redirectUri = form.getFirst("redirect_uri");
+      if (StringUtils.isBlank(code) || StringUtils.isBlank(redirectUri)) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\":\"invalid_request\"}").build();
+      }
+      if (!isAllowedRedirectUri(redirectUri)) {
+        logger.warn("BFF token proxy: rejected redirect_uri " + redirectUri);
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\":\"invalid_redirect_uri\"}").build();
+      }
+      appendFormParam(data, "code", code);
+      appendFormParam(data, "redirect_uri", redirectUri);
+    } else {
+      String refreshToken = form.getFirst("refresh_token");
+      if (StringUtils.isBlank(refreshToken)) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\":\"invalid_request\"}").build();
+      }
+      appendFormParam(data, "refresh_token", refreshToken);
+    }
+    appendFormParam(data, "scope", "openid");
+
+    String[] result = KeycloakAuthenticationManager.getInstance().exchangeToken(data.toString());
+    int status = 502;
+    try {
+      status = Integer.parseInt(result[0]);
+    } catch (NumberFormatException ignore) {
+      logger.warn("BFF token proxy: unexpected status from Keycloak: " + result[0]);
+    }
+    return Response.status(status).entity(result[1]).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  /**
+   * Appends a single x-www-form-urlencoded parameter (URL-encoded) to the builder.
+   */
+  private static void appendFormParam(StringBuilder sb, String name, String value)
+      throws Exception {
+    if (sb.length() > 0) {
+      sb.append("&");
+    }
+    sb.append(URLEncoder.encode(name, "UTF-8")).append("=")
+        .append(URLEncoder.encode(value, "UTF-8"));
+  }
+
+  /**
+   * Validates a redirect_uri origin against the configured CORS allowlist. Keycloak
+   * independently validates redirect_uri against the client's registered URIs; this
+   * is defense-in-depth so the BFF proxy cannot be used as an open forwarder. When
+   * the allowlist is unset, defers to Keycloak's own validation.
+   */
+  private static boolean isAllowedRedirectUri(String redirectUri) {
+    String allowed = System.getProperty("idra.cors.allowed.origins", "");
+    if (StringUtils.isBlank(allowed)) {
+      return true;
+    }
+    try {
+      URI uri = URI.create(redirectUri);
+      String scheme = uri.getScheme();
+      if (scheme == null
+          || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+        return false;
+      }
+      String origin = scheme + "://" + uri.getAuthority();
+      for (String a : allowed.split(",")) {
+        if (origin.equalsIgnoreCase(a.trim())) {
+          return true;
+        }
+      }
+    } catch (Exception e) {
+      return false;
+    }
+    return false;
+  }
+
    /**
     * logout.
     *

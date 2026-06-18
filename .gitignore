@@ -1,5 +1,9 @@
 
 # Created by https://www.gitignore.io/api/git,java,maven,bower,eclipse,java-web
+#### Secrets / local env (never commit) ####
+.env
+!.env.example
+docker/secrets.txt
 #### Data Folder ####
 opt/
 ### Bower ###

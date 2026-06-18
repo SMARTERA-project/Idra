@@ -75,7 +75,9 @@ public class EuroVocTranslator {
     try {
       em = emf.createEntityManager();
 
-      String whereClause = " WHERE " + sourceLanguage.name() + " LIKE '" + term + "'";
+      // Column names come from the EuroVocLanguage enum (safe); the user-supplied
+      // `term` is bound as a parameter to prevent SQL injection.
+      String whereClause = " WHERE " + sourceLanguage.name() + " LIKE ?1";
 
       String query = "SELECT "
           + targetLanguages.stream().filter(lang -> !lang.equals(sourceLanguage)).distinct()
@@ -85,6 +87,7 @@ public class EuroVocTranslator {
       logger.info(query);
 
       Query q = em.createNativeQuery(query);
+      q.setParameter(1, term);
 
       if (targetLanguages.size() == 1) {
         @SuppressWarnings("unchecked")
@@ -129,15 +132,22 @@ public class EuroVocTranslator {
 
     logger.info("Get Eurovoc Exact Terms of " + term + " term");
     List<String> result = new ArrayList<String>();
+    // Column names come from the EuroVocLanguage enum (safe); the user-supplied
+    // `term` is bound to a distinct positional parameter per column.
     String whereClause = "WHERE ";
     Iterator<EuroVocLanguage> it = Arrays.asList(EuroVocLanguage.values()).iterator();
+    int paramIndex = 1;
     while (it.hasNext()) {
-      whereClause += it.next().name() + " LIKE '" + term + "'" + (it.hasNext() ? " OR " : "");
+      whereClause += it.next().name() + " LIKE ?" + paramIndex + (it.hasNext() ? " OR " : "");
+      paramIndex++;
     }
 
     try {
       em = emf.createEntityManager();
       Query q = em.createNativeQuery("SELECT * from eurovoc_terms " + whereClause);
+      for (int i = 1; i < paramIndex; i++) {
+        q.setParameter(i, term);
+      }
 
       List<Object[]> resultList = q.getResultList();
 

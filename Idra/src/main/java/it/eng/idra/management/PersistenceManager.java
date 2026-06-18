@@ -763,24 +763,12 @@ public class PersistenceManager {
    */
   private String buildLogsQuery(List<String> levelList, ZonedDateTime from, ZonedDateTime to) {
 
-    String query = "SELECT d FROM Log d WHERE ( ";
+    // User-controlled `level` values are bound via the :levels collection parameter
+    // (see getLogs) to prevent JPQL injection. The date bounds below are derived from
+    // integer date components and are not user-controlled strings.
+    String query = "SELECT d FROM Log d WHERE ( d.level IN :levels )";
 
-    if (levelList.size() == 1) {
-      query += " d.level = '" + levelList.get(0) + "' ";
-    } else {
-      for (int i = 0; i < levelList.size(); i++) {
-        if (i == 0 && i != (levelList.size() - 1)) {
-          query += " d.level = '" + levelList.get(i) + "' ";
-        } else {
-          query += " OR d.level = '" + levelList.get(i) + "' ";
-        }
-      }
-      // query += " d.level = '" + levelList.get(0) + "' " + " OR
-      // d.level='" + levelList.get(1) + "' " + " OR d.level='" +
-      // levelList.get(2) + "' ";
-    }
-
-    query += " ) AND ( d.dated  BETWEEN '" + from.getYear() + "-" + from.getMonthValue() + "-"
+    query += " AND ( d.dated  BETWEEN '" + from.getYear() + "-" + from.getMonthValue() + "-"
         + from.getDayOfMonth() + " 00:00:00" + "' " + " AND '" + to.getYear() + "-"
         + to.getMonthValue() + "-" + to.getDayOfMonth() + " 23:59:59" + "' ) order by d.dated asc";
 
@@ -798,6 +786,7 @@ public class PersistenceManager {
   public List<Log> getLogs(List<String> level, ZonedDateTime from, ZonedDateTime to) {
     String query = buildLogsQuery(level, from, to);
     TypedQuery<Log> q = em.createQuery(query, Log.class);
+    q.setParameter("levels", level);
     List<Log> list = q.getResultList();
     return list;
     // JSONObject arr = new JSONObject();
@@ -838,10 +827,18 @@ public class PersistenceManager {
    */
   public String getCountryFromIp(String ip) {
 
+    // Reject anything that is not a bare IPv4/IPv6 literal, then bind as a parameter:
+    // the IP can originate from a client-controlled X-FORWARDED-FOR header.
+    if (ip == null || !ip.matches("[0-9a-fA-F:.]+")) {
+      logger.warn("Invalid IP for country lookup, skipping: " + ip);
+      return "";
+    }
+
     String query = "SELECT c.country  FROM ip2nationCountries c,  ip2nation i  WHERE"
-        + " i.ip < INET_ATON('" + ip + "') AND  c.code = i.country ORDER BY  i.ip DESC";
+        + " i.ip < INET_ATON(?1) AND  c.code = i.country ORDER BY  i.ip DESC";
 
     Query q = em.createNativeQuery(query);
+    q.setParameter(1, ip);
     String res = "";
     if (q.getResultList().size() > 0) {
       res = q.getResultList().get(0).toString();

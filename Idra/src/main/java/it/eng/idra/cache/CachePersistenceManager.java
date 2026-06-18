@@ -665,9 +665,13 @@ public class CachePersistenceManager {
    */
   public List<Datalet> jpaGetDataletByTripleId(String nodeId, String datasetId,
       String distributionId) {
-    TypedQuery<Datalet> q = em.createQuery("SELECT d FROM Datalet d where d.nodeId='" + nodeId
-        + "' and d.distributionId='" + distributionId + "' and d.datasetId='" + datasetId + "'",
+    TypedQuery<Datalet> q = em.createQuery(
+        "SELECT d FROM Datalet d where d.nodeId = :nodeId and d.distributionId = :distId"
+            + " and d.datasetId = :dsId",
         Datalet.class);
+    q.setParameter("nodeId", nodeId);
+    q.setParameter("distId", distributionId);
+    q.setParameter("dsId", datasetId);
     return q.getResultList();
   }
 
@@ -683,9 +687,13 @@ public class CachePersistenceManager {
   public Datalet jpaGetDataletByIds(String nodeId, String datasetId, String distributionId,
       String dataletId) {
     TypedQuery<Datalet> q = em.createQuery(
-        "SELECT d FROM Datalet d where d.nodeId='" + nodeId + "' and d.distributionId='"
-            + distributionId + "' and d.datasetId='" + datasetId + "' and d.id='" + dataletId + "'",
+        "SELECT d FROM Datalet d where d.nodeId = :nodeId and d.distributionId = :distId"
+            + " and d.datasetId = :dsId and d.id = :dataletId",
         Datalet.class);
+    q.setParameter("nodeId", nodeId);
+    q.setParameter("distId", distributionId);
+    q.setParameter("dsId", datasetId);
+    q.setParameter("dataletId", dataletId);
     if (q.getResultList().isEmpty()) {
       return null;
     } else {

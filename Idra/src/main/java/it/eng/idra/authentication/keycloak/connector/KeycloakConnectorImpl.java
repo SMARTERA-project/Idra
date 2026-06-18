@@ -91,6 +91,33 @@ public class KeycloakConnectorImpl extends KeycloakConnector {
   }
 
   /**
+   * BFF token proxy: forwards an OAuth2 token request (authorization_code or
+   * refresh_token) to Keycloak, adding the confidential client credentials
+   * (client_id:client_secret via HTTP Basic) server-side. The SPA therefore never
+   * holds the client secret. Returns the raw Keycloak token-endpoint response so
+   * the caller can relay status and body verbatim.
+   *
+   * @param formData the x-www-form-urlencoded request body forwarded from the SPA
+   * @return a 2-element array: [0] = HTTP status code, [1] = response body JSON
+   * @throws Exception the exception
+   */
+  public String[] exchangeToken(String formData) throws Exception {
+    String url = baseUrl + path_token;
+    String auth = "Basic "
+        + new String(Base64.getEncoder().encode((clientId + ":" + clientSecret).getBytes()));
+
+    Map<String, String> headers = new HashMap<String, String>();
+    headers.put("Authorization", auth);
+
+    RestClient client = new RestClientImpl();
+    HttpResponse response = client.sendPostRequest(url, formData,
+        MediaType.APPLICATION_FORM_URLENCODED_TYPE, headers);
+
+    String body = client.getHttpResponseBody(response);
+    return new String[] { String.valueOf(client.getStatus(response)), body };
+  }
+
+  /**
    * Get user info.
    *
    * @param token the token

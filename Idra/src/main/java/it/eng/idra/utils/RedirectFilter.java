@@ -17,9 +17,7 @@ package it.eng.idra.utils;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
 import java.net.URI;
-import java.util.regex.Pattern;
 import javax.ws.rs.client.ClientRequestContext;
 import javax.ws.rs.client.ClientResponseContext;
 import javax.ws.rs.client.ClientResponseFilter;
@@ -31,24 +29,9 @@ import javax.ws.rs.core.Response;
  */
 public class RedirectFilter implements ClientResponseFilter {
 
-  private static final Pattern PRIVATE_IP = Pattern.compile(
-      "^(127\\.|10\\.|172\\.(1[6-9]|2\\d|3[01])\\.|192\\.168\\.|0\\.0\\.0\\.0|::1$|localhost$)",
-      Pattern.CASE_INSENSITIVE);
-
   private boolean isSafeRedirectTarget(URI location) {
-    if (location == null) return false;
-    String scheme = location.getScheme();
-    if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return false;
-    String host = location.getHost();
-    if (host == null) return false;
-    if (PRIVATE_IP.matcher(host).find()) return false;
-    try {
-      InetAddress addr = InetAddress.getByName(host);
-      if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()) return false;
-    } catch (Exception e) {
-      return false;
-    }
-    return true;
+    // Delegates to the shared SSRF guard (scheme + public-IP checks).
+    return UrlSecurityValidator.isSafePublicUrl(location);
   }
 
   /*

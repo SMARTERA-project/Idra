@@ -72,6 +72,7 @@ import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.utils.NgsiLdCbDcatDeserializer;
 import it.eng.idra.utils.PropertyManager;
 import it.eng.idra.utils.RedirectFilter;
+import it.eng.idra.utils.UrlSecurityValidator;
 import it.eng.idra.utils.restclient.RestClient;
 import it.eng.idra.utils.restclient.RestClientImpl;
 import java.io.BufferedInputStream;
@@ -536,9 +537,11 @@ public class ClientApi {
     request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
 
       // Gets the source IP address from HTTPRequest
-      String ipAddress = null;
-      if (httpRequest.getHeader("X-FORWARDED-FOR") == null) {
+      String ipAddress = httpRequest.getHeader("X-FORWARDED-FOR");
+      if (ipAddress == null || ipAddress.isEmpty()) {
         ipAddress = httpRequest.getRemoteAddr();
+      } else {
+        ipAddress = ipAddress.split(",")[0].trim();
       }
 
       // If the filters list is not empty, start to build the parameters
@@ -717,9 +720,11 @@ public class ClientApi {
     request = GsonUtil.json2Obj(input, GsonUtil.searchRequestType);
 
       // Gets the source IP address from HTTPRequest
-      String ipAddress = null;
-      if (httpRequest.getHeader("X-FORWARDED-FOR") == null) {
+      String ipAddress = httpRequest.getHeader("X-FORWARDED-FOR");
+      if (ipAddress == null || ipAddress.isEmpty()) {
         ipAddress = httpRequest.getRemoteAddr();
+      } else {
+        ipAddress = ipAddress.split(",")[0].trim();
       }
 
       // If the filters list is not empty, start to build the parameters
@@ -953,9 +958,11 @@ public class ClientApi {
   public Response runSparqlQuery(@Context HttpServletRequest httpRequest, final String input)
       throws Exception {
     // Gets the source IP address from HTTPRequest
-    String ipAddress = null;
-    if (httpRequest.getHeader("X-FORWARDED-FOR") == null) {
+    String ipAddress = httpRequest.getHeader("X-FORWARDED-FOR");
+    if (ipAddress == null || ipAddress.isEmpty()) {
       ipAddress = httpRequest.getRemoteAddr();
+    } else {
+      ipAddress = ipAddress.split(",")[0].trim();
     }
 
     SparqlSearchRequest request = GsonUtil.json2Obj(input, GsonUtil.sparqlSearchRequestType);
@@ -998,6 +1005,11 @@ public class ClientApi {
 
     logger.info("Download file API: " + downloadFile);
     String compiledUri = url;
+    // SSRF guard: validate the initial target (the RedirectFilter only covers 3xx hops).
+    if (!UrlSecurityValidator.isSafePublicUrl(compiledUri)) {
+      logger.warn("Blocked downloadFromUri for non-public or invalid URL: " + compiledUri);
+      return Response.status(Status.BAD_REQUEST).entity("Invalid or non-public URL").build();
+    }
     int timeout = Integer.parseInt(PropertyManager.getProperty(IdraProperty.PREVIEW_TIMEOUT))
         * 1000;
     Client localClient = ClientBuilder.newClient().register(RedirectFilter.class);
