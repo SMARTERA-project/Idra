@@ -22,8 +22,12 @@
 
 # The base image from which the image build starts
 # The image is based on the source code present in the project's Idra folder
+# Override versions via docker build --build-arg MAVEN_VERSION=x.y.z
 
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+ARG MAVEN_VERSION=3.9.6-eclipse-temurin-21
+ARG TOMCAT_VERSION=8.5.100-jre21-temurin
+
+FROM maven:${MAVEN_VERSION} AS build
 MAINTAINER Engineering Ingegneria Informatica S.p.A.
 
 WORKDIR /
@@ -38,7 +42,7 @@ RUN cd Idra && mvn package
 
 RUN git clone https://github.com/vishnubob/wait-for-it.git
 
-FROM tomcat:8.5.100-jre21-temurin AS deploy
+FROM tomcat:${TOMCAT_VERSION} AS deploy
 
 WORKDIR /
 COPY --from=build /Idra/target/Idra.war /
