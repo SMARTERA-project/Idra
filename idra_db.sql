@@ -1428,6 +1428,9 @@ ALTER TABLE `odms`
   ADD CONSTRAINT `FK_cat_temp` FOREIGN KEY (`temporalCoverage_id`)
     REFERENCES `dcat_periodoftime`(`periodOfTime_id`);
 
+-- ODMS: id of the last MQA analysis (automatic MQA analysis on federation)
+ALTER TABLE `odms` ADD COLUMN `mqa_analysis_id` VARCHAR(255) DEFAULT NULL;
+
 --
 -- Table structure for table `odms_additional_config`
 --

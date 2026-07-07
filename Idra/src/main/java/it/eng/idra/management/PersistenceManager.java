@@ -302,6 +302,7 @@ public class PersistenceManager {
       if (node.isFederatedInCb() != null) {
         managed.setFederatedInCb(node.isFederatedInCb());
       }
+      managed.setMqaAnalysisId(node.getMqaAnalysisId());
       if (node.getImage() != null && Hibernate.isInitialized(node.getImage())) {
         if (managed.getImage() != null) {
           managed.getImage().setImageData(node.getImage().getImageData());

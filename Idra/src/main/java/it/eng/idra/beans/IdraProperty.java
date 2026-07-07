@@ -172,7 +172,19 @@ public enum IdraProperty {
   BOOTSTRAP_ADMIN_SUBS("idra.bootstrap.admin.subs"),
 
   /** Default role for newly provisioned users. */
-  BOOTSTRAP_DEFAULT_ROLE("idra.bootstrap.default.role");
+  BOOTSTRAP_DEFAULT_ROLE("idra.bootstrap.default.role"),
+
+  /** Enable automatic MQA analysis on federation / re-synchronization. */
+  MQA_ENABLED("idra.mqa.enabled"),
+
+  /** MQA scoring service base URL, as reachable from Idra. */
+  MQA_URL("idra.mqa.url"),
+
+  /**
+   * Idra base URL (including context path) as reachable from the MQA service,
+   * used to build the catalogue dump file_url submitted to MQA.
+   */
+  MQA_IDRA_BASEURL("idra.mqa.idra.baseurl");
 
   /** The text. */
   private final String text;

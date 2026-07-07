@@ -49,6 +49,7 @@
  import it.eng.idra.exception.AppException;
  import it.eng.idra.exception.ErrorCode;
  import it.eng.idra.management.FederationCore;
+ import it.eng.idra.management.MqaManager;
  import it.eng.idra.management.OdmsManager;
  import it.eng.idra.management.RdfPrefixManager;
  import it.eng.idra.management.StatisticsManager;
@@ -802,6 +803,44 @@ import java.nio.file.Paths;
     logger.info("Forcing the synchronization for node " + nodeId);
     FederationCore.startOdmsCatalogueSynch(nodeIdentifier);
     logger.info("Fine funzione sync");
+
+    // LEVEL_2/3 catalogues run an asynchronous synch job that already re-triggers
+    // the MQA analysis once completed (see OdmsSynchJob). LEVEL_4 catalogues have
+    // no synch job, so trigger the MQA analysis directly here on their current dump
+    // so that "synchronize" refreshes the MQA score for them too.
+    try {
+      OdmsCatalogue node = OdmsManager.getOdmsCatalogue(nodeIdentifier);
+      if (node != null
+          && OdmsCatalogueFederationLevel.LEVEL_4.equals(node.getFederationLevel())) {
+        MqaManager.submitCatalogue(node);
+      }
+    } catch (Exception e) {
+      logger.error("Error while triggering MQA analysis for node " + nodeId + ": "
+          + e.getMessage());
+    }
+    return Response.status(Response.Status.OK).build();
+  }
+
+  /**
+   * Triggers an on-demand MQA analysis for a catalogue (the "Send MQA analysis"
+   * action). Routed through MqaManager so it reuses the catalogue's stored
+   * mqaAnalysisId and appends to the same MQA history (last 5) instead of creating
+   * a new separate analysis each time; MqaManager also handles title, forceDump and
+   * self-healing if the referenced analysis was deleted.
+   *
+   * @param nodeId the node id
+   * @return the response
+   */
+  @POST
+  @Secured
+  @RequiresPermission("admin.catalogue.activate")
+  @Path("/catalogues/{nodeId}/mqa")
+  @Produces("application/json")
+  public Response sendMqaAnalysis(@PathParam("nodeId") String nodeId) throws Exception {
+    int nodeIdentifier = Integer.parseInt(nodeId);
+    logger.info("Triggering on-demand MQA analysis for node " + nodeId);
+    OdmsCatalogue node = OdmsManager.getOdmsCatalogue(nodeIdentifier);
+    MqaManager.submitCatalogue(node);
     return Response.status(Response.Status.OK).build();
   }
  

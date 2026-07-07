@@ -270,6 +270,15 @@ public class OdmsCatalogue {
   @Expose
   private Boolean isFederatedInCb;
 
+  /**
+   * The id of the last MQA analysis for this catalogue (MongoDB ObjectId on the
+   * MQA scoring service). Null until the first automatic MQA submission. Reused on
+   * subsequent submissions to append to the existing analysis history.
+   */
+  @Column(name = "mqa_analysis_id", nullable = true)
+  @Expose
+  private String mqaAnalysisId;
+
   /** The synch lock for the Context Broker. */
   @Transient
   private OdmsSynchLock synchLockOrion;
@@ -941,6 +950,24 @@ public class OdmsCatalogue {
    */
   public void setFederatedInCb(Boolean isFederatedInCb) {
     this.isFederatedInCb = isFederatedInCb;
+  }
+
+  /**
+   * Gets the id of the last MQA analysis for this catalogue.
+   *
+   * @return the mqa analysis id
+   */
+  public String getMqaAnalysisId() {
+    return mqaAnalysisId;
+  }
+
+  /**
+   * Sets the id of the last MQA analysis for this catalogue.
+   *
+   * @param mqaAnalysisId the new mqa analysis id
+   */
+  public void setMqaAnalysisId(String mqaAnalysisId) {
+    this.mqaAnalysisId = mqaAnalysisId;
   }
 
   public List<DcatProperty> getApplicableLegislation() {

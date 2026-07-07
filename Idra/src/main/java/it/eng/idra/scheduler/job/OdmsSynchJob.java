@@ -37,6 +37,7 @@ import it.eng.idra.cache.MetadataCacheManager;
 import it.eng.idra.dcat.dump.DcatApDumpManager;
 import it.eng.idra.dcat.dump.DcatApSerializer;
 import it.eng.idra.management.FederationCore;
+import it.eng.idra.management.MqaManager;
 import it.eng.idra.management.OdmsManager;
 import it.eng.idra.management.StatisticsManager;
 import it.eng.idra.utils.CommonUtil;
@@ -437,6 +438,9 @@ public class OdmsSynchJob implements InterruptableJob {
           logger.error("Error: " + e1.getMessage() + " in creation of the dump file for node "
               + node.getId());
         }
+
+        // Refresh the MQA analysis after each successful synchronization
+        MqaManager.submitCatalogue(node);
       }
       return true;
     } else {

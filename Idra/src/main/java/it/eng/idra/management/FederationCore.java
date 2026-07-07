@@ -559,6 +559,11 @@ public class FederationCore {
               + node.getId());
         }
 
+        /*
+         * 5. Start the automatic MQA analysis on the freshly generated dump
+         */
+        MqaManager.submitCatalogue(node);
+
       } catch (InvocationTargetException e) {
         logger.error(e.getMessage(), e);
         Throwable target = null;

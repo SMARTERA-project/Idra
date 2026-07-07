@@ -137,6 +137,12 @@ services:
             - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
             - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
             - MINIO_ACTIVE=${MINIO_ACTIVE}
+            # Hosts allowed for server-side fetch (SSRF allowlist); must include Idra
+            # so MQA can pull catalogue dumps via file_url during auto-analysis.
+            - MQA_URL_ALLOWLIST=${MQA_URL_ALLOWLIST}
+            # Timezone for analysis timestamps shown in the MQA list (Python datetime.now()
+            # uses the container TZ). Defaults to UTC if unset.
+            - TZ=${TZ}
         networks:
             idra_main:
 
@@ -202,6 +208,10 @@ services:
             - JAVA_OPTS=${JAVA_OPTS}
             - idra.orion.manager.url=${IDRA_ORION_MANAGER_URL}
             - idra.orion.cb.url=${IDRA_ORION_CB_URL}
+        # Automatic MQA analysis on federation / re-synchronization
+            - idra.mqa.enabled=${IDRA_MQA_ENABLED}
+            - idra.mqa.url=${IDRA_MQA_URL}
+            - idra.mqa.idra.baseurl=${IDRA_MQA_IDRA_BASEURL}
         # env variables for KEYCLOAK authentication
             - idra.authentication.method=${IDRA_AUTH_METHOD}
             - idm.protocol=${IDM_PROTOCOL}
