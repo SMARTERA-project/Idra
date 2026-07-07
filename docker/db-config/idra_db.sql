@@ -1376,6 +1376,7 @@ CREATE TABLE `odms` (
   `name` varchar(255) NOT NULL,
   `state` varchar(255) NOT NULL,
   `isFederatedInCb` bit(1) DEFAULT NULL,
+  `mqa_analysis_id` varchar(255) DEFAULT NULL,
   `type` varchar(255) NOT NULL,
   `publisher_email` varchar(255) DEFAULT NULL,
   `publisher_name` varchar(255) NOT NULL,
@@ -1428,9 +1429,6 @@ ALTER TABLE `odms`
     REFERENCES `dcat_location`(`location_id`),
   ADD CONSTRAINT `FK_cat_temp` FOREIGN KEY (`temporalCoverage_id`)
     REFERENCES `dcat_periodoftime`(`periodOfTime_id`);
-
--- ODMS: id of the last MQA analysis (automatic MQA analysis on federation)
-ALTER TABLE `odms` ADD COLUMN `mqa_analysis_id` VARCHAR(255) DEFAULT NULL;
 
 --
 -- Table structure for table `odms_additional_config`

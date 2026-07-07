@@ -140,9 +140,6 @@ services:
             # Hosts allowed for server-side fetch (SSRF allowlist); must include Idra
             # so MQA can pull catalogue dumps via file_url during auto-analysis.
             - MQA_URL_ALLOWLIST=${MQA_URL_ALLOWLIST}
-            # Timezone for analysis timestamps shown in the MQA list (Python datetime.now()
-            # uses the container TZ). Defaults to UTC if unset.
-            - TZ=${TZ}
         networks:
             idra_main:
 
