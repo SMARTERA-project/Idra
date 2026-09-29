@@ -216,8 +216,13 @@ public class OdmsCatalogue {
   @Column(name = "dumpFilePath", unique = true, nullable = true)
   private String dumpFilePath;
 
-  /** The dump url. */
-  @Column(name = "dumpURL", unique = true, nullable = true)
+  /**
+   * The dump url. Length 2048: a dumpURL can be a SPARQL endpoint with an
+   * URL-encoded CONSTRUCT query, which easily exceeds the default 255 chars.
+   * The unique index is built on a prefix (see idra_db.sql), since utf8mb3
+   * caps an InnoDB index key at 3072 bytes.
+   */
+  @Column(name = "dumpURL", unique = true, nullable = true, length = 2048)
   @SerializedName(value = "dumpURL")
   private String dumpUrl;
 
