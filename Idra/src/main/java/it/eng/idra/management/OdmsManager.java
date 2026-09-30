@@ -98,6 +98,8 @@ public class OdmsManager {
           "it.eng.idra.connectors.OpenDataSoftConnector");
       ODMSConnectorsList.put(OdmsCatalogueType.JUNAR, "it.eng.idra.connectors.JunarConnector");
       ODMSConnectorsList.put(OdmsCatalogueType.ZENODO, "it.eng.idra.connectors.ZenodoConnector");
+      ODMSConnectorsList.put(OdmsCatalogueType.GEONETWORK_ISO19139,
+          "it.eng.idra.connectors.GeoNetworkConnector");
 
     } catch (Exception e) {
       logger.error(e.getMessage(), e);
