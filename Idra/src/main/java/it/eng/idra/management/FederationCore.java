@@ -1066,7 +1066,7 @@ public class FederationCore {
    */
   public static boolean isDcatTheme(String value) {
     // log dcatThemes
-    logger.info("Available DCAT themes: " + dcatThemes.toString());
+    logger.debug("Available DCAT themes: " + dcatThemes);
 
     String identifierFromLink = (value != null && (value.startsWith("http://") || value.startsWith("https://"))) ? value.substring(value.lastIndexOf("/") + 1) : null;
   

@@ -611,7 +611,9 @@ public class SocrataConnector implements IodmsConnector {
       throws ParseException, URISyntaxException, OdmsCatalogueOfflineException,
       OdmsCatalogueForbiddenException, OdmsCatalogueNotFoundException, IOException {
 
-    return getAllDatasets().size();
+    // Count the raw data.json entries: converting every dataset to DCAT just to count
+    // them is expensive on large portals.
+    return getJsonDatasets().length();
 
   }
 

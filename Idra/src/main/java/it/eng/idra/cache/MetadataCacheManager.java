@@ -1513,7 +1513,8 @@ public class MetadataCacheManager {
         for (int i = 0; i < rounds; i++) {
 
           int beg = i * 10000;
-          int end = (((i + 1) * 10000 - 1) > toLoad.size()) ? toLoad.size() : ((i + 1) * 10000 - 1);
+          // subList's end is exclusive: (i + 1) * 10000 - 1 skipped one dataset per full round.
+          int end = Math.min((i + 1) * 10000, toLoad.size());
 
           logger.debug("TOTAL: " + toLoad.size() + " FROM: " + beg + " TO: " + end);
 

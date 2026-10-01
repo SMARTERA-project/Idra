@@ -307,7 +307,9 @@ public class DcatDataset implements Serializable {
     try {
       setNodeName(FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId)).getName());
     } catch (NumberFormatException | OdmsCatalogueNotFoundException e) {
-      logger.error(e.getMessage(), e);
+      // Expected for datasets built from a non-federated catalogue (e.g. the remote
+      // catalogue datasetCount probe): logging a stack trace per dataset floods the log.
+      logger.debug("Node name not resolved for nodeId=" + nodeId + ": " + e.getMessage());
       setNodeName("");
     }
 
@@ -1848,18 +1850,18 @@ public class DcatDataset implements Serializable {
     }
 
     if (distributions != null && !distributions.isEmpty()) {
-      logger.info("into distribution block");
-      // logger.info(distributions);
+      logger.debug("into distribution block");
+      // logger.debug(distributions);
       distributions.stream().filter(item -> item != null)
           .forEach(item -> {
-            logger.info(item);
+            logger.debug(item);
             doc.addChildDocument(item.toDoc());
           });
 
       doc.addField("distributionFormats", distributions.stream().filter(x -> x != null).map(x -> {
-        logger.info("into distributionFormats block");
-        logger.info(x.getFormat());
-        logger.info(x.getMediaType());
+        logger.debug("into distributionFormats block");
+        logger.debug(x.getFormat());
+        logger.debug(x.getMediaType());
         if (x.getFormat() != null && StringUtils.isNotBlank(x.getFormat().getValue())) {
           return x.getFormat().getValue().replaceFirst("\\.", "").toLowerCase();
         } else if (x.getMediaType() != null
@@ -1873,7 +1875,7 @@ public class DcatDataset implements Serializable {
           return null;
         }
       }).distinct().collect(Collectors.toList()));
-      logger.info("dopo distribution formats");
+      logger.debug("dopo distribution formats");
       doc.addField("distributionLicenses",
           distributions.stream()
               .filter(x -> x != null && x.getLicense() != null && x.getLicense().getName() != null
@@ -1881,7 +1883,7 @@ public class DcatDataset implements Serializable {
               .map(x -> x.getLicense().getName().getValue().toLowerCase()).distinct()
               .collect(Collectors.toList()));
     }
-    logger.info("distributionLicenses to doc ok");
+    logger.debug("distributionLicenses to doc ok");
     List<String> flattenedKeywords = getKeywords();
     if (flattenedKeywords != null && !flattenedKeywords.isEmpty()) {
       doc.addField("keywords", flattenedKeywords);
@@ -1909,7 +1911,7 @@ public class DcatDataset implements Serializable {
         doc.addField("keywordDetails_ss", serializedKeywordDetails);
       }
     }
-    logger.info("keywords to doc ok");
+    logger.debug("keywords to doc ok");
     // try {
     // if(StringUtils.isNotBlank(seoIdentifier))
     // doc.addField("seoIdentifier",seoIdentifier);
