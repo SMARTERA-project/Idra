@@ -54,6 +54,7 @@
  import it.eng.idra.management.RdfPrefixManager;
  import it.eng.idra.management.StatisticsManager;
  import it.eng.idra.utils.CommonUtil;
+import it.eng.idra.utils.UrlSecurityValidator;
  import it.eng.idra.utils.GsonUtil;
  import it.eng.idra.utils.GsonUtilException;
  import it.eng.idra.utils.PropertyManager;
@@ -931,15 +932,21 @@ import java.nio.file.Paths;
   @Produces(MediaType.APPLICATION_JSON)
   public Response checkRemoteCatalogueHealth(@QueryParam("url") String url) {
     String status = "UNKNOWN";
-    if (url != null && !url.trim().isEmpty()) {
+    // SSRF guard: without it this endpoint (read permission) works as a port scanner
+    // of the internal network.
+    if (url != null && !url.trim().isEmpty() && !UrlSecurityValidator.isSafePublicUrl(url)) {
+      logger.warn("Blocked remote catalogue health check for non-public or invalid URL: " + url);
+    } else if (url != null && !url.trim().isEmpty()) {
       java.net.HttpURLConnection conn = null;
       try {
-        java.net.URL urlObj = new java.net.URL(url);
+        java.net.URL urlObj = new java.net.URL(url.trim());
         conn = (java.net.HttpURLConnection) urlObj.openConnection();
         conn.setRequestMethod("HEAD");
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
-        conn.setInstanceFollowRedirects(true);
+        // Do not follow redirects (the target would escape the guard); a 3xx already
+        // proves the host is alive.
+        conn.setInstanceFollowRedirects(false);
         int code = conn.getResponseCode();
         // 405 means server rejected HEAD but is alive — treat as ONLINE
         status = (code < 500 || code == 405) ? "ONLINE" : "OFFLINE";
@@ -979,6 +986,10 @@ import java.nio.file.Paths;
       @QueryParam("apiKey") String apiKey) {
     JSONObject body = new JSONObject();
     if (url == null || url.trim().isEmpty() || nodeType == null || nodeType.trim().isEmpty()) {
+      return Response.status(Response.Status.OK).entity(body.put("count", JSONObject.NULL).toString()).build();
+    }
+    if (!UrlSecurityValidator.isSafePublicUrl(url)) {
+      logger.warn("Blocked remote catalogue datasetCount for non-public or invalid URL: " + url);
       return Response.status(Response.Status.OK).entity(body.put("count", JSONObject.NULL).toString()).build();
     }
     try {

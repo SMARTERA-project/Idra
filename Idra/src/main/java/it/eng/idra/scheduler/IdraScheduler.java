@@ -29,6 +29,7 @@ import it.eng.idra.scheduler.job.DcatApDumpJob;
 import it.eng.idra.scheduler.job.DeleteLogsJob;
 import it.eng.idra.scheduler.job.OauthTokenSynchJob;
 import it.eng.idra.scheduler.job.OdmsSynchJob;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import javax.servlet.ServletContext;
@@ -261,7 +262,9 @@ public class IdraScheduler {
           .withSchedule(CronScheduleBuilder.weeklyOnDayAndHourAndMinute(DateBuilder.SUNDAY, 2, 0)
               .withMisfireHandlingInstructionDoNothing())
           .build();
-      scheduler.scheduleJob(job, trigger);
+      // Persistent JobStore: replace the stored job/trigger instead of failing with
+      // ObjectAlreadyExistsException at every boot (and never picking up schedule changes).
+      scheduler.scheduleJob(job, Collections.singleton(trigger), true);
       logger.info("Delete Logs Job scheduled");
     } catch (SchedulerException e) {
       logger.error("Error while scheduling Delete Logs job: " + e.getMessage());
@@ -283,7 +286,7 @@ public class IdraScheduler {
           .withSchedule(CronScheduleBuilder.dailyAtHourAndMinute(0, 0)
               .withMisfireHandlingInstructionDoNothing())
           .build();
-      scheduler.scheduleJob(job, trigger);
+      scheduler.scheduleJob(job, Collections.singleton(trigger), true);
       logger.info("Catalogues Dump Job scheduled");
     } catch (SchedulerException e) {
       logger.error("Error while scheduling Catalogues Dump job: " + e.getMessage());
@@ -364,7 +367,7 @@ public class IdraScheduler {
                     .withMisfireHandlingInstructionNextWithExistingCount())
             .build();
 
-        scheduler.scheduleJob(job, trigger);
+        scheduler.scheduleJob(job, Collections.singleton(trigger), true);
         logger.info("Synch Job scheduled for catalogue " + node.getName());
 
       } catch (SchedulerException e) {
@@ -404,7 +407,7 @@ public class IdraScheduler {
               .withMisfireHandlingInstructionNowWithRemainingCount())
           .startNow().build();
 
-      scheduler.scheduleJob(job, trigger);
+      scheduler.scheduleJob(job, Collections.singleton(trigger), true);
       logger.info("Token Synch Job scheduled for catalogue " + node.getName());
 
     } catch (SchedulerException e) {

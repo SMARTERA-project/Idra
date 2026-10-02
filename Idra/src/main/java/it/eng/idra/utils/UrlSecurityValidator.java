@@ -18,6 +18,11 @@ package it.eng.idra.utils;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Shared SSRF guard for outbound HTTP requests built from user-supplied URLs.
@@ -25,10 +30,26 @@ import java.net.URISyntaxException;
  * <p>A URL is considered safe only when its scheme is http/https and every
  * resolved IP address is publicly routable (not loopback, link-local,
  * site-local/RFC-1918, any-local, or multicast).
+ *
+ * <p>Hosts listed in the {@code IDRA_URL_ALLOWLIST} environment variable
+ * (comma-separated host names, e.g. {@code orion-ld,mqa-score}) skip the IP
+ * check, so services on the internal docker network stay reachable.
  */
 public final class UrlSecurityValidator {
 
+  private static final Set<String> ALLOWED_HOSTS = parseAllowlist(System.getenv("IDRA_URL_ALLOWLIST"));
+
   private UrlSecurityValidator() {
+  }
+
+  static Set<String> parseAllowlist(String raw) {
+    if (raw == null || raw.trim().isEmpty()) {
+      return Collections.emptySet();
+    }
+    return Arrays.stream(raw.split(","))
+        .map(h -> h.trim().toLowerCase(Locale.ROOT))
+        .filter(h -> !h.isEmpty())
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
@@ -57,6 +78,9 @@ public final class UrlSecurityValidator {
     String host = uri.getHost();
     if (host == null || host.isEmpty()) {
       return false;
+    }
+    if (ALLOWED_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+      return true;
     }
     try {
       // Validate every resolved address to reduce DNS-rebinding / multi-A-record bypass.

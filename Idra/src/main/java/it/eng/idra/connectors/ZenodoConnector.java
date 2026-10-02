@@ -172,7 +172,6 @@ public class ZenodoConnector implements IodmsConnector {
     logger.info("findDatasets nodeid " + String.valueOf(node.getId()));
     logger.info("findDatasets node name " + node.getName());
     logger.info("findDatasets node host" + node.getHost());
-    logger.info("findDatasets node apikey " + node.getApiKey());
     logger.info("findDatasets node communities " + node.getCommunities());
     logger.info("findDatasets searchParameters communities " + communities);
     //
@@ -514,7 +513,6 @@ public class ZenodoConnector implements IodmsConnector {
     logger.info("getDataset nodeid " + String.valueOf(node.getId()));
     logger.info("getDataset node name " + node.getName());
     logger.info("getDataset node host" + node.getHost());
-    logger.info("getDataset node apikey " + node.getApiKey());
     logger.info("getDataset node dataset count " + node.getDatasetCount());
     logger.info("getDataset node dataset start " + node.getDatasetStart());
     logger.info("getDataset node communities " + node.getCommunities());
@@ -570,7 +568,6 @@ public class ZenodoConnector implements IodmsConnector {
     logger.info("ZenodoConnector - getAllDatasets - nodeid: " + String.valueOf(node.getId()));
     logger.info("ZenodoConnector - getAllDatasets - node name: " + node.getName());
     logger.info("ZenodoConnector - getAllDatasets - node host: " + node.getHost());
-    logger.info("ZenodoConnector - getAllDatasets - node apikey: " + node.getApiKey());
     logger.info("ZenodoConnector - getAllDatasets - node communities: " + node.getCommunities());
     //
     logger.info("-- Zenodo Connector Request sent -- First synchronization ");

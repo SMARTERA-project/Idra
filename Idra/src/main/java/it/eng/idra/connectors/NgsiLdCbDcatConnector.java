@@ -170,7 +170,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       distro.setTitle(title);
 
     }
-    logger.info("title ok");
+    logger.debug("title ok");
     String description = null;
     if (j.has("description")) {
       JSONObject titleObject = j.getJSONObject("description");
@@ -185,7 +185,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       distro.setAccessUrl(accessUrl);
     }
 
-    logger.info("accessUrl ok");
+    logger.debug("accessUrl ok");
 
     String downloadUrl = null;
     if (j.has("downloadURL")) {
@@ -194,44 +194,44 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       distro.setDownloadUrl(downloadUrl);
     }
 
-    logger.info("downloadUrl ok");
+    logger.debug("downloadUrl ok");
     if (j.has("format")) {
       JSONObject formatObject = j.getJSONObject("format");
       distro.setFormat(formatObject.getString("value"));
     }
-    logger.info("format ok");
+    logger.debug("format ok");
     JSONObject attributeObject = new JSONObject();
     if (j.has("byteSize")) {
       attributeObject = j.getJSONObject("byteSize");
       distro.setByteSize(attributeObject.getString("value"));
     }
-    logger.info("byteSize ok");
+    logger.debug("byteSize ok");
     if (j.has("checksum")) {
       attributeObject = j.getJSONObject("checksum");
       distro.setChecksum(attributeObject.getString("value"));
     }
-    logger.info("checksum ok");
+    logger.debug("checksum ok");
     if (j.has("rights")) {
       attributeObject = j.getJSONObject("rights");
       distro.setRights(attributeObject.getString("value"));
     }
-    logger.info("rights ok");
+    logger.debug("rights ok");
     if (j.has("mediaType")) {
       attributeObject = j.getJSONObject("mediaType");
       distro.setMediaType(attributeObject.getString("value"));
     }
-    logger.info("mediaType ok");
+    logger.debug("mediaType ok");
     if (j.has("description")) {
       attributeObject = j.getJSONObject("description");
       distro.setDescription(attributeObject.getString("value"));
     }
-    logger.info("description ok");
+    logger.debug("description ok");
     if (j.has("license")) {
       attributeObject = j.getJSONObject("license");
       distro.setLicense(new DctLicenseDocument("", attributeObject.getString("value"),
           "", "", nodeId));
     }
-    logger.info("license ok");
+    logger.debug("license ok");
     String releaseDate = null;
     if (j.has("releaseDate")) {
       JSONObject relDateObject = j.getJSONObject("releaseDate");
@@ -240,7 +240,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       releaseDate = CommonUtil.fixBadUtcDate(date);
       distro.setReleaseDate(releaseDate);
     }
-    logger.info("releaseDate ok");
+    logger.debug("releaseDate ok");
     String updateDate = null;
     if (j.has("modifiedDate")) {
       JSONObject updDateObject = j.getJSONObject("modifiedDate");
@@ -250,18 +250,18 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       distro.setUpdateDate(updateDate);
 
     }
-    logger.info("modifiedDate ok");
+    logger.debug("modifiedDate ok");
     // if (j.has("status")) {
-    // logger.info("Distribution status skipped");
+    // logger.debug("Distribution status skipped");
     // }
     // if (j.has("language")) {
-    // logger.info("Distribution language skipped");
+    // logger.debug("Distribution language skipped");
     // }
     // if (j.has("linkedSchemas")) {
-    // logger.info("Distribution linkedSchemas skipped");
+    // logger.debug("Distribution linkedSchemas skipped");
     // }
     // if (j.has("documentation")) {
-    // logger.info("Distribution documentation skipped");
+    // logger.debug("Distribution documentation skipped");
     // }
 
     // new
@@ -386,7 +386,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
 
     JSONObject titleObject = j.getJSONObject("title");
     title = titleObject.getString("value");
-    logger.info("title ok");
+    logger.debug("title ok");
 
     identifier = j.optString("id", null);
 
@@ -394,13 +394,13 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       JSONObject desObject = j.getJSONObject("description");
       description = desObject.getString("value");
     }
-    logger.info("description ok");
+    logger.debug("description ok");
     // landingPage
     String landingPage = "";
     if (j.has("landingPage")) {
       JSONObject lanPageObject = j.getJSONObject("landingPage");
       landingPage = lanPageObject.getString("value");
-      logger.info("landingPage ok");
+      logger.debug("landingPage ok");
     }
 
     // frequency
@@ -409,7 +409,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       JSONObject freqObject = j.getJSONObject("frequency");
       frequency = freqObject.getString("value");
     }
-    logger.info("frequency ok");
+    logger.debug("frequency ok");
     JSONArray values = new JSONArray();
 
     // Themes
@@ -431,7 +431,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
             SkosConceptTheme.class));
       }
     }
-    logger.info("theme ok");
+    logger.debug("theme ok");
     // Keywords
     if (j.has("keyword")) {
       JSONObject keyObject = j.getJSONObject("keyword");
@@ -445,7 +445,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         keywords.add(keyObject.getString("value"));
       }
     }
-    logger.info("keyword ok");
+    logger.debug("keyword ok");
     // Languages
     List<String> language = new ArrayList<String>();
     if (j.has("language")) {
@@ -460,7 +460,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         language.add(lanObject.getString("value"));
       }
     }
-    logger.info("language ok");
+    logger.debug("language ok");
     // Documentation
     if (j.has("documentation")) {
       JSONObject docObject = j.getJSONObject("documentation");
@@ -474,7 +474,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         documentation.add(docObject.getString("value"));
       }
     }
-    logger.info("documentation ok");
+    logger.debug("documentation ok");
     // Provenance
     if (j.has("provenance")) {
       JSONObject provObject = j.getJSONObject("provenance");
@@ -488,7 +488,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         provenance.add(provObject.getString("value"));
       }
     }
-    logger.info("provenance ok");
+    logger.debug("provenance ok");
     // Other Identifiers
     if (j.has("otherIdentifier")) {
       JSONObject othIdObject = j.getJSONObject("otherIdentifier");
@@ -502,14 +502,14 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         otherIdentifier.add(othIdObject.getString("value"));
       }
     }
-    logger.info("other ok");
+    logger.debug("other ok");
     // Version
     String version = "";
     if (j.has("version")) {
       JSONObject verObject = j.getJSONObject("version");
       version = verObject.getString("value");
     }
-    logger.info("versione ok");
+    logger.debug("versione ok");
     // Version Notes
     if (j.has("versionNotes")) {
       JSONObject verNotesObject = j.getJSONObject("versionNotes");
@@ -523,14 +523,14 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
         versionNotes.add(verNotesObject.getString("value"));
       }
     }
-    logger.info("versionNote ok");
+    logger.debug("versionNote ok");
     // AccessRights
     String accessRights = "";
     if (j.has("accessRights")) {
       JSONObject accRightsObject = j.getJSONObject("accessRights");
       accessRights = accRightsObject.getString("value");
     }
-    logger.info("access ok");
+    logger.debug("access ok");
     String type = null;
     type = j.optString("type", null); // ?
 
@@ -542,7 +542,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       String date = valueObj.getString("@value");
       releaseDate = CommonUtil.fixBadUtcDate(date);
     }
-    logger.info("release ok");
+    logger.debug("release ok");
     // Update Date
     String updateDate = null;
     if (j.has("updateDate")) {
@@ -551,7 +551,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
       String date = valueObj.getString("@value");
       updateDate = CommonUtil.fixBadUtcDate(date);
     }
-    logger.info("update ok");
+    logger.debug("update ok");
     List<VcardOrganization> contactPointList = new ArrayList<VcardOrganization>();
     if (j.has("contactPoint")) {
       JSONObject contObject = j.getJSONObject("contactPoint");
@@ -572,7 +572,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
                 "", "", "", nodeId));// identifier
       }
     }
-    logger.info("contactpoint ok");
+    logger.debug("contactpoint ok");
     FoafAgent publisher = null;
     FoafAgent creator = null;
     // Publisher
@@ -585,7 +585,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
           "", "", null,
           "", String.valueOf(node.getId()));
     }
-    logger.info("publisher ok");
+    logger.debug("publisher ok");
     // Creator
     if (j.has("creator")) {
       JSONObject creat = j.getJSONObject("creator");
@@ -596,7 +596,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
           "", "", null,
           "", String.valueOf(node.getId()));
     }
-    logger.info("creator ok");
+    logger.debug("creator ok");
     List<String> sample = new ArrayList<String>();
     List<String> source = new ArrayList<String>();
     List<String> hasVersion = new ArrayList<String>();
@@ -619,29 +619,29 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
     if (j.has("datasetDistribution")) {
       List<String> distributionsId = new ArrayList<String>();
       JSONObject distribObject = j.getJSONObject("datasetDistribution");
-      logger.info(distribObject.toString());
+      logger.debug(distribObject.toString());
       if (distribObject.get("value") instanceof JSONArray) {
-        logger.info("distribution array");
+        logger.debug("distribution array");
         JSONArray distrib = distribObject.getJSONArray("value");
-        logger.info(distrib);
+        logger.debug(distrib);
         for (int i = 0; i < distrib.length(); i++) {
-          logger.info("nel for");
+          logger.debug("nel for");
           distributionsId.add(distrib.getString(i));
         }
 
       } else {
         distributionsId.add(distribObject.getString("value"));
       }
-      logger.info(distributionsId);
+      logger.debug(distributionsId);
       for (int i = 0; i < distributionsId.size(); i++) {
-        logger.info(distributionsId);
+        logger.debug(distributionsId);
         DcatDistribution distro = distributionToDcat(getJsonDistribution(distributionsId.get(i)),
             node);
         distributionList.add(distro);
       }
 
     }
-    logger.info("datasetDistr ok");
+    logger.debug("datasetDistr ok");
     FoafAgent rightsHolder = null;
     // spatialCoverage e conformsTo non sono previsti nello smart data model
     // DCATAP/NGSILD
@@ -908,7 +908,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
           + "}"
           + "}";
 
-      logger.info("REQUEST NOTIFY: " + req);
+      logger.debug("REQUEST NOTIFY: " + req);
 
       String api = node.getHost() + "/ngsi-ld/v1/subscriptions/";
       response = client.sendPostRequest(api, req,
@@ -941,14 +941,13 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
 
     for (int i = 0; i < datasetsArray.length(); i++) {
       try {
-        logger.info(datasetsArray);
 
         JSONObject dataset = datasetsArray.getJSONObject(i);
-        logger.info(dataset);
+        logger.debug(dataset);
         DcatDataset dcatDataset = datasetToDcat(dataset, node);
 
         dcatDatasets.add(dcatDataset);
-        logger.info("aggiunto indice" + i);
+        logger.debug("aggiunto indice" + i);
         datasetsNgsiId.add(dcatDataset.getIdentifier().getValue());
 
         dataset = null;
@@ -1001,13 +1000,13 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
     }
 
     String url = node.getHost() + "/ngsi-ld/v1/entities?type=DistributionDCAT-AP&id=" + distribId;
-    logger.info(url);
+    logger.debug(url);
 
     HttpResponse response = client.sendGetRequest(url, headers);
     String returnedJson = client.getHttpResponseBody(response);
 
     JSONArray jsonArr = new JSONArray(returnedJson);
-    logger.info(jsonArr);
+    logger.debug(jsonArr);
     JSONObject jsonObject = jsonArr.getJSONObject(0);
     return jsonObject;
   }

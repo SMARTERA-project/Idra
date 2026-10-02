@@ -213,7 +213,10 @@ services:
             - idra.db.password=${IDRA_DB_PASSWORD}
             - idra.db.name=${IDRA_DB_NAME}
             - idra.cache.loadfromdb=true
-            - idra.synch.onstart=true
+            # Full sync of every catalogue at each boot: off by default (heavy right after startup)
+            - idra.synch.onstart=${IDRA_SYNCH_ONSTART:-false}
+            # Internal hosts allowed by the SSRF guard (comma-separated host names)
+            - IDRA_URL_ALLOWLIST=${IDRA_URL_ALLOWLIST:-}
             - idra.odms.dump.file.path=/opt/idra/dump/
             - idra.dump.file.path=/opt/idra/dump/
             - idra.lod.enable=true
