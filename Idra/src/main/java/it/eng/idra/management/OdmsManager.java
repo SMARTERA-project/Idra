@@ -42,8 +42,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
 import org.apache.jena.rdf.model.Model;
@@ -59,14 +61,17 @@ public class OdmsManager {
   /** The logger. */
   private static Logger logger = LogManager.getLogger(OdmsManager.class);
 
-  /** The federated nodes. */
-  private static List<OdmsCatalogue> federatedNodes = new ArrayList<OdmsCatalogue>();
+  /**
+   * The federated nodes, by id. Read concurrently by REST requests, Quartz jobs and the
+   * DcatDataset constructor: entries are replaced atomically (never removed and re-added)
+   * and a reload swaps the whole map, so readers never see a node temporarily missing.
+   */
+  private static volatile ConcurrentHashMap<Integer, OdmsCatalogue> federatedNodes =
+      new ConcurrentHashMap<Integer, OdmsCatalogue>();
 
   /** The ODMS connectors list. */
   private static HashMap<OdmsCatalogueType, String> ODMSConnectorsList = new HashMap<OdmsCatalogueType, String>();
   
-  /** The get nodes lock. */
-  private static boolean getNodesLock = false;
   // private static PersistenceManager jpa;
 
   /**
@@ -78,7 +83,7 @@ public class OdmsManager {
   static {
     try {
 
-      federatedNodes = getOdmsCataloguesfromDb(false);
+      federatedNodes = toRegistry(getOdmsCataloguesfromDb(false));
 
       logger.info("Federated Nodes: " + federatedNodes.size());
       ODMSConnectorsList.put(OdmsCatalogueType.CKAN, "it.eng.idra.connectors.CkanConnector");
@@ -153,18 +158,24 @@ public class OdmsManager {
    * @return the odms catalogues
    */
   public static List<OdmsCatalogue> getOdmsCataloguesList() {
+    return snapshot();
+  }
 
-    while (getNodesLock) {
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-
-        logger.error(e.getMessage(), e);
-      }
+  /** Builds a registry from a list of catalogues. */
+  private static ConcurrentHashMap<Integer, OdmsCatalogue> toRegistry(List<OdmsCatalogue> nodes) {
+    ConcurrentHashMap<Integer, OdmsCatalogue> registry =
+        new ConcurrentHashMap<Integer, OdmsCatalogue>();
+    for (OdmsCatalogue node : nodes) {
+      registry.put(node.getId(), node);
     }
+    return registry;
+  }
 
-    return federatedNodes;
-
+  /** A copy of the federated nodes ordered by id: callers may filter/sort it freely. */
+  private static List<OdmsCatalogue> snapshot() {
+    List<OdmsCatalogue> nodes = new ArrayList<OdmsCatalogue>(federatedNodes.values());
+    nodes.sort(Comparator.comparingInt(OdmsCatalogue::getId));
+    return nodes;
   }
 
   /**
@@ -174,13 +185,10 @@ public class OdmsManager {
    * @return the odms catalogue idby name
    */
   public static Integer getOdmsCatalogueIdbyName(String nodeName) {
-    try {
-      return federatedNodes.stream().filter(x -> x.getName().equals(nodeName)).findFirst().get()
-          .getId();
-    } catch (Exception e) {
-      return federatedNodes.stream().map(x -> x.getId()).collect(Collectors.toList()).stream()
-          .max(Integer::compare).get() + 1;
-    }
+    List<OdmsCatalogue> nodes = snapshot();
+    return nodes.stream().filter(x -> x.getName().equals(nodeName)).findFirst()
+        .map(OdmsCatalogue::getId)
+        .orElseGet(() -> nodes.stream().mapToInt(OdmsCatalogue::getId).max().orElse(0) + 1);
   }
 
   /**
@@ -191,14 +199,13 @@ public class OdmsManager {
   public static void updateOdmsCatalogueList() throws SQLException {
     List<OdmsCatalogue> newNodes = getOdmsCataloguesfromDb(false);
     for (OdmsCatalogue newNode : newNodes) {
-      OdmsCatalogue existing = federatedNodes.stream()
-          .filter(n -> n.getId() == newNode.getId())
-          .findFirst().orElse(null);
+      OdmsCatalogue existing = federatedNodes.get(newNode.getId());
       if (existing != null && existing.getImage() != null) {
         newNode.setImage(existing.getImage());
       }
     }
-    federatedNodes = newNodes;
+    // Swap the whole registry at once: no window where the nodes are missing.
+    federatedNodes = toRegistry(newNodes);
   }
 
   /**
@@ -211,17 +218,8 @@ public class OdmsManager {
   public static List<OdmsCatalogue> getOdmsCatalogues(boolean withImage)
       throws OdmsManagerException {
 
-    while (getNodesLock) {
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-
-        logger.error(e.getMessage(), e);
-      }
-    }
-
     if (!withImage) {
-      return federatedNodes;
+      return snapshot();
     } else {
       try {
         return getOdmsCataloguesfromDb(withImage);
@@ -244,7 +242,7 @@ public class OdmsManager {
   public static ArrayList<Integer> getOdmsCataloguesId() {
     ArrayList<Integer> nodesIdList = new ArrayList<Integer>();
 
-    for (OdmsCatalogue node : federatedNodes) {
+    for (OdmsCatalogue node : snapshot()) {
       nodesIdList.add(node.getId());
     }
 
@@ -263,12 +261,11 @@ public class OdmsManager {
 
   public static OdmsCatalogue getOdmsCatalogue(int id) throws OdmsCatalogueNotFoundException {
 
-    try {
-      return federatedNodes.get(federatedNodes.indexOf((new OdmsCatalogue(id))));
-    } catch (IndexOutOfBoundsException | NullPointerException e) {
+    OdmsCatalogue node = federatedNodes.get(id);
+    if (node == null) {
       throw new OdmsCatalogueNotFoundException("The ODMS node does not exist in the federation!");
     }
-
+    return node;
   }
 
   /**
@@ -284,11 +281,7 @@ public class OdmsManager {
       throws OdmsCatalogueNotFoundException, OdmsManagerException {
 
     if (!withImage) {
-      try {
-        return federatedNodes.get(federatedNodes.indexOf((new OdmsCatalogue(id))));
-      } catch (IndexOutOfBoundsException | NullPointerException e) {
-        throw new OdmsCatalogueNotFoundException("The ODMS node does not exist in the federation!");
-      }
+      return getOdmsCatalogue(id);
     } else {
       try {
         return getOdmsCataloguefromDb(id, withImage);
@@ -339,7 +332,7 @@ public class OdmsManager {
       OdmsCatalogueFederationLevel integrationLevelFirst,
       OdmsCatalogueFederationLevel integrationLevelSecond) {
 
-    return federatedNodes.stream()
+    return snapshot().stream()
         .filter(node -> node.getFederationLevel().equals(integrationLevelFirst)
             || node.getFederationLevel().equals(integrationLevelSecond))
         .collect(Collectors.toList());
@@ -355,10 +348,25 @@ public class OdmsManager {
    */
   public static List<OdmsCatalogue> getOdmsCataloguesbyFederationLevelOne() {
 
-    return federatedNodes.stream()
+    return snapshot().stream()
         .filter(node -> !node.getFederationLevel().equals(OdmsCatalogueFederationLevel.LEVEL_0))
         .collect(Collectors.toList());
 
+  }
+
+  /**
+   * Whether the node would duplicate an already federated endpoint (same type and host).
+   * DCATDUMP nodes may share a host; Zenodo nodes may share it with a different community.
+   */
+  static boolean isDuplicateEndpoint(OdmsCatalogue node) {
+    if (OdmsCatalogueType.DCATDUMP.equals(node.getNodeType())) {
+      return false;
+    }
+    List<OdmsCatalogue> nodes = snapshot();
+    if (OdmsCatalogueType.ZENODO.equals(node.getNodeType())) {
+      return hasDuplicateZenodoCommunity(nodes, node);
+    }
+    return nodes.stream().anyMatch(n -> n.isSameEndpoint(node));
   }
 
   public static boolean hasDuplicateZenodoCommunity(List<OdmsCatalogue> nodes, OdmsCatalogue newNode) {
@@ -391,14 +399,10 @@ public class OdmsManager {
       throws OdmsAlreadyPresentException, OdmsCatalogueNotFoundException,
       OdmsCatalogueOfflineException, OdmsCatalogueForbiddenException, OdmsManagerException {
 
-    // Sets the lock true, in order to avoid node retrieval until the new
-    // node is created
-    getNodesLock = true;
-
     int assignedNodeId;
     int datasetsCount = 0;
 
-    if (!federatedNodes.contains(node) || !hasDuplicateZenodoCommunity(federatedNodes, node) || node.getNodeType().equals(OdmsCatalogueType.DCATDUMP)) {
+    if (!isDuplicateEndpoint(node)) {
       PersistenceManager jpa = new PersistenceManager();
 
       try {
@@ -452,8 +456,8 @@ public class OdmsManager {
            * Unlock the Get nodes and add the persisted Node in the global Federated Nodes
            * list
            */
-          getNodesLock = false;
-          federatedNodes.add(node);
+          // Published only once persisted, so readers never see a half-built node.
+          federatedNodes.put(assignedNodeId, node);
 
           return assignedNodeId;
 
@@ -528,8 +532,8 @@ public class OdmsManager {
           if (updateNode) {
             updateInactiveOdmsCatalogue(node);
           }
-          getNodesLock = false;
-          federatedNodes.add(node);
+          // Published only once persisted, so readers never see a half-built node.
+          federatedNodes.put(assignedNodeId, node);
 
           return assignedNodeId;
         }
@@ -540,12 +544,10 @@ public class OdmsManager {
         throw new OdmsManagerException(
             "There was an error " + "while adding the ODMS Node: " + e.getMessage());
       } finally {
-        getNodesLock = false;
         jpa.jpaClose();
       }
 
     } else {
-      getNodesLock = false;
       throw new OdmsAlreadyPresentException("ODMS Node is already present");
     }
 
@@ -671,7 +673,7 @@ public class OdmsManager {
     try {
 
       jpa.jpaDeleteOdmsCatalogue(node.getId());
-      federatedNodes.remove(node);
+      federatedNodes.remove(node.getId());
 
     } catch (Exception e) {
       throw new OdmsManagerException(
@@ -696,22 +698,20 @@ public class OdmsManager {
 
     throws OdmsCatalogueNotFoundException, OdmsManagerException {
       try {
-        if (federatedNodes.remove(node)) {
-          try {
-            if (persist) {
-              PersistenceManager jpa = new PersistenceManager();
-              try {
-                jpa.jpaUpdateOdmsCatalogue(node);
-              } catch (Exception e) {
-                throw new OdmsManagerException(
-                    "There " + "was an error while updating the ODMS Node: " + e.getMessage());
-              } finally {
-                jpa.jpaClose();
-              }
+        if (federatedNodes.containsKey(node.getId())) {
+          if (persist) {
+            PersistenceManager jpa = new PersistenceManager();
+            try {
+              jpa.jpaUpdateOdmsCatalogue(node);
+            } catch (Exception e) {
+              throw new OdmsManagerException(
+                  "There " + "was an error while updating the ODMS Node: " + e.getMessage());
+            } finally {
+              jpa.jpaClose();
             }
-          } finally {
-            federatedNodes.add(node);
           }
+          // Atomic replace: the node never disappears from the registry while updating.
+          federatedNodes.put(node.getId(), node);
 
         } else {
           throw new OdmsCatalogueNotFoundException("The ODMS node does not exist!");
@@ -751,9 +751,7 @@ public class OdmsManager {
    */
   public static void addFederatedOdmsCatalogueToList(OdmsCatalogue node)
       throws OdmsAlreadyPresentException {
-    if (!federatedNodes.contains(node)) {
-      federatedNodes.add(node);
-    } else {
+    if (federatedNodes.putIfAbsent(node.getId(), node) != null) {
       throw new OdmsAlreadyPresentException("ODMS Node is already present");
     }
   }
@@ -766,9 +764,7 @@ public class OdmsManager {
    */
   public static void removeFederatedOdmsCatalogueFromList(OdmsCatalogue node)
       throws OdmsCatalogueNotFoundException {
-    if (federatedNodes.contains(node)) {
-      federatedNodes.remove(node);
-    } else {
+    if (federatedNodes.remove(node.getId()) == null) {
       throw new OdmsCatalogueNotFoundException("ODMS Node not found");
     }
   }

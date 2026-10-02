@@ -797,6 +797,23 @@ public class DcatApSerializer {
   }
 
   /**
+   * Whether the value is an absolute IRI (has a scheme and no whitespace).
+   *
+   * @param value the candidate IRI
+   * @return true if it can be used as a resource IRI
+   */
+  static boolean isAbsoluteIri(String value) {
+    if (StringUtils.isBlank(value) || value.chars().anyMatch(Character::isWhitespace)) {
+      return false;
+    }
+    try {
+      return new java.net.URI(value).isAbsolute();
+    } catch (java.net.URISyntaxException e) {
+      return false;
+    }
+  }
+
+  /**
    * Serialize concept.
    *
    * @param <T>            the generic type
@@ -814,9 +831,11 @@ public class DcatApSerializer {
         if (concept != null) {
           List<SkosPrefLabel> labelList = concept.getPrefLabel();
 
-          if (StringUtils.isNotBlank(concept.getResourceUri())) {
+          if (isAbsoluteIri(concept.getResourceUri())) {
             conceptR = model.createResource(concept.getResourceUri(), SKOS.Concept);
           } else {
+            // A non-absolute value (e.g. a bare code) would make the whole RDF/XML dump fail
+            // with "Not an RDF IRI": keep the concept as a blank node with its labels.
             conceptR = model.createResource(SKOS.Concept);
           }
 

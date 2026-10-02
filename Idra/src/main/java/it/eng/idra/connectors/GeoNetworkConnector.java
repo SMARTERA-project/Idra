@@ -45,6 +45,11 @@ import java.net.CookiePolicy;
  * Fetches ISO19139 metadata via CSW GetRecords/GetRecordById and maps to DCAT datasets.
  */
 public class GeoNetworkConnector implements IodmsConnector {
+
+    /** INSPIRE code list for the ISO 19115 MD_TopicCategoryCode values. */
+    private static final String INSPIRE_TOPIC_CATEGORY_URI =
+        "http://inspire.ec.europa.eu/metadata-codelist/TopicCategory/";
+
 	
 	
 	static {
@@ -542,7 +547,10 @@ if (bboxes.getLength() > 0) {
                 if (!topic.isEmpty()) {
                     java.util.List<it.eng.idra.beans.dcat.SkosPrefLabel> labels = new java.util.ArrayList<>();
                     labels.add(new it.eng.idra.beans.dcat.SkosPrefLabel("", topic, nodeId));
-                    themeList.add(new SkosConceptTheme(DCAT.theme.getURI(), topic, labels, nodeId));
+                    // The ISO 19115 code (e.g. "geoscientificInformation") is not an IRI: use the
+                    // INSPIRE TopicCategory code list URI, as GeoDCAT-AP does.
+                    themeList.add(new SkosConceptTheme(DCAT.theme.getURI(),
+                        INSPIRE_TOPIC_CATEGORY_URI + topic, labels, nodeId));
                 }
             }
         }

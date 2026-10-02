@@ -1032,47 +1032,46 @@ public class OdmsCatalogue {
   }
 
   /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#hashCode()
+   * Identity is the catalogue id only: equals/hashCode must agree and must not depend on
+   * mutable fields. Use isSameEndpoint to compare catalogues by type and host.
    */
   @Override
   public int hashCode() {
-    final int prime = 31;
-    int result = 1;
-    result = prime * result + id;
-    result = prime * result + ((nodeType == null) ? 0 : nodeType.hashCode());
-    result = prime * result + ((registerDate == null) ? 0 : registerDate.hashCode());
-    return result;
+    return Integer.hashCode(id);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#equals(java.lang.Object)
-   */
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {
       return true;
     }
-    if (obj == null) {
+    if (obj == null || getClass() != obj.getClass()) {
       return false;
     }
-    if (getClass() != obj.getClass()) {
-      return false;
+    return id == ((OdmsCatalogue) obj).id;
+  }
+
+  /**
+   * Whether the other catalogue points to the same endpoint: same type and same host
+   * (compared ignoring case, surrounding blanks and trailing slashes).
+   *
+   * @param other the catalogue to compare
+   * @return true if type and host match
+   */
+  public boolean isSameEndpoint(OdmsCatalogue other) {
+    return other != null && nodeType == other.getNodeType()
+        && normalizeHost(host).equals(normalizeHost(other.getHost()));
+  }
+
+  private static String normalizeHost(String value) {
+    if (value == null) {
+      return "";
     }
-    OdmsCatalogue other = (OdmsCatalogue) obj;
-    if (id != other.id) {
-      if (nodeType != other.getNodeType() || !host.equals(other.getHost())) {
-        return false;
-      }
+    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
     }
-    /*
-     * if (registerDate == null) { if (other.registerDate != null) return false; }
-     * else if (!registerDate.equals(other.registerDate)) return false;
-     */
-    return true;
+    return normalized;
   }
 
   /**
