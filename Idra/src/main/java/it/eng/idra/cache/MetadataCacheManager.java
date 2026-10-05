@@ -30,6 +30,9 @@ import it.eng.idra.beans.search.SearchFacetsList;
 import it.eng.idra.beans.search.SearchResult;
 import it.eng.idra.management.OdmsManager;
 import it.eng.idra.management.StatisticsManager;
+import it.eng.idra.beans.dcat.DcatKeyword;
+import it.eng.idra.utils.GsonUtil;
+import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.search.EuroVocTranslator;
 import it.eng.idra.utils.DcatVersionDetector;
 import it.eng.idra.utils.PropertyManager;
@@ -40,6 +43,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -690,10 +694,121 @@ public class MetadataCacheManager {
    */
   public static SearchResult searchDatasets(HashMap<String, Object> searchParameters)
       throws IOException, SolrServerException {
-    SolrQuery query = new SolrQuery();
+    SolrQuery query = buildDatasetQuery(searchParameters);
 
     List<DcatDataset> resultDatasets = new ArrayList<DcatDataset>();
     List<SearchFacetsList> facets = new ArrayList<SearchFacetsList>();
+
+    // Facets
+    query.addFacetField("HVDCategory");
+    query.addFacetField("keywords");
+    query.addFacetField("distributionFormats");
+    query.addFacetField("distributionLicenses");
+    query.addFacetField("nodeID");
+    query.addFacetField("datasetThemes");
+
+    // query.setFacetLimit(40);
+    query.setFacetMinCount(1);
+
+    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+
+    QueryResponse rsp = server.query(query);
+
+    SolrDocumentList docs = rsp.getResults();
+    // Collect resulting datasets
+    for (SolrDocument doc : docs) {
+      DcatDataset d = DcatDataset.docToDataset(doc);
+      resultDatasets.add(d);
+    }
+
+    // Collect resulting facets
+
+    for (FacetField f : rsp.getFacetFields()) {
+      facets.add(new SearchFacetsList(f));
+    }
+
+    logger.info("-- Search-- Matched Datasets in cache: " + docs.getNumFound());
+    Long count = docs.getNumFound();
+    docs = null;
+    rsp = null;
+
+    return new SearchResult(count, resultDatasets, facets);
+
+  }
+
+  /**
+   * Keywords (plain and with language) of the datasets matching the search, read from the
+   * stored Solr fields only: no child documents and no full DcatDataset conversion, which
+   * costs ~5 ms per dataset. Used to build the localized tags facet.
+   *
+   * @param searchParameters the search parameters (same as {@link #searchDatasets})
+   * @return one entry per matching dataset
+   * @throws IOException         Signals that an I/O exception has occurred.
+   * @throws SolrServerException the solr server exception
+   */
+  public static List<DatasetKeywords> searchDatasetKeywords(
+      HashMap<String, Object> searchParameters) throws IOException, SolrServerException {
+    SolrQuery query = buildDatasetQuery(searchParameters);
+    query.setParam("fl", "id,keywords,keywordDetails_ss");
+
+    List<DatasetKeywords> result = new ArrayList<DatasetKeywords>();
+    for (SolrDocument doc : server.query(query).getResults()) {
+      List<String> keywords = new ArrayList<String>();
+      Collection<Object> plain = doc.getFieldValues("keywords");
+      if (plain != null) {
+        for (Object value : plain) {
+          if (value != null) {
+            keywords.add(value.toString());
+          }
+        }
+      }
+      List<DcatKeyword> details = new ArrayList<DcatKeyword>();
+      Collection<Object> serialized = doc.getFieldValues("keywordDetails_ss");
+      if (serialized != null) {
+        for (Object value : serialized) {
+          if (value == null) {
+            continue;
+          }
+          try {
+            DcatKeyword keyword = GsonUtil.json2Obj(value.toString(), DcatKeyword.class);
+            if (keyword != null) {
+              details.add(keyword);
+            }
+          } catch (GsonUtilException e) {
+            logger.debug("Unable to parse serialized keyword detail from Solr field", e);
+          }
+        }
+      }
+      result.add(new DatasetKeywords(keywords, details));
+    }
+    return result;
+  }
+
+  /** Keywords of one dataset, as stored in Solr. */
+  public static final class DatasetKeywords {
+    private final List<String> keywords;
+    private final List<DcatKeyword> details;
+
+    DatasetKeywords(List<String> keywords, List<DcatKeyword> details) {
+      this.keywords = keywords;
+      this.details = details;
+    }
+
+    public List<String> getKeywords() {
+      return keywords;
+    }
+
+    public List<DcatKeyword> getDetails() {
+      return details;
+    }
+  }
+
+  /**
+   * Builds the dataset query shared by the search methods: paging, sort, HVD filter, query
+   * string and parent/child filters. Consumes rows/start/sort/hasHvdCategory.
+   */
+  private static SolrQuery buildDatasetQuery(HashMap<String, Object> searchParameters) {
+    SolrQuery query = new SolrQuery();
 
     // Risparmiamo cicli inutili nella buildGenericQuery
     if (searchParameters.containsKey("rows")) {
@@ -722,47 +837,12 @@ public class MetadataCacheManager {
     // DATASETS QUERY
     query.setQuery(buildGenericQuery(searchParameters));
 
-    // Facets
-    query.addFacetField("HVDCategory");
-    query.addFacetField("keywords");
-    query.addFacetField("distributionFormats");
-    query.addFacetField("distributionLicenses");
-    query.addFacetField("nodeID");
-    query.addFacetField("datasetThemes");
-
-    // query.setFacetLimit(40);
-    query.setFacetMinCount(1);
-
     // Set the filters in order to match parent and childs
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
 
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
-
-    QueryResponse rsp = server.query(query);
-
-    SolrDocumentList docs = rsp.getResults();
-    // Collect resulting datasets
-    for (SolrDocument doc : docs) {
-      DcatDataset d = DcatDataset.docToDataset(doc);
-      resultDatasets.add(d);
-    }
-
-    // Collect resulting facets
-
-    for (FacetField f : rsp.getFacetFields()) {
-      facets.add(new SearchFacetsList(f));
-    }
-
-    logger.info("-- Search-- Matched Datasets in cache: " + docs.getNumFound());
-    Long count = docs.getNumFound();
-    docs = null;
-    rsp = null;
-
-    return new SearchResult(count, resultDatasets, facets);
-
+    return query;
   }
 
   /**

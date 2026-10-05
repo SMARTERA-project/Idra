@@ -63,6 +63,7 @@ import it.eng.idra.dcat.dump.DcatApSerializer;
 import it.eng.idra.management.FederationCore;
 import it.eng.idra.management.StatisticsManager;
 import it.eng.idra.scheduler.job.OdmsSynchJob;
+import it.eng.idra.search.EuroVocTranslator;
 import it.eng.idra.search.FederatedSearch;
 import it.eng.idra.search.SparqlFederatedSearch;
 import it.eng.idra.utils.CommonUtil;
@@ -1776,6 +1777,22 @@ public class ClientApi {
       tagsSearchParameters.put("rows", String.valueOf(maxRows));
 
       try {
+        if (!Boolean.TRUE.equals(tagsSearchParameters.get("live"))) {
+          // Cache search: read only the keyword fields of the matching datasets instead of
+          // running the full search again (whole datasets + distributions, ~5 ms each).
+          tagsSearchParameters.remove("live");
+          if (Boolean.TRUE.equals(tagsSearchParameters.get("euroVoc"))) {
+            tagsSearchParameters = EuroVocTranslator.replaceEuroVocTerms(tagsSearchParameters);
+          }
+          List<List<String>> keywordsPerDataset = new ArrayList<>();
+          for (MetadataCacheManager.DatasetKeywords row
+              : MetadataCacheManager.searchDatasetKeywords(tagsSearchParameters)) {
+            keywordsPerDataset.add(
+                pickLocalizedKeywords(row.getDetails(), row.getKeywords(), preferredLanguage));
+          }
+          applyLocalizedTagsFacet(result, buildLocalizedTagFacetsFromKeywords(keywordsPerDataset));
+          return;
+        }
         SearchResult tagsResult = FederatedSearch.search(tagsSearchParameters);
         if (tagsResult != null && tagsResult.getResults() != null) {
           datasetsForTags = tagsResult.getResults();
@@ -1889,17 +1906,31 @@ public class ClientApi {
     if (datasets == null || datasets.isEmpty()) {
       return new ArrayList<>();
     }
+    List<List<String>> keywordsPerDataset = new ArrayList<>();
+    for (DcatDataset dataset : datasets) {
+      if (dataset != null) {
+        keywordsPerDataset.add(dataset.getKeywords());
+      }
+    }
+    return buildLocalizedTagFacetsFromKeywords(keywordsPerDataset);
+  }
+
+  private static List<SearchFacet> buildLocalizedTagFacetsFromKeywords(
+      List<List<String>> keywordsPerDataset) {
+    if (keywordsPerDataset == null || keywordsPerDataset.isEmpty()) {
+      return new ArrayList<>();
+    }
 
     Map<String, Long> countsByKeyword = new LinkedHashMap<>();
     Map<String, String> displayByKeyword = new LinkedHashMap<>();
 
-    for (DcatDataset dataset : datasets) {
-      if (dataset == null || dataset.getKeywords() == null || dataset.getKeywords().isEmpty()) {
+    for (List<String> datasetKeywords : keywordsPerDataset) {
+      if (datasetKeywords == null || datasetKeywords.isEmpty()) {
         continue;
       }
 
       Set<String> seenInDataset = new HashSet<>();
-      for (String keyword : dataset.getKeywords()) {
+      for (String keyword : datasetKeywords) {
         String normalizedKeyword = StringUtils.trimToNull(keyword);
         if (normalizedKeyword == null) {
           continue;
