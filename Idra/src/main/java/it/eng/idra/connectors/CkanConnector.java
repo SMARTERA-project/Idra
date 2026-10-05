@@ -154,6 +154,13 @@ public class CkanConnector implements IodmsConnector {
     DCATtoCKANmap.put("publisher_name", "publisher_name");
   }
 
+  /** An empty CKAN catalogue is online: reachability is the rows=0 search succeeding. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
+  }
+
   /**
    * Counts the datasets present in the node.
    *
@@ -165,6 +172,7 @@ public class CkanConnector implements IodmsConnector {
    * @throws OdmsCatalogueForbiddenException excp
    * @returns int resulting datasets count
    */
+
   @Override
   public int countDatasets()
       throws CKANException, MalformedURLException, OdmsCatalogueOfflineException,
@@ -182,12 +190,6 @@ public class CkanConnector implements IodmsConnector {
       result = c.findDatasets("", "", "0", "");
 
       c = null;
-      if (result.count == 0) {
-        result.count = 1;
-        // throw new OdmsCatalogueOfflineException(" The ODMS node is currently
-        // unreachable");
-      }
-
       return result.count;
 
     } catch (CKANException e) {

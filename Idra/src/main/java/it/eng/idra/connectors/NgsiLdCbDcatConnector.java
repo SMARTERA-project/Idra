@@ -141,8 +141,27 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    */
   @Override
   public int countDatasets() throws Exception {
-    return getAllDatasets().size();
-    // return -1;
+    // NGSI-LD count=true&limit=0 returns only the NGSILD-Results-Count header.
+    Map<String, String> headers = new HashMap<String, String>();
+    headers.put("Content-Type", "application/json");
+    RestClient client = new RestClientImpl();
+    HttpResponse response = client.sendGetRequest(
+        node.getHost() + "/ngsi-ld/v1/entities?type=Dataset&count=true&limit=0", headers);
+    org.apache.http.Header countHeader = response.getFirstHeader("NGSILD-Results-Count");
+    // Always consume the body so the connection goes back to the pool.
+    client.getHttpResponseBody(response);
+    if (countHeader != null && StringUtils.isNotBlank(countHeader.getValue())) {
+      return Integer.parseInt(countHeader.getValue().trim());
+    }
+    // Broker without count support: count the raw entities without converting them.
+    return getJsonDatasets().length();
+  }
+
+  /** An empty broker is online: the count request succeeding is enough. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
   }
 
   /**

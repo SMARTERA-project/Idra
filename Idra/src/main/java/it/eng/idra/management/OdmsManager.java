@@ -791,8 +791,8 @@ public class OdmsManager {
        * interface?
        */
 
-      return getOdmsCatalogueConnector(node).countDatasets() != 0 ? OdmsCatalogueState.ONLINE
-          : OdmsCatalogueState.OFFLINE;
+      // Lightweight check: most connectors no longer download the catalogue to answer it.
+      return getOdmsCatalogueConnector(node).checkState();
 
     } catch (Exception e) {
       // e.printStackTrace();

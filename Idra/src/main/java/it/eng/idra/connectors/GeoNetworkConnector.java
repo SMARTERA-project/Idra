@@ -85,10 +85,56 @@ public class GeoNetworkConnector implements IodmsConnector {
      */
     @Override
     public int countDatasets() throws Exception {
-        // Leverage getAllDatasets to retrieve and count all records:contentReference[oaicite:1]{index=1}
-        int size = getAllDatasets().size();
-        logger.info("CswConnector - countDatasets - size: " + size);
-        return size;
+        // resultType=hits returns only csw:SearchResults@numberOfRecordsMatched: no records
+        // downloaded. Fall back to the full fetch for servers that do not support it.
+        try {
+            return countWithHits();
+        } catch (OdmsCatalogueNotFoundException | OdmsCatalogueForbiddenException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.warn("CswConnector - resultType=hits not usable (" + e.getMessage()
+                + "), counting with a full fetch");
+            return getAllDatasets().size();
+        }
+    }
+
+    private int countWithHits() throws Exception {
+        String cswUrl = node.getHost()
+                + (node.getHost().contains("?") ? "&" : "?")
+                + "service=CSW&request=GetRecords&version=2.0.2"
+                + "&resultType=hits&outputSchema=http://www.isotc211.org/2005/gmd"
+                + "&typeNames=gmd:MD_Metadata&elementSetName=brief&maxRecords=1"
+                + "&namespace=xmlns(gmd,http://www.isotc211.org/2005/gmd),xmlns(csw,http://www.opengis.net/cat/csw/2.0.2)";
+        HttpURLConnection conn;
+        try {
+            conn = openFollowingRedirects(cswUrl);
+        } catch (Exception e) {
+            String msg = e.getMessage() == null ? "" : e.getMessage();
+            if (msg.contains("HTTP 404")) throw new OdmsCatalogueNotFoundException("The ODMS host does not exist (HTTP 404)");
+            if (msg.contains("HTTP 403")) throw new OdmsCatalogueForbiddenException("The ODMS node is forbidden (HTTP 403)");
+            throw new OdmsCatalogueOfflineException("The ODMS node is currently unreachable: " + msg);
+        }
+        Document doc;
+        try {
+            DocumentBuilderFactory factory = GeoNetworkConnectorUtils.newSecureDocumentBuilderFactory();
+            factory.setNamespaceAware(true);
+            doc = factory.newDocumentBuilder().parse(conn.getInputStream());
+        } finally {
+            conn.disconnect();
+        }
+        Element resultsElem = (Element) doc
+                .getElementsByTagNameNS("http://www.opengis.net/cat/csw/2.0.2", "SearchResults").item(0);
+        if (resultsElem == null || resultsElem.getAttribute("numberOfRecordsMatched").isEmpty()) {
+            throw new Exception("missing csw:SearchResults@numberOfRecordsMatched");
+        }
+        return Integer.parseInt(resultsElem.getAttribute("numberOfRecordsMatched").trim());
+    }
+
+    /** An empty CSW catalogue is online: the hits request succeeding is enough. */
+    @Override
+    public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+        countDatasets();
+        return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
     }
 
     /**

@@ -125,11 +125,14 @@ public class OpenDataSoftConnector implements IodmsConnector {
     String sjson = sendGetRequest(node.getHost().concat(datasetsPath).concat("?rows=0"));
     JSONObject jjson = new JSONObject(sjson);
 
-    int count = jjson.getInt("total_count");
-    if (count == 0) {
-      throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
-    }
-    return count;
+    return jjson.getInt("total_count");
+  }
+
+  /** An empty catalogue is online: the rows=0 request succeeding is enough. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
   }
 
   /**

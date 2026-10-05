@@ -78,6 +78,11 @@ import java.nio.file.Paths;
  import java.util.HashMap;
  import java.util.List;
  import java.util.Map;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+ import java.util.concurrent.Future;
+ import java.util.concurrent.TimeUnit;
+ import java.util.concurrent.TimeoutException;
  import javax.servlet.http.HttpServletRequest;
  import javax.ws.rs.Consumes;
  import javax.ws.rs.DELETE;
@@ -129,6 +134,16 @@ import java.nio.file.Paths;
  
    /** The client. */
    private static Client client;
+
+   /** Overall limit for a remote catalogue datasetCount probe. */
+   private static final long REMOTE_COUNT_TIMEOUT_SECONDS = 20;
+
+   /** Small daemon pool so concurrent probes cannot exhaust Tomcat threads. */
+   private static final ExecutorService REMOTE_COUNT_POOL = Executors.newFixedThreadPool(4, r -> {
+     Thread t = new Thread(r, "remote-catalogue-count");
+     t.setDaemon(true);
+     return t;
+   });
    
    private static String urlOrionmanager = 
        PropertyManager.getProperty(IdraProperty.ORION_MANAGER_URL);
@@ -1002,7 +1017,17 @@ import java.nio.file.Paths;
       String effectiveApiKey = (apiKeyHeader != null && !apiKeyHeader.isEmpty())
           ? apiKeyHeader : apiKey;
       probe.setApiKey(effectiveApiKey == null ? "" : effectiveApiKey);
-      int count = OdmsManager.getOdmsCatalogueConnector(probe).countDatasets();
+      // Bounded pool + overall timeout: a slow remote must not hold a Tomcat thread.
+      Future<Integer> future = REMOTE_COUNT_POOL.submit(
+          () -> OdmsManager.getOdmsCatalogueConnector(probe).countDatasets());
+      int count;
+      try {
+        count = future.get(REMOTE_COUNT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      } catch (TimeoutException e) {
+        future.cancel(true);
+        logger.warn("getRemoteCatalogueDatasetCount timed out for url=" + url);
+        count = -1;
+      }
       if (count < 0) {
         body.put("count", JSONObject.NULL);
       } else {

@@ -124,6 +124,13 @@ public class SpodConnector implements IodmsConnector {
     }
   }
 
+  /** An empty catalogue is online: the ids request succeeding is enough. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
+  }
+
   /*
    * (non-Javadoc)
    * 

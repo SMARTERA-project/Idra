@@ -98,9 +98,22 @@ public class ZenodoConnector implements IodmsConnector {
   @Override
   public int countDatasets() throws ZenodoException, MalformedURLException, OdmsCatalogueOfflineException,
       OdmsCatalogueNotFoundException, OdmsCatalogueForbiddenException, Exception {
-    Integer size = getAllDatasets().size();
-    logger.info("ZenodoConnector - countDatasets - size: " + size);
-    return size;
+    // One record is enough to read the total: never page through the whole repository.
+    ZenodoClient zc = new ZenodoClient(new ZenodoConnection(node.getHost()), node.getApiKey());
+    try {
+      return zc.findRecords("", "", "", 1, 1, "", node.getCommunities(), "", "", "", "")
+          .getTotal();
+    } catch (ZenodoException e) {
+      handleError(e);
+      return 0;
+    }
+  }
+
+  /** An empty community is online: the size=1 search succeeding is enough. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
   }
 
   /**
@@ -603,10 +616,6 @@ public class ZenodoConnector implements IodmsConnector {
           if (resultsCount == 0) {
             resultsCount = hits.getTotal();
             logger.info("Zenodo Connector - getAllDatasets - Records count: " + resultsCount);
-
-            if (resultsCount == 0) {
-              throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
-            }
           }
 
           // Increment the page number

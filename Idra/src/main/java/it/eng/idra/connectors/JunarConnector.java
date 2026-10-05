@@ -142,7 +142,22 @@ public class JunarConnector implements IodmsConnector {
    */
   @Override
   public int countDatasets() throws Exception {
-    return getAllDatasets().size();
+    // Count the raw "ds" resources: converting every dataset to DCAT just to count is expensive.
+    JSONArray resources = getJsonResources();
+    int count = 0;
+    for (int i = 0; i < resources.length(); i++) {
+      JSONObject resource = resources.optJSONObject(i);
+      if (resource != null && "ds".equalsIgnoreCase(resource.optString("type"))) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /** The count downloads every resource: probe the host instead. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    return CatalogueProbe.checkHost(node.getHost());
   }
 
   /*
@@ -153,24 +168,9 @@ public class JunarConnector implements IodmsConnector {
   @Override
   public List<DcatDataset> getAllDatasets() throws Exception {
 
-    logger.info("-- JUNAR Connector Request sent -- " + node.getHost());
-
     ArrayList<DcatDataset> dcatDatasets = new ArrayList<DcatDataset>();
 
-    Optional<String> returnedJson = Optional.ofNullable(sendGetRequest(
-        node.getHost() + "/api/v2/resources?auth_key=" + node.getApiKey() + "&format=json"));
-
-    if (!returnedJson.isPresent()) {
-      throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
-    } else if (!returnedJson.get().startsWith("[")) {
-      if (returnedJson.get().contains("403")) {
-        throw new OdmsCatalogueForbiddenException("The ODMS node is forbidden");
-      } else {
-        throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
-      }
-    }
-
-    JSONArray jsonArray = new JSONArray(returnedJson.get());
+    JSONArray jsonArray = getJsonResources();
     logger.debug("-- JUNAR Connector Response - Result count:" + jsonArray.length());
 
     for (int i = 0; i < jsonArray.length(); i++) {
@@ -190,6 +190,26 @@ public class JunarConnector implements IodmsConnector {
 
     return dcatDatasets;
 
+  }
+
+  /** Fetches the raw Junar resources list (all types). */
+  private JSONArray getJsonResources() throws Exception {
+    logger.info("-- JUNAR Connector Request sent -- " + node.getHost());
+
+    Optional<String> returnedJson = Optional.ofNullable(sendGetRequest(
+        node.getHost() + "/api/v2/resources?auth_key=" + node.getApiKey() + "&format=json"));
+
+    if (!returnedJson.isPresent()) {
+      throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
+    } else if (!returnedJson.get().startsWith("[")) {
+      if (returnedJson.get().contains("403")) {
+        throw new OdmsCatalogueForbiddenException("The ODMS node is forbidden");
+      } else {
+        throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
+      }
+    }
+
+    return new JSONArray(returnedJson.get());
   }
 
   /**

@@ -1597,13 +1597,12 @@ public class MetadataCacheManager {
        * been retrieved
        * 
        */
-      if (!node.getNodeType().equals(OdmsCatalogueType.SOCRATA)
-          && !node.getNodeType().equals(OdmsCatalogueType.DKAN)) {
+      // Only the paginated connectors (CKAN, NATIVE) need the total upfront to know when to
+      // stop; for the others the count comes from the downloaded datasets. Availability is
+      // decided by the download itself (exceptions), not by a zero count.
+      if (node.getNodeType().equals(OdmsCatalogueType.CKAN)
+          || node.getNodeType().equals(OdmsCatalogueType.NATIVE)) {
         initialDatasetsCount = OdmsManager.getOdmsCatalogueConnector(node).countDatasets();
-        if (!(initialDatasetsCount > 0)) {
-          node.setNodeState(OdmsCatalogueState.OFFLINE);
-        }
-
         node.setDatasetCount(initialDatasetsCount);
         OdmsManager.updateOdmsCatalogue(node, true);
       }
@@ -1615,7 +1614,8 @@ public class MetadataCacheManager {
         currentDatasetCount = currentDatasets.size();
         currentSkipped = 0;
 
-        if (!node.getNodeType().equals(OdmsCatalogueType.CKAN) && currentDatasets.size() != 0) {
+        // An empty catalogue is online with 0 datasets.
+        if (!node.getNodeType().equals(OdmsCatalogueType.CKAN)) {
 
           node.setDatasetCount(currentDatasetCount);
           node.setNodeState(OdmsCatalogueState.ONLINE);

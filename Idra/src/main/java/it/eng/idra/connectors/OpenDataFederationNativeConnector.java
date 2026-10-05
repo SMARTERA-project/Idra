@@ -154,13 +154,14 @@ public class OpenDataFederationNativeConnector implements IodmsConnector {
     int count = datasetsId.length();
     datasetsId = null;
     c = null;
-
-    if (count == 0) {
-      throw new OdmsCatalogueOfflineException(" The ODMS node is currently unreachable");
-    }
-
     return count;
+  }
 
+  /** An empty catalogue is online: the ids request succeeding is enough. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    countDatasets();
+    return it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE;
   }
 
   /**

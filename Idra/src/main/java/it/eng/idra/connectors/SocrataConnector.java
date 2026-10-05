@@ -617,6 +617,12 @@ public class SocrataConnector implements IodmsConnector {
 
   }
 
+  /** The count downloads the whole data.json: probe the host instead. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    return CatalogueProbe.checkHost(node.getHost());
+  }
+
   /*
    * (non-Javadoc)
    * 

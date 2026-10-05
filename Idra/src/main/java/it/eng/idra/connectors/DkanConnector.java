@@ -625,9 +625,14 @@ public class DkanConnector implements IodmsConnector {
   public int countDatasets()
       throws ParseException, URISyntaxException, OdmsCatalogueOfflineException,
       OdmsCatalogueForbiddenException, OdmsCatalogueNotFoundException, IOException {
+    // Count the raw entries: converting every dataset to DCAT just to count is expensive.
+    return getJsonDatasets().length();
+  }
 
-    return getAllDatasets().size();
-
+  /** The count downloads the whole catalogue: probe the host instead. */
+  @Override
+  public it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    return CatalogueProbe.checkHost(node.getHost());
   }
 
   /*

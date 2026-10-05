@@ -346,8 +346,8 @@ public class OdmsSynchJob implements InterruptableJob {
         } else {
           try {
             logger.info("LOAD CACHE FROM ODMS");
-            node.setDatasetCount(OdmsManager.countOdmsCatalogueDatasets(node));
-            logger.info(node.getDatasetCount());
+            // loadCacheFromOdmsCatalogue computes the count itself (and fetches it only for
+            // the paginated CKAN/NATIVE connectors): counting here downloaded it once more.
             MetadataCacheManager.loadCacheFromOdmsCatalogue(node, false);
             logger.info(node.getDatasetCount());
             node.setNodeState(OdmsCatalogueState.ONLINE);

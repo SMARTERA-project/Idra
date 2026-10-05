@@ -48,10 +48,28 @@ public interface IodmsConnector {
   /**
    * Count datasets.
    *
+   * <p>Returns the real number of datasets ({@code 0} for an empty catalogue) or
+   * {@code -1} when it cannot be known without downloading the whole catalogue.
+   *
    * @return the int
    * @throws Exception the exception
    */
   public int countDatasets() throws Exception;
+
+  /**
+   * Checks whether the catalogue is reachable, without downloading its datasets where the
+   * connector allows it. Throws (or returns OFFLINE) when it is not.
+   *
+   * <p>Default: legacy rule based on {@link #countDatasets()} ({@code 0} means
+   * offline, {@code -1} unknown but online). Connectors for which an empty catalogue is
+   * legitimate, or whose count is expensive, override it.
+   *
+   * @return the catalogue state
+   * @throws Exception when the catalogue cannot be reached
+   */
+  default it.eng.idra.beans.odms.OdmsCatalogueState checkState() throws Exception {
+    return countDatasets() != 0 ? it.eng.idra.beans.odms.OdmsCatalogueState.ONLINE : it.eng.idra.beans.odms.OdmsCatalogueState.OFFLINE;
+  }
 
   /**
    * Dataset to dcat.
