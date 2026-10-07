@@ -853,9 +853,24 @@ public class FederationCore {
    */
   public static void startOdmsCatalogueSynch(final int nodeId)
       throws OdmsCatalogueNotFoundException, OdmsManagerException {
+    startOdmsCatalogueSynch(nodeId, false);
+  }
+
+  /**
+   * Starts the synchronization of a catalogue now.
+   *
+   * @param nodeId   the catalogue id
+   * @param fullSync true to rewrite every dataset, not only the ones changed since the last sync
+   * @throws OdmsCatalogueNotFoundException the odms catalogue not found exception
+   * @throws OdmsManagerException           the odms manager exception
+   */
+  public static void startOdmsCatalogueSynch(final int nodeId, final boolean fullSync)
+      throws OdmsCatalogueNotFoundException, OdmsManagerException {
 
     try {
-      IdraScheduler.getSingletonInstance().triggerNow(Integer.toString(nodeId));
+      org.quartz.JobDataMap data = new org.quartz.JobDataMap();
+      data.put(OdmsSynchJob.FULL_SYNC_KEY, fullSync);
+      IdraScheduler.getSingletonInstance().triggerNow(Integer.toString(nodeId), data);
     } catch (SchedulerNotInitialisedException e) {
       // TODO Auto-generated catch block
       logger.error(e.getMessage(), e);

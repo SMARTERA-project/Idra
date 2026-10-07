@@ -82,6 +82,12 @@ public class OdmsSynchJob implements InterruptableJob {
 
   /** The logger. */
   private static Logger logger = LogManager.getLogger(OdmsSynchJob.class);
+
+  /** Job data key: when true the next execution rewrites every dataset of the catalogue. */
+  public static final String FULL_SYNC_KEY = "fullSync";
+
+  /** Start date passed to the connectors on a full synchronization (everything is newer). */
+  private static final String FULL_SYNC_START_DATE = "1970-01-01T00:00:00Z";
   
   /** The Context Broker Manager URL. */
   private static String urlOrionmanager = 
@@ -126,7 +132,8 @@ public class OdmsSynchJob implements InterruptableJob {
         node.setSynchLock(OdmsSynchLock.PERIODIC);
         OdmsManager.updateOdmsCatalogue(node, false);
         try {
-          synchOdmsNode(node, false);
+          synchOdmsNode(node, false,
+              context.getMergedJobDataMap().getBooleanValue(FULL_SYNC_KEY));
         } catch (OdmsCatalogueNotFoundException e) {
           logger.error(e.getMessage(), e);
         } catch (OdmsCatalogueForbiddenException e) {
@@ -146,6 +153,31 @@ public class OdmsSynchJob implements InterruptableJob {
 
       logger.error(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Turns the connector result obtained with no known datasets into a full synchronization:
+   * remote datasets already present are updated, the others are added. Nothing is deleted,
+   * deletions are left to the regular synchronization.
+   *
+   * @param remoteResult    the connector result computed against an empty dataset list
+   * @param presentDatasets the datasets of the catalogue currently stored
+   * @return the result to apply
+   */
+  static OdmsSynchronizationResult toFullSyncResult(OdmsSynchronizationResult remoteResult,
+      List<DcatDataset> presentDatasets) {
+    OdmsSynchronizationResult result = new OdmsSynchronizationResult();
+    java.util.Set<DcatDataset> present = new java.util.HashSet<>(presentDatasets);
+    java.util.Set<DcatDataset> remote = new java.util.LinkedHashSet<>(remoteResult.getAddedDatasets());
+    remote.addAll(remoteResult.getChangedDatasets());
+    for (DcatDataset dataset : remote) {
+      if (present.contains(dataset)) {
+        result.addToChangedList(dataset);
+      } else {
+        result.addToAddedList(dataset);
+      }
+    }
+    return result;
   }
 
   /**
@@ -242,7 +274,8 @@ public class OdmsSynchJob implements InterruptableJob {
    *                                         exception
    * @throws OdmsManagerException            the odms manager exception
    */
-  protected static boolean synchOdmsNode(OdmsCatalogue node, boolean isChangedProtocol)
+  protected static boolean synchOdmsNode(OdmsCatalogue node, boolean isChangedProtocol,
+      boolean fullSync)
       throws SQLException, IOException, SolrServerException, ClassNotFoundException,
       InstantiationException, IllegalAccessException, IllegalArgumentException,
       NoSuchMethodException, SecurityException, DatasetNotFoundException, RepositoryException,
@@ -287,12 +320,21 @@ public class OdmsSynchJob implements InterruptableJob {
 
             // if (!node.getNodeType().equals(ODMSCatalogueType.DCATDUMP)) {
 
-            if (!node.getNodeType().equals(OdmsCatalogueType.CKAN)) {
+            if (fullSync || !node.getNodeType().equals(OdmsCatalogueType.CKAN)) {
               presentDatasets = MetadataCacheManager.getAllDatasetsByOdmsCatalogue(node.getId());
             }
 
-            synchroResult = getChangedDatasets(node, presentDatasets,
-                CommonUtil.formatDate(lastUpdate));
+            if (fullSync) {
+              // Ask the connector for every remote dataset (no known datasets, no start date),
+              // then update the ones already present and add the others.
+              logger.info("Full synchronization: rewriting all the datasets of node " + node.getId());
+              synchroResult = toFullSyncResult(
+                  getChangedDatasets(node, new ArrayList<DcatDataset>(), FULL_SYNC_START_DATE),
+                  presentDatasets);
+            } else {
+              synchroResult = getChangedDatasets(node, presentDatasets,
+                  CommonUtil.formatDate(lastUpdate));
+            }
 
             for (DcatDataset dataset : synchroResult.getDeletedDatasets()) {
               deletedRdf += OdmsSynchJob.deleteDataset(node, dataset);
@@ -367,7 +409,7 @@ public class OdmsSynchJob implements InterruptableJob {
       } else {
         if (!isChangedProtocol) {
           node = OdmsManager.returnChangedProtocol(node);
-          return synchOdmsNode(node, true);
+          return synchOdmsNode(node, true, fullSync);
         } else {
           return false;
         }

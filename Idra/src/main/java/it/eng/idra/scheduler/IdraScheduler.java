@@ -38,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
+import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.Scheduler;
@@ -168,9 +169,19 @@ public class IdraScheduler {
    * @param jobName the job name
    */
   public void triggerNow(String jobName) {
+    triggerNow(jobName, new JobDataMap());
+  }
+
+  /**
+   * Trigger now, passing data to this execution only (e.g. {@code fullSync}).
+   *
+   * @param jobName the job name
+   * @param data    the data merged into the job data map of this execution
+   */
+  public void triggerNow(String jobName, JobDataMap data) {
     try {
       if (scheduler.checkExists(jobKey(jobName, "jobs"))) {
-        scheduler.triggerJob(jobKey(jobName, "jobs"));
+        scheduler.triggerJob(jobKey(jobName, "jobs"), data);
       }
     } catch (Exception e) {
       logger.debug(e.getLocalizedMessage());

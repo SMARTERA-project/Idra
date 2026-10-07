@@ -812,12 +812,14 @@ import java.nio.file.Paths;
   @RequiresPermission("admin.catalogue.activate")
   @Path("/catalogues/{nodeId}/synchronize")
   @Produces("application/json")
-  public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId) throws Exception {
+  public Response startOdmsCatalogueSynch(@PathParam("nodeId") String nodeId,
+      @DefaultValue("false") @QueryParam("full") Boolean full) throws Exception {
     // OdmsCatalogueNotFoundException -> ERR_CATALOGUE_NOT_FOUND (404) via mapper.
     // OdmsManagerException -> ERR_CATALOGUE_MANAGER (500) via mapper.
     int nodeIdentifier = Integer.parseInt(nodeId);
-    logger.info("Forcing the synchronization for node " + nodeId);
-    FederationCore.startOdmsCatalogueSynch(nodeIdentifier);
+    logger.info("Forcing the " + (Boolean.TRUE.equals(full) ? "full " : "")
+        + "synchronization for node " + nodeId);
+    FederationCore.startOdmsCatalogueSynch(nodeIdentifier, Boolean.TRUE.equals(full));
     logger.info("Fine funzione sync");
 
     // LEVEL_2/3 catalogues run an asynchronous synch job that already re-triggers
