@@ -96,6 +96,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -621,13 +622,14 @@ public class ClientApi {
           Object themeObj = searchParameters.remove("datasetThemes");
           List<String> tmp = new ArrayList<>();
           if (themeObj instanceof String) {
-            if (!((String) themeObj).isEmpty()) {
-              tmp.add((String) themeObj);
-            }
+            tmp.addAll(CommonUtil.splitFilterValues((String) themeObj));
           } else if (themeObj instanceof List) {
             tmp.addAll((List<String>) themeObj);
           }
-          List<String> themeAbbr = tmp.stream().filter(x -> FederationCore.isDcatTheme(x)).collect(Collectors.toList());
+          // datasetThemes is indexed with the EU data-theme identifier: accept identifiers, URIs
+          // and labels in any language (the home page sends English labels)
+          List<String> themeAbbr = tmp.stream().map(FederationCore::getDcatThemeIdentifier)
+              .filter(Objects::nonNull).distinct().collect(Collectors.toList());
           logger.info("Requested themes: " + tmp);
           logger.info("v2 ");
           logger.info("Mapped themes: " + themeAbbr);
@@ -641,8 +643,8 @@ public class ClientApi {
         List<Integer> ids = new ArrayList<Integer>();
         if (searchParameters.containsKey("catalogues")) {
 
-          List<String> catalogues = Arrays
-              .asList(((String) searchParameters.remove("catalogues")).split(",")).stream()
+          List<String> catalogues = CommonUtil
+              .splitFilterValues((String) searchParameters.remove("catalogues")).stream()
               .distinct().collect(Collectors.toList());
 
           ids = catalogues.stream().map(x -> FederationCore.getOdmsCatalogueIdbyName(x)).distinct()

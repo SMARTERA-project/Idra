@@ -32,12 +32,15 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.commons.lang.StringUtils;
@@ -258,6 +261,23 @@ public class CommonUtil {
 
     throw new IllegalArgumentException("Invalid date: " + originalDateString);
 
+  }
+
+  /**
+   * Splits a search filter value into its values. Values are comma-separated; a comma that
+   * belongs to a value (e.g. the keyword "boschi, ecosistemi") is sent escaped as "\,".
+   *
+   * @param value the filter value
+   * @return the non-blank, unescaped values
+   */
+  public static List<String> splitFilterValues(String value) {
+    if (StringUtils.isBlank(value)) {
+      return new ArrayList<>();
+    }
+    return Arrays.stream(value.split("(?<!\\\\),"))
+        .map(x -> x.replace("\\,", ",").trim())
+        .filter(StringUtils::isNotBlank)
+        .collect(Collectors.toList());
   }
 
   /**

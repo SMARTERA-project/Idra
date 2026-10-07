@@ -1717,12 +1717,23 @@ public class DcatDataset implements Serializable {
     if (theme != null && !theme.isEmpty()) {
       theme.stream().filter(item -> item != null)
           .forEach(item -> doc.addChildDocument(item.toDoc(CacheContentType.theme)));
+      // Index the EU data-theme identifier (AGRI, ENVI, ...), whatever form the connector used
+      // (authority URI, English or localized label): search and facets work on the identifier.
       List<String> datasetThemes = new ArrayList<>();
       for (SkosConceptTheme c : theme) {
-        for (SkosPrefLabel p : c.getPrefLabel()) {
-          if (StringUtils.isNotBlank(p.getValue()) && FederationCore.isDcatTheme(p.getValue())) {
-            datasetThemes.add(p.getValue());
-          }
+        if (c == null) {
+          continue;
+        }
+        String identifier = StringUtils.isNotBlank(c.getResourceUri())
+            ? FederationCore.getDcatThemeIdentifier(c.getResourceUri()) : null;
+        if (identifier == null && c.getPrefLabel() != null) {
+          identifier = c.getPrefLabel().stream()
+              .filter(p -> p != null && StringUtils.isNotBlank(p.getValue()))
+              .map(p -> FederationCore.getDcatThemeIdentifier(p.getValue()))
+              .filter(Objects::nonNull).findFirst().orElse(null);
+        }
+        if (identifier != null && !datasetThemes.contains(identifier)) {
+          datasetThemes.add(identifier);
         }
       }
 

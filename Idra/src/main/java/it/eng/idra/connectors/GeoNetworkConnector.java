@@ -15,6 +15,7 @@ import it.eng.idra.beans.odms.OdmsCatalogueNotFoundException;
 import it.eng.idra.beans.odms.OdmsCatalogueForbiddenException;
 import it.eng.idra.beans.odms.OdmsCatalogueOfflineException;
 import it.eng.idra.beans.odms.OdmsSynchronizationResult;
+import it.eng.idra.management.FederationCore;
 import it.eng.idra.utils.CommonUtil;
 import it.eng.idra.utils.GeoNetworkConnectorUtils;
 import org.apache.logging.log4j.LogManager;
@@ -49,6 +50,35 @@ public class GeoNetworkConnector implements IodmsConnector {
     /** INSPIRE code list for the ISO 19115 MD_TopicCategoryCode values. */
     private static final String INSPIRE_TOPIC_CATEGORY_URI =
         "http://inspire.ec.europa.eu/metadata-codelist/TopicCategory/";
+
+    /** EU Publications Office data-theme authority (the DCAT-AP dcat:theme vocabulary). */
+    private static final String EU_DATA_THEME_URI =
+        "http://publications.europa.eu/resource/authority/data-theme/";
+
+    /** ISO 19115 MD_TopicCategoryCode -> EU data-theme identifier, as in GeoDCAT-AP practice. */
+    private static final java.util.Map<String, String> TOPIC_CATEGORY_TO_DATA_THEME =
+        java.util.Map.ofEntries(
+            java.util.Map.entry("farming", "AGRI"),
+            java.util.Map.entry("biota", "ENVI"),
+            java.util.Map.entry("environment", "ENVI"),
+            java.util.Map.entry("inlandwaters", "ENVI"),
+            java.util.Map.entry("oceans", "ENVI"),
+            java.util.Map.entry("climatologymeteorologyatmosphere", "ENVI"),
+            java.util.Map.entry("elevation", "ENVI"),
+            java.util.Map.entry("imagerybasemapsearthcover", "ENVI"),
+            java.util.Map.entry("disaster", "ENVI"),
+            java.util.Map.entry("boundaries", "REGI"),
+            java.util.Map.entry("location", "REGI"),
+            java.util.Map.entry("planningcadastre", "REGI"),
+            java.util.Map.entry("structure", "REGI"),
+            java.util.Map.entry("economy", "ECON"),
+            java.util.Map.entry("geoscientificinformation", "TECH"),
+            java.util.Map.entry("extraterrestrial", "TECH"),
+            java.util.Map.entry("health", "HEAL"),
+            java.util.Map.entry("intelligencemilitary", "JUST"),
+            java.util.Map.entry("society", "SOCI"),
+            java.util.Map.entry("transportation", "TRAN"),
+            java.util.Map.entry("utilitiescommunication", "ENER"));
 
 	
 	
@@ -593,10 +623,22 @@ if (bboxes.getLength() > 0) {
                 if (!topic.isEmpty()) {
                     java.util.List<it.eng.idra.beans.dcat.SkosPrefLabel> labels = new java.util.ArrayList<>();
                     labels.add(new it.eng.idra.beans.dcat.SkosPrefLabel("", topic, nodeId));
-                    // The ISO 19115 code (e.g. "geoscientificInformation") is not an IRI: use the
-                    // INSPIRE TopicCategory code list URI, as GeoDCAT-AP does.
-                    themeList.add(new SkosConceptTheme(DCAT.theme.getURI(),
+                    // The ISO 19115 code (e.g. "geoscientificInformation") is not an IRI: keep it as
+                    // dct:subject with the INSPIRE TopicCategory code list URI, as GeoDCAT-AP does.
+                    subjectList.add(new SkosConceptSubject(DCTerms.subject.getURI(),
                         INSPIRE_TOPIC_CATEGORY_URI + topic, labels, nodeId));
+
+                    // dcat:theme uses the EU data-theme vocabulary, which the portal categories search on
+                    String themeId = TOPIC_CATEGORY_TO_DATA_THEME.get(topic.toLowerCase(java.util.Locale.ROOT));
+                    String themeLabel = themeId == null ? null : FederationCore.getEnglishDcatTheme(themeId);
+                    boolean alreadyAdded = themeList.stream()
+                        .anyMatch(x -> (EU_DATA_THEME_URI + themeId).equals(x.getResourceUri()));
+                    if (themeLabel != null && !alreadyAdded) {
+                        java.util.List<it.eng.idra.beans.dcat.SkosPrefLabel> themeLabels = new java.util.ArrayList<>();
+                        themeLabels.add(new it.eng.idra.beans.dcat.SkosPrefLabel("en", themeLabel, nodeId));
+                        themeList.add(new SkosConceptTheme(DCAT.theme.getURI(),
+                            EU_DATA_THEME_URI + themeId, themeLabels, nodeId));
+                    }
                 }
             }
         }

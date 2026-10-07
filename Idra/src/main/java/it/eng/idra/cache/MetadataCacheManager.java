@@ -34,6 +34,7 @@ import it.eng.idra.beans.dcat.DcatKeyword;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import it.eng.idra.search.EuroVocTranslator;
+import it.eng.idra.utils.CommonUtil;
 import it.eng.idra.utils.DcatVersionDetector;
 import it.eng.idra.utils.PropertyManager;
 import java.io.IOException;
@@ -1189,7 +1190,7 @@ public class MetadataCacheManager {
           // .map(x -> x.replaceAll("\\s",
           // "*")).collect(Collectors.joining("* OR *", "(*", "*)"));
 
-          queryString += "*:" + Arrays.asList(((String) value).split(",")).stream()
+          queryString += "*:" + CommonUtil.splitFilterValues((String) value).stream()
               .collect(Collectors.joining("\" " + defaultOperator + " \"", "(\"", "\")"));
 
         } else if (isFirst && queryString.trim().equals("")) {
@@ -1210,9 +1211,8 @@ public class MetadataCacheManager {
 
       } else if (key.equals("tags")) {
 
-        String[] tags = value.split(",");
-        String escapedTags = Arrays.stream(tags)
-            .map(t -> ClientUtils.escapeQueryChars(t.trim()))
+        String escapedTags = CommonUtil.splitFilterValues((String) value).stream()
+            .map(t -> ClientUtils.escapeQueryChars(t))
             .collect(Collectors.joining("\" AND \""));
         queryString += (isFirst ? "" : " AND ") + "keywords" + ":" + "(\"" + escapedTags + "\")";
         isFirst = false;
@@ -1230,7 +1230,8 @@ public class MetadataCacheManager {
             .collect(Collectors.joining(" OR "));
           queryString += (isFirst ? "" : " AND ") + key.trim() + ":(" + joined + ")";
         } else {
-          queryString += (isFirst ? "" : " AND ") + key.trim() + ":(\"" + ClientUtils.escapeQueryChars(value) + "\")";
+          queryString += (isFirst ? "" : " AND ") + key.trim() + ":(\""
+              + ClientUtils.escapeQueryChars(value.replace("\\,", ",")) + "\")";
         }
         isFirst = false;
       }
