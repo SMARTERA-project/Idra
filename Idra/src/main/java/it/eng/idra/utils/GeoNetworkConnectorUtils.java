@@ -291,6 +291,59 @@ public class GeoNetworkConnectorUtils {
         return "";
     }
 
+    /** Selects HTTPS first and remembers the working protocol for this connector. */
+    public static class EndpointConnection {
+        private String selectedProtocol;
+
+        @FunctionalInterface
+        interface ConnectionOpener {
+            HttpURLConnection open(String url) throws Exception;
+        }
+
+        public HttpURLConnection open(String requestUrl) throws Exception {
+            return open(requestUrl, GeoNetworkConnectorUtils::openFollowingRedirects);
+        }
+
+        synchronized HttpURLConnection open(String requestUrl, ConnectionOpener opener) throws Exception {
+            if (selectedProtocol != null) return opener.open(withProtocol(requestUrl, selectedProtocol));
+            Exception httpsFailure;
+            try {
+                HttpURLConnection conn = opener.open(withProtocol(requestUrl, "https"));
+                selectedProtocol = conn.getURL().getProtocol();
+                logger.info("CSW selected protocol: {}", selectedProtocol);
+                return conn;
+            } catch (Exception e) {
+                httpsFailure = e;
+            }
+            try {
+                HttpURLConnection conn = opener.open(withProtocol(requestUrl, "http"));
+                selectedProtocol = conn.getURL().getProtocol();
+                logger.info("CSW selected protocol: {} (HTTPS unavailable: {})",
+                        selectedProtocol, httpsFailure.getMessage());
+                return conn;
+            } catch (Exception httpFailure) {
+                httpFailure.addSuppressed(httpsFailure);
+                throw httpFailure;
+            }
+        }
+
+        private static String withProtocol(String requestUrl, String protocol) throws Exception {
+            URL source = new URL(requestUrl);
+            if (!"http".equalsIgnoreCase(source.getProtocol())
+                    && !"https".equalsIgnoreCase(source.getProtocol())) {
+                throw new IllegalArgumentException("CSW endpoint must use HTTP or HTTPS");
+            }
+            int port = source.getPort();
+            // Explicit standard ports follow the protocol; custom ports are preserved.
+            if (port == source.getDefaultPort()) port = -1;
+            String authority = source.getHost();
+            if (source.getUserInfo() != null) authority = source.getUserInfo() + "@" + authority;
+            if (port != -1) authority += ":" + port;
+            return protocol + "://" + authority + source.getFile()
+                    + (source.getRef() == null ? "" : "#" + source.getRef());
+        }
+    }
+
     public static HttpURLConnection openFollowingRedirects(String initialUrl) throws Exception {
         URL url = new URL(initialUrl);
         int redirects = 0;
@@ -302,7 +355,13 @@ public class GeoNetworkConnectorUtils {
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/xml");
             conn.setRequestProperty("User-Agent", "Idra-CSW-Connector/1.0");
-            int code = conn.getResponseCode();
+            int code;
+            try {
+                code = conn.getResponseCode();
+            } catch (Exception e) {
+                conn.disconnect();
+                throw e;
+            }
             String loc = conn.getHeaderField("Location");
             String ct  = conn.getContentType();
             logger.info("CSW hop code={} url='{}' location='{}' contentType='{}'", code, conn.getURL(), loc, ct);

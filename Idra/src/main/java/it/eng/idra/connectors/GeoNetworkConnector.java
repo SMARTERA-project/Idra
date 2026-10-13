@@ -26,7 +26,6 @@ import org.w3c.dom.*;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -93,6 +92,8 @@ public class GeoNetworkConnector implements IodmsConnector {
 	
     /** The ODMS catalogue node configuration. */
     private OdmsCatalogue node;
+    private final GeoNetworkConnectorUtils.EndpointConnection endpointConnection =
+            new GeoNetworkConnectorUtils.EndpointConnection();
     /** Logger for CswConnector. */
     private static Logger logger = LogManager.getLogger(GeoNetworkConnector.class);
 
@@ -1087,12 +1088,7 @@ if (bboxes.getLength() > 0) {
         logger.info("CswConnector - countSearchDatasets - CSW query URL: " + cswUrl);
         int matched = 0;
         try {
-            URL url = new URL(cswUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(30000);
-            conn.setRequestMethod("GET");
-            conn.connect();
+            HttpURLConnection conn = openFollowingRedirects(cswUrl);
             int code = conn.getResponseCode();
             if (code == 404) {
                 throw new OdmsCatalogueNotFoundException("The ODMS host does not exist (HTTP 404)");
@@ -1194,7 +1190,7 @@ if (bboxes.getLength() > 0) {
      */
    
     private HttpURLConnection openFollowingRedirects(String initialUrl) throws Exception {
-        return GeoNetworkConnectorUtils.openFollowingRedirects(initialUrl);
+        return endpointConnection.open(initialUrl);
     }
     
  // --- DATE: portiamo tutto a YYYY-MM-DDThh:mm:ssZ per Solr ---
