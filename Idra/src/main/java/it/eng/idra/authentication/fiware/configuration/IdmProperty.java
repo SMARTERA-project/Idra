@@ -50,6 +50,12 @@ public enum IdmProperty {
 
   /** The idm path user. */
   IDM_PATH_USER("idm.path.user"),
+
+  /** Comma separated issuers accepted in access tokens; empty accepts the configured realm. */
+  IDM_ISSUERS("idm.issuers"),
+
+  /** Explicit JWKS URI; defaults to the realm certs endpoint of idm.host. */
+  IDM_JWKS_URI("idm.jwks.uri"),
   /** The idm fiware keystone host. */
   IDM_FIWARE_KEYSTONE_HOST("idm.fiware.keystone.host"),
 

@@ -21,7 +21,6 @@ import it.eng.idra.authentication.fiware.configuration.IdmProperty;
 import it.eng.idra.authentication.fiware.model.Token;
 import it.eng.idra.authentication.keycloak.connector.KeycloakConnectorImpl;
 import it.eng.idra.authentication.keycloak.model.KeycloakUser;
-import it.eng.idra.utils.JwtUtil;
 import it.eng.idra.utils.PropertyManager;
 import java.net.InetAddress;
 import java.net.URI;
@@ -35,6 +34,8 @@ import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -69,11 +70,18 @@ public class KeycloakAuthenticationManager extends AuthenticationManager {
   private static final String logoutCallback = PropertyManager
       .getProperty(IdmProperty.IDM_LOGOUT_CALLBACK);
 
+  private static final Logger logger = LogManager.getLogger(KeycloakAuthenticationManager.class);
+
+  private static KeycloakTokenVerifier verifier;
+
   /**
    * Instantiates a new keycloak authentication manager.
    */
   private KeycloakAuthenticationManager() {
     connector = new KeycloakConnectorImpl(protocol, host, -1, clientId, clientSecret, redirectUri);
+    verifier = KeycloakTokenVerifier.fromConfiguration(protocol, host,
+        PropertyManager.getProperty(IdmProperty.IDM_ISSUERS),
+        PropertyManager.getProperty(IdmProperty.IDM_JWKS_URI));
   }
 
   /**
@@ -164,15 +172,19 @@ public class KeycloakAuthenticationManager extends AuthenticationManager {
     }
 
     try {
-      // First validate locally from JWT claims to avoid hard runtime dependency on /userinfo.
-      KeycloakJwtClaims claims = parseJwtClaims(token.getAccessToken());
-      if (isValidJwtClaims(claims)) {
+      // JWTs are verified locally (realm JWKS signature, expiration, issuer); a JWT that fails
+      // verification is rejected without falling back to /userinfo.
+      if (KeycloakTokenVerifier.isCompactJws(token.getAccessToken())) {
+        verifier.verify(token.getAccessToken());
         return true;
       }
 
-      // Fallback for non-JWT tokens / unexpected formats.
+      // Opaque tokens can only be validated by Keycloak itself.
       connector.getUserInfo(token.getAccessToken());
       return true;
+    } catch (KeycloakTokenVerifier.InvalidTokenException e) {
+      logger.warn("Rejected access token: {}", e.getMessage());
+      return false;
     } catch (Exception e) {
       return false;
     }
@@ -216,9 +228,9 @@ public class KeycloakAuthenticationManager extends AuthenticationManager {
    * @throws Exception the exception
    */
   public KeycloakUser getUserInfo(String token) throws Exception {
-    KeycloakJwtClaims claims = parseJwtClaims(token);
-    if (isValidJwtClaims(claims)) {
-      return toUserInfo(claims);
+    if (KeycloakTokenVerifier.isCompactJws(token)) {
+      return toUserInfo(new Gson().fromJson(verifier.verify(token).toJson(),
+          KeycloakJwtClaims.class));
     }
     return connector.getUserInfo(token);
   }
@@ -283,31 +295,6 @@ public class KeycloakAuthenticationManager extends AuthenticationManager {
 
     String withoutPath = idmHost.split("/", 2)[0];
     return withoutPath.split(":", 2)[0];
-  }
-
-  private static KeycloakJwtClaims parseJwtClaims(String token) {
-    String payloadJson = JwtUtil.decodeJwtPayloadJson(token);
-    if (payloadJson == null) {
-      return null;
-    }
-    try {
-      return new Gson().fromJson(payloadJson, KeycloakJwtClaims.class);
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  private static boolean isValidJwtClaims(KeycloakJwtClaims claims) {
-    if (claims == null || StringUtils.isBlank(claims.sub)) {
-      return false;
-    }
-    if (claims.exp != null) {
-      long nowEpoch = System.currentTimeMillis() / 1000L;
-      if (claims.exp.longValue() <= nowEpoch) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private static KeycloakUser toUserInfo(KeycloakJwtClaims claims) {
