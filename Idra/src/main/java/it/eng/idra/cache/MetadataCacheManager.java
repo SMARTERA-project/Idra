@@ -81,12 +81,37 @@ public class MetadataCacheManager {
   /** The logger. */
   public static Logger logger = LogManager.getLogger(MetadataCacheManager.class);
 
+  /**
+   * Child document transformer returning every nested document. A fixed limit silently
+   * truncated datasets with many distributions (each also carries nested children).
+   */
+  static final String ALL_CHILDREN = "[child parentFilter=$parent_filter limit=-1]";
+
   /** The enable rdf. */
   private static Boolean enableRdf = Boolean
       .parseBoolean(PropertyManager.getProperty(IdraProperty.ENABLE_RDF));
 
   /** The server. */
   private static SolrClient server;
+
+  public static SyncIndexBatch newSyncIndexBatch(int nodeId, Collection<DcatDataset> present) {
+    int limit = Integer.getInteger("idra.solr.sync.maxDocuments", 1000);
+    if (limit < 1 || limit > 100000) throw new IllegalArgumentException("Invalid Solr sync batch limit");
+    return new SyncIndexBatch(server, nodeId, present, limit);
+  }
+
+  /** Replay only persisted IDs logged by a failed sync, from the authoritative DB. No DB writes. */
+  public static void reconcileDatasetIndex(int nodeId, Collection<String> persistedIds)
+      throws IOException, SolrServerException {
+    try (CachePersistenceManager persistence = new CachePersistenceManager();
+        SyncIndexBatch batch = newSyncIndexBatch(nodeId, java.util.Collections.emptyList())) {
+      for (String id : persistedIds) {
+        DcatDataset dataset = persistence.jpaGetDatasetByIdAndNode(id, nodeId);
+        if (dataset == null) batch.deleteRoot(id); else batch.upsert(dataset);
+      }
+      batch.flush();
+    }
+  }
 
   /**
    * Instantiates a new metadata cache manager.
@@ -117,7 +142,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
     SolrDocumentList docs = rsp.getResults();
@@ -153,7 +178,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
     SolrDocumentList docs = rsp.getResults();
@@ -190,7 +215,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + CacheContentType.distribution);
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
     SolrDocumentList docs = rsp.getResults();
@@ -226,7 +251,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + CacheContentType.distribution);
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
     SolrDocumentList docs = rsp.getResults();
@@ -388,7 +413,7 @@ public class MetadataCacheManager {
     // query.setParam("fl", (nativeID ? "identifier" : "id") + ",[child
     // parentFilter=$parent_filter limit=1000]");
     query.setParam("fl",
-        "otherIdentifier,identifier" + ",[child parentFilter=$parent_filter limit=1000]");
+        "otherIdentifier,identifier," + ALL_CHILDREN);
     query.set("rows", "1000000");
     // query.set("fl", nativeID ? "otherIdentifier" : "id");
 
@@ -412,15 +437,24 @@ public class MetadataCacheManager {
    */
   public static void deleteDataset(int nodeId, DcatDataset dataset)
       throws SolrServerException, IOException, DatasetNotFoundException {
-    CachePersistenceManager jpaInstance;
-    jpaInstance = new CachePersistenceManager();
+    deleteDataset(nodeId, dataset, null);
+  }
+
+  public static void deleteDataset(int nodeId, DcatDataset dataset, SyncIndexBatch batch)
+      throws SolrServerException, IOException, DatasetNotFoundException {
+    if (batch != null) batch.validate(nodeId, dataset);
+    try (CachePersistenceManager jpaInstance = new CachePersistenceManager()) {
 
     // Deletes dataset from DB
     // DCATDataset matchingDataset = getDataset(nodeID,
     // dataset.getLegacyIdentifier());
-    DcatDataset matchingDataset = getDatasetByIdentifier(nodeId,
-        dataset.getIdentifier().getValue());
-    jpaInstance.jpaDeleteDataset(matchingDataset);
+    DcatDataset matchingDataset = batch == null ? getDatasetByIdentifier(nodeId,
+        dataset.getIdentifier().getValue()) : batch.find(dataset.getIdentifier().getValue());
+    long dbStart = System.nanoTime();
+    try { jpaInstance.deleteDatasetAtomically(matchingDataset); }
+    finally { if (batch != null) batch.databaseTime(System.nanoTime() - dbStart); }
+
+    if (batch != null) { batch.delete(matchingDataset); return; }
 
     // Deletes dataset from SOLR server
     // System.out.println(dataset.getId()+" "+dataset.getNodeID());
@@ -428,10 +462,7 @@ public class MetadataCacheManager {
         + matchingDataset.getNodeId());
     server.commit();
 
-    jpaInstance.jpaClose();
-    jpaInstance = null;
-    matchingDataset = null;
-    dataset = null;
+    }
   }
 
   /**
@@ -457,6 +488,10 @@ public class MetadataCacheManager {
     // if (matchingDatasets != null && matchingDatasets.size() != 0)
     // jpaInstance.jpaDeleteDatasets(matchingDatasets);
     jpaInstance.jpaDeleteDatasetsByOdmsNode(node.getId());
+    node.setService(new java.util.ArrayList<>());
+    node.setRecord(new java.util.ArrayList<>());
+    node.setDatasetSeries(new java.util.ArrayList<>());
+    node.setStandaloneRdf(null);
 
     // Deletes dataset by its id from SOLR Cache
     logger.info("Datasets delete from HIBERNATE complete - Start deleting from SOLR Cache");
@@ -499,6 +534,7 @@ public class MetadataCacheManager {
     jpaInstance = null;
     // matchingDatasets = null;
 
+    it.eng.idra.dcat.dump.DcatApDumpManager.invalidateCatalogueDump(node.getId());
     logger.info("Deleting datasets completed successfully");
   }
 
@@ -512,23 +548,30 @@ public class MetadataCacheManager {
    */
   public static void addDataset(DcatDataset dataset)
       throws IOException, SolrServerException, EntityExistsException {
+    addDataset(dataset, null);
+  }
 
-    CachePersistenceManager jpaInstance;
-    jpaInstance = new CachePersistenceManager();
+  public static void addDataset(DcatDataset dataset, SyncIndexBatch batch)
+      throws IOException, SolrServerException, EntityExistsException {
+    if (batch != null) batch.validate(Integer.parseInt(dataset.getNodeId()), dataset);
+    try (CachePersistenceManager jpaInstance = new CachePersistenceManager()) {
 
     // Persists dataset to DB
-    jpaInstance.jpaPersistAndCommitDataset(dataset);
+    long dbStart = System.nanoTime();
+    DcatDataset committed;
+    try { committed = jpaInstance.insertDatasetAtomically(dataset); }
+    finally { if (batch != null) batch.databaseTime(System.nanoTime() - dbStart); }
+
+    if (batch != null) { batch.upsert(committed); return; }
 
     /*
      * Load dataset and related distributions in SOLR Cache
      * 
      */
 
-    server.add(dataset.toDoc());
+    server.add(committed.toDoc());
     server.commit();
-    jpaInstance.jpaClose();
-    jpaInstance = null;
-
+    }
   }
 
   /**
@@ -544,8 +587,13 @@ public class MetadataCacheManager {
    */
   public static void updateDataset(int nodeId, DcatDataset dataset)
       throws SolrServerException, IOException, DatasetNotFoundException {
-    CachePersistenceManager jpaInstance;
-    jpaInstance = new CachePersistenceManager();
+    updateDataset(nodeId, dataset, null);
+  }
+
+  public static void updateDataset(int nodeId, DcatDataset dataset, SyncIndexBatch batch)
+      throws SolrServerException, IOException, DatasetNotFoundException {
+    if (batch != null) batch.validate(nodeId, dataset);
+    try (CachePersistenceManager jpaInstance = new CachePersistenceManager()) {
 
     // Check if dataset is present, otherwise throw a
     // DatasetNotFoundException
@@ -554,8 +602,8 @@ public class MetadataCacheManager {
     // dataset.getOtherIdentifier().get(0).getValue());
     // DCATDataset matchingDataset = getDataset(nodeID,
     // dataset.getLegacyIdentifier());
-    DcatDataset matchingDataset = getDatasetByIdentifier(nodeId,
-        dataset.getIdentifier().getValue());
+    DcatDataset matchingDataset = batch == null ? getDatasetByIdentifier(nodeId,
+        dataset.getIdentifier().getValue()) : batch.find(dataset.getIdentifier().getValue());
 
     // Settiamo i vecchi id e seoid
     dataset.setId(matchingDataset.getId());
@@ -565,20 +613,22 @@ public class MetadataCacheManager {
 
     // Update dataset from persistence
     // jpaInstance.jpaDelete(dataset);
-    jpaInstance.jpaDeleteDataset(matchingDataset);
-    jpaInstance.jpaPersistAndCommitDataset(dataset);
+    long dbStart = System.nanoTime();
+    DcatDataset committed;
+    try { committed = jpaInstance.replaceDatasetAtomically(dataset); }
+    finally { if (batch != null) batch.databaseTime(System.nanoTime() - dbStart); }
+
+    if (batch != null) { batch.upsert(committed); return; }
 
     // Delete and add updated dataset into SOLR cache
     // server.deleteByQuery("_root_:" + "\"" + dataset.getId() + "\"" + "
     // AND nodeID:" + dataset.getNodeID());
-    server.deleteByQuery("_root_:" + "\"" + matchingDataset.getId() + "\"");
+    server.deleteByQuery("_root_:" + "\"" + matchingDataset.getId() + "\" AND nodeID:" + nodeId);
     // + " AND nodeID:" + matchingDataset.getNodeID());
     // server.commit();
-    server.add(dataset.toDoc());
+    server.add(committed.toDoc());
     server.commit();
-
-    jpaInstance.jpaClose();
-    jpaInstance = null;
+    }
   }
 
   /**
@@ -665,7 +715,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + "dataset");
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
     query.set("rows", "0");
     query.set("facet", "true");
 
@@ -711,7 +761,7 @@ public class MetadataCacheManager {
     // query.setFacetLimit(40);
     query.setFacetMinCount(1);
 
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
 
@@ -876,7 +926,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + CacheContentType.dataset);
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
     if (rows < 0) {
       query.setRows(100);
     } else {
@@ -942,7 +992,7 @@ public class MetadataCacheManager {
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
 
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
 
@@ -1103,7 +1153,7 @@ public class MetadataCacheManager {
   // query.set("parent_filter", "content_type:" + "dataset");
   // query.set("defType", "edismax");
   // query.addFilterQuery("{!parent which=$parent_filter}");
-  // query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+  // query.setParam("fl", "*," + ALL_CHILDREN);
   //
   // rsp = server.query(query);
   //
@@ -1353,7 +1403,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + "dataset");
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
 
     QueryResponse rsp = server.query(query);
 
@@ -1397,7 +1447,7 @@ public class MetadataCacheManager {
     query.set("parent_filter", "content_type:" + "dataset");
     query.set("defType", "edismax");
     query.addFilterQuery("{!parent which=$parent_filter}");
-    query.setParam("fl", "*,[child parentFilter=$parent_filter limit=1000]");
+    query.setParam("fl", "*," + ALL_CHILDREN);
     query.set("rows", "0");
     query.set("facet", "true");
 
@@ -1703,132 +1753,30 @@ public class MetadataCacheManager {
           OdmsManager.updateOdmsCatalogue(node, true);
         }
 
-        int i = 0;
-
-        logger.info("Starting to persist current datasets (ALL in one transaction");
-        cachePersistence.jpaBeginTransaction();
-
-        for (DcatDataset dataset : currentDatasets) {
-
-          try {
-
-            i++;
-            logger.debug("Persisting " + i);
-
-            /*
-             * Add distribution RDFs (if any) to the LODCache
-             */
-            if (enableRdf) {
-              dataset = handleRfdDistributions(dataset);
-            }
-
-            cachePersistence.jpaPersistDataset(dataset);
-
-            // Se è orion setting sulle downloadURL e accessURL delle distribution
-            if (node.getNodeType().equals(OdmsCatalogueType.ORION)) {
-              handleOrionDistribution(cachePersistence, node, dataset);
-            }
-
-            server.add(dataset.toDoc());
-
-          } catch (EntityExistsException e) {
-            logger
-                .info("Dataset with Id: " + dataset.getId() + " is already present, then skipped");
-            currentSkipped++;
-
-          } catch (SolrServerException | IOException | SolrException e) {
-            logger.info("Problem during SOLR adding of dataset with Id: " + dataset.getId()
-                + " , then skipped:" + e.getClass() + " - " + e.getMessage());
-            currentSkipped++;
-            cachePersistence.jpaRemoveDataset(dataset);
-
+        // Prepare RDF once, outside the retried DB unit.
+        if (enableRdf) {
+          for (int i = 0; i < currentDatasets.size(); i++) {
+            currentDatasets.set(i, handleRfdDistributions(currentDatasets.get(i)));
           }
-
         }
-
-        /*
-         * Commit the current datasets page to Hibernate and then to SOLR Cache
-         * 
-         */
-        try {
-
-          logger.info("Starting to commit the current datasets page");
-          logger.info("Hibernate Commit Transaction");
-          cachePersistence.jpaCommitTransanction();
-          logger.info("SOLR Commit");
-          server.commit();
-          // Auto-detect DCAT-AP version from this page's payload (monotonic toward v3).
-          node.setDcatVersion(DcatVersionDetector.detect(currentDatasets, node.getDcatVersion()));
-          currentDatasets = null;
-          skipped += currentSkipped;
-          logger.info("Current datasets page was successfully committed and persisted");
-
-          /*
-           * If there was an error while committing the whole transaction, start to
-           * persist datasets one by one
-           */
-        } catch (IllegalStateException | RollbackException | SolrServerException | IOException
-            | SolrException e) {
-
-          logger.info("There was an error while committing " + "the current datasets page: "
-              + e.getClass() + " - " + e.getMessage());
-          logger.info("Starting to persist datasets one by one");
-          logger.error(e.getMessage(), e);
-
-          // cachePersistence.jpaClear();
-          server.rollback();
-          //Rob 03/09/2021: delete documents autocommitted by SOLR        
-          String idsToBeRolledBack = currentDatasets.stream().map(x -> x.getId())
-              .collect(Collectors.joining("\" OR \"", "(\"", "\")"));
-          logger.info("id:" + idsToBeRolledBack + " AND nodeID:"
-              + node.getId());
-          server.deleteByQuery("id:" + idsToBeRolledBack + " AND nodeID:"
-              + node.getId());
-          server.commit();
-          
-
-          i = 0;
-          for (DcatDataset dataset : currentDatasets) {
-
-            try {
-              i++;
-              logger.info("Persisting dataset: " + i);
-
-              if (enableRdf) {
-                dataset = handleRfdDistributions(dataset);
-              }
-
-              cachePersistence.jpaPersistOrMergeAndCommitDataset(dataset);
-              // Se è orion setting sulle downloadURL e accessURL delle distribution
+        long pageDbStart = System.nanoTime();
+        List<DcatDataset> committedPage = cachePersistence.insertDatasetPageAtomically(
+            currentDatasets, dataset -> {
               if (node.getNodeType().equals(OdmsCatalogueType.ORION)) {
-                handleOrionDistribution(cachePersistence, node, dataset);
+                prepareOrionDistributionUrls(node, dataset);
               }
-              server.add(dataset.toDoc());
-              server.commit();
-
-            } catch (RollbackException | IllegalStateException ex) {
-              logger.info("Transaction Failed while committing " + "dataset with Id: "
-                  + dataset.getId() + " - " + ex.getClass() + " - " + ex.getMessage());
-              skipped++;
-            } catch (Exception ex) {
-
-              logger.info("Problem during committing of " + "dataset with Id: " + dataset.getId()
-                  + " , then skipped: " + ex.getClass() + " - " + ex.getMessage());
-              skipped++;
-              if (ex.getClass().equals(IOException.class)
-                  || ex.getClass().equals(SolrServerException.class)) {
-                cachePersistence.jpaRemoveDataset(dataset);
-              }
-
-            }
-
-          }
-
-          // Auto-detect DCAT-AP version (monotonic toward v3) on the per-dataset fallback path.
-          node.setDcatVersion(DcatVersionDetector.detect(currentDatasets, node.getDcatVersion()));
-          currentDatasets = null;
-
-        }
+            });
+        long pageDatabaseNs = System.nanoTime() - pageDbStart;
+        // Never roll back the shared Solr server or replay external writes inside a DB retry.
+        long pageIndexStart = System.nanoTime();
+        for (DcatDataset committed : committedPage) server.add(committed.toDoc());
+        server.commit();
+        logger.info("SYNC initial page catalogue=" + node.getId() + " databaseMs="
+            + pageDatabaseNs / 1000000 + " preparation/write/commitMs="
+            + (System.nanoTime() - pageIndexStart) / 1000000);
+        node.setDcatVersion(DcatVersionDetector.detect(committedPage, node.getDcatVersion()));
+        currentDatasets = null;
+        logger.info("Current datasets page was successfully committed and indexed");
 
         /*
          * Update all node counts (RDF and datasets) for this page iteration and //
@@ -1899,16 +1847,8 @@ public class MetadataCacheManager {
 
 
     } catch (Exception e) {
-      if (!isProtocolChange) {
-
-        node = OdmsManager.returnChangedProtocol(node);
-
-        loadCacheFromOdmsCatalogue(node, true);
-
-      } else {
-        logger.error(e.getMessage(), e);
-        throw new InvocationTargetException(e, e.getMessage());
-      }
+      logger.error(e.getMessage(), e);
+      throw new InvocationTargetException(e, e.getMessage());
 
     } finally {
       cachePersistence.jpaClose();
@@ -1993,8 +1933,7 @@ public class MetadataCacheManager {
    * @param node             the node
    * @param dataset          the dataset
    */
-  private static void handleOrionDistribution(CachePersistenceManager cachePersistence,
-      OdmsCatalogue node, DcatDataset dataset) {
+  private static void prepareOrionDistributionUrls(OdmsCatalogue node, DcatDataset dataset) {
     String internalApi = PropertyManager.getProperty(IdraProperty.ORION_INTERNAL_API);
     OrionCatalogueConfiguration nodeConf = (OrionCatalogueConfiguration) node.getAdditionalConfig();
     for (DcatDistribution distribution : dataset.getDistributions()) {
@@ -2014,7 +1953,7 @@ public class MetadataCacheManager {
       }
       distribution.setDownloadUrl(url);
       distribution.setAccessUrl(url);
-      cachePersistence.jpaUpdateDistribution(distribution, false);
+      // Called on managed entities inside the DB-only transaction; dirty checking persists URLs.
     }
   }
 

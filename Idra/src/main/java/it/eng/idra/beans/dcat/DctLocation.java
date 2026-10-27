@@ -136,6 +136,8 @@ public class DctLocation {
    *
    * @return the uri
    */
+  // Source IRIs can exceed 255 characters; a single long value used to fail the whole catalogue sync.
+  @Column(name = "uri", columnDefinition = "TEXT")
   public String getUri() {
     return uri;
   }
@@ -197,7 +199,7 @@ public class DctLocation {
    * @return the geometry
    */
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "geometry")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "geometry", columnDefinition = "TEXT")) })
   public DcatProperty getGeometry() {
     return geometry;
   }
@@ -231,7 +233,7 @@ public class DctLocation {
   }
 
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "bbox")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "bbox", columnDefinition = "TEXT")) })
   public DcatProperty getBbox() {
     return bbox;
   }
@@ -241,7 +243,7 @@ public class DctLocation {
   }
 
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "centroid")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "centroid", columnDefinition = "TEXT")) })
   public DcatProperty getCentroid() {
     return centroid;
   }

@@ -583,6 +583,7 @@ public class SparqlConnector implements IodmsConnector {
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
         j.opt("title"), j.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, j);
     return mapped;
   }
 
@@ -722,6 +723,7 @@ public class SparqlConnector implements IodmsConnector {
     }
 
     distro.setDistributionAdditionalConfig(c);
+    it.eng.idra.utils.DcatJsonMetadata.apply(distro, tmp);
     return distro;
   }
 

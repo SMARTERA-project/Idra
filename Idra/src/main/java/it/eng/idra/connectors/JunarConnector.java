@@ -425,6 +425,7 @@ public class JunarConnector implements IodmsConnector {
         wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
         dataset.opt("title"), dataset.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, dataset);
     return mapped;
   }
 
@@ -562,6 +563,7 @@ public class JunarConnector implements IodmsConnector {
         spatialResolution, temporalResolution);
     distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
         obj.opt("title"), obj.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(distribution, obj);
     return distribution;
 
   }
@@ -595,7 +597,7 @@ public class JunarConnector implements IodmsConnector {
           List<SkosPrefLabel> prefLabelList = Arrays.asList(new SkosPrefLabel(null, FederationCore.getEnglishDcatTheme(label), nodeId));
           try {
             result.add(type.getDeclaredConstructor(SkosConcept.class)
-                .newInstance(new SkosConcept(property.getURI(), null, prefLabelList, nodeId)));
+                .newInstance(new SkosConcept(property.getURI(), label.matches("^[a-zA-Z][a-zA-Z0-9+.-]*:.*") ? label : null, prefLabelList, nodeId)));
           } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
               | InvocationTargetException | NoSuchMethodException | SecurityException e) {
             logger.error(e.getMessage(), e);

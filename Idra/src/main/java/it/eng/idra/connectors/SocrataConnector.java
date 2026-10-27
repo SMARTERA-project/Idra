@@ -390,13 +390,40 @@ public class SocrataConnector implements IodmsConnector {
     }
 
     DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
-        publisher, contactPointList, keywords, null, null, null, null, null, null, landingPage,
+        publisher, contactPointList, keywords, accessRight(dataset.optString("accessLevel")), null,
+        null, null, null, null, landingPage,
         null, null, issued, modified, null, null, null, null, null, null, null, null, null, null,
         null, null, applicableLegislation, inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy,
         HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
         dataset.opt("title"), dataset.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, dataset);
     return mapped;
+  }
+
+  /**
+   * DCAT-US accessLevel as the EU access-right concept (DCAT-US / DCAT-AP crosswalk). Unknown
+   * values are not converted.
+   *
+   * @param accessLevel the DCAT-US access level
+   * @return the access-right IRI, or null
+   */
+  public static String accessRight(String accessLevel) {
+    String code;
+    switch (StringUtils.defaultString(accessLevel).trim().toLowerCase()) {
+      case "public":
+        code = "PUBLIC";
+        break;
+      case "restricted public":
+        code = "RESTRICTED";
+        break;
+      case "non-public":
+        code = "NON_PUBLIC";
+        break;
+      default:
+        return null;
+    }
+    return "http://publications.europa.eu/resource/authority/access-right/" + code;
   }
 
   /**
@@ -494,6 +521,12 @@ public class SocrataConnector implements IodmsConnector {
     if (obj.has("title")) {
       title = obj.optString("title");
     }
+    // DCAT-US describedBy (data dictionary) is the schema the distribution conforms to.
+    if (StringUtils.isNotBlank(obj.optString("describedBy"))) {
+      linkedSchemas = new ArrayList<DctStandard>();
+      linkedSchemas.add(new DctStandard(obj.optString("describedBy").trim(), "", "", "",
+          new ArrayList<String>(), nodeId));
+    }
 
     DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize, checksum,
         documentation, downloadUrl, language, linkedSchemas, mediaType, releaseDate, updateDate,
@@ -501,6 +534,7 @@ public class SocrataConnector implements IodmsConnector {
         hasPolicy, packagingFormat, spatialResolution, temporalResolution);
     distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
         obj.opt("title"), obj.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(distribution, obj);
     return distribution;
 
   }

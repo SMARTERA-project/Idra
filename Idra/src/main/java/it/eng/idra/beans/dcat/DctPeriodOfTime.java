@@ -152,6 +152,8 @@ public class DctPeriodOfTime {
    *
    * @return the uri
    */
+  // Source IRIs can exceed 255 characters; a single long value used to fail the whole catalogue sync.
+  @Column(name = "uri", columnDefinition = "TEXT")
   public String getUri() {
     return uri;
   }

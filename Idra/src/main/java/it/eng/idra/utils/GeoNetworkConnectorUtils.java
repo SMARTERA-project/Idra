@@ -247,7 +247,7 @@ public class GeoNetworkConnectorUtils {
                 if (low.contains("modellicentie") || low.contains("gratis hergebruik")) return "OPEN";
             }
         }
-        return "OTHER";
+        return "";
     }
 
     public static String readRestrictionCode(org.w3c.dom.Element recordElem) {

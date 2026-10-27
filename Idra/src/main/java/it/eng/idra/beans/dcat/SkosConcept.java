@@ -20,6 +20,7 @@ import it.eng.idra.cache.CacheContentType;
 import it.eng.idra.utils.GsonUtil;
 import it.eng.idra.utils.GsonUtilException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.persistence.CascadeType;
@@ -188,6 +189,8 @@ public class SkosConcept implements Serializable {
    *
    * @return the resource uri
    */
+  // Source IRIs can exceed 255 characters; a single long value used to fail the whole catalogue sync.
+  @Column(name = "resourceUri", columnDefinition = "TEXT")
   public String getResourceUri() {
     return resourceUri;
   }
@@ -275,9 +278,24 @@ public class SkosConcept implements Serializable {
    */
   public static SkosConcept docToSkosConcept(SolrDocument doc, String propertyUri, String nodeId) {
 
-    return new SkosConcept(propertyUri, (String) doc.getFieldValue("resourceUri"), SkosPrefLabel
-        .jsonArrayToPrefLabelList(new JSONArray(doc.getFieldValue("prefLabel").toString()), nodeId),
-        nodeId);
+    return new SkosConcept(propertyUri, (String) doc.getFieldValue("resourceUri"),
+        docToPrefLabels(doc, nodeId), nodeId);
+  }
+
+  /**
+   * Reads the pref labels of a cached concept. toDoc omits the field when the source
+   * provides no label, so a missing field is an empty list rather than an error.
+   *
+   * @param doc    the doc
+   * @param nodeId the node ID
+   * @return the pref labels
+   */
+  protected static List<SkosPrefLabel> docToPrefLabels(SolrDocument doc, String nodeId) {
+    Object labels = doc.getFieldValue("prefLabel");
+    if (labels == null) {
+      return new ArrayList<SkosPrefLabel>();
+    }
+    return SkosPrefLabel.jsonArrayToPrefLabelList(new JSONArray(labels.toString()), nodeId);
   }
 
   /*

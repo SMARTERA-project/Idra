@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
@@ -189,6 +190,12 @@ public class OdmsManager {
     return nodes.stream().filter(x -> x.getName().equals(nodeName)).findFirst()
         .map(OdmsCatalogue::getId)
         .orElseGet(() -> nodes.stream().mapToInt(OdmsCatalogue::getId).max().orElse(0) + 1);
+  }
+
+  /** Display names are not identities: include every matching catalogue in name filters. */
+  public static List<Integer> getOdmsCatalogueIdsByName(String nodeName) {
+    return snapshot().stream().filter(node -> node.getName().equals(nodeName))
+        .map(OdmsCatalogue::getId).collect(Collectors.toList());
   }
 
   /**
@@ -360,7 +367,9 @@ public class OdmsManager {
    */
   static boolean isDuplicateEndpoint(OdmsCatalogue node) {
     if (OdmsCatalogueType.DCATDUMP.equals(node.getNodeType())) {
-      return false;
+      String dumpUrl = StringUtils.trimToNull(node.getDumpUrl());
+      return dumpUrl != null && snapshot().stream()
+          .anyMatch(existing -> dumpUrl.equals(StringUtils.trimToNull(existing.getDumpUrl())));
     }
     List<OdmsCatalogue> nodes = snapshot();
     if (OdmsCatalogueType.ZENODO.equals(node.getNodeType())) {
@@ -395,7 +404,7 @@ public class OdmsManager {
    * @throws OdmsManagerException            the odms manager exception
    * @returns Node itself with assigned Dataset Count and id
    */
-  public static int addOdmsCatalogue(OdmsCatalogue node)
+  public static synchronized int addOdmsCatalogue(OdmsCatalogue node)
       throws OdmsAlreadyPresentException, OdmsCatalogueNotFoundException,
       OdmsCatalogueOfflineException, OdmsCatalogueForbiddenException, OdmsManagerException {
 
@@ -403,6 +412,11 @@ public class OdmsManager {
     int datasetsCount = 0;
 
     if (!isDuplicateEndpoint(node)) {
+      // A dump has no catalogue endpoint. Allocate its technical identity before either
+      // insertion path; activation later updates this row and keeps the identity intact.
+      if (OdmsCatalogueType.DCATDUMP.equals(node.getNodeType())) {
+        node.setHost(createUniqueString(node));
+      }
       PersistenceManager jpa = new PersistenceManager();
 
       try {
@@ -443,10 +457,6 @@ public class OdmsManager {
           logger.info(node.getNodeType().equals(OdmsCatalogueType.DCATDUMP));
           
            logger.info("Persist the node and return the ID assigned by the Entity Manager");
-           if(node.getNodeType().equals(OdmsCatalogueType.DCATDUMP) ){
-          node.setHost(createUniqueString(node));
-          logger.info(node.getHost());
-        }
           assignedNodeId = jpa.jpaInsertOdmsCatalogue(node);
           node.setId(assignedNodeId);
         
@@ -554,7 +564,7 @@ public class OdmsManager {
   }
 
   public static String createUniqueString(OdmsCatalogue node) {
-        String raw =  node.getNodeType() + "-" + node.getName() + "-" + node.getRegisterDate() + "-" + node.getPublisherName();
+        String raw = node.getNodeType() + "-" + UUID.randomUUID();
         return hashString(raw);
     }
 
@@ -705,7 +715,7 @@ public class OdmsManager {
               jpa.jpaUpdateOdmsCatalogue(node);
             } catch (Exception e) {
               throw new OdmsManagerException(
-                  "There " + "was an error while updating the ODMS Node: " + e.getMessage());
+                  "There " + "was an error while updating the ODMS Node: " + e.getMessage(), e);
             } finally {
               jpa.jpaClose();
             }
@@ -718,7 +728,7 @@ public class OdmsManager {
         }
       } catch (Exception e) {
         throw new OdmsManagerException(
-            "There " + "was an error while updating the ODMS Node: " + e.getMessage());
+            "There " + "was an error while updating the ODMS Node: " + e.getMessage(), e);
       }
   }
 

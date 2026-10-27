@@ -171,7 +171,7 @@ public class LodCacheManager {
       } catch (IOException x) {
         logger.error(link + " " + x.getMessage());
       } finally {
-        repoConnection.close();
+        if (repoConnection != null) repoConnection.close();
       }
     }
     return rdfAdded;
@@ -190,8 +190,9 @@ public class LodCacheManager {
       InputStream rdfStream1 = new ByteArrayInputStream(file);
 
       ValueFactory f = repoConnection.getValueFactory();
-      IRI context = f.createIRI(node.getHost());
-      repoConnection.add(rdfStream, node.getHost(), RDFFormat.RDFXML, context);
+      String contextUri = catalogueContext(node);
+      IRI context = f.createIRI(contextUri);
+      repoConnection.add(rdfStream, contextUri, RDFFormat.RDFXML, context);
 
       getPrefixes(rdfStream1);
       logger.info("RDF file: " + node.getHost() + " loading completed successfully!");
@@ -201,6 +202,21 @@ public class LodCacheManager {
     } finally {
       repoConnection.close();
     }
+  }
+
+  /** Keep historical endpoint contexts; technical dump hashes need an absolute IRI. */
+  public static String catalogueContext(OdmsCatalogue node) {
+    try {
+      java.net.URI host = new java.net.URI(node.getHost());
+      if (host.isAbsolute()) return host.toASCIIString();
+    } catch (java.net.URISyntaxException | NullPointerException invalidHost) {
+      // The technical ID is not an RDF IRI.
+    }
+    return "urn:idra:catalogue:" + node.getId();
+  }
+
+  public static void deleteCatalogueDump(OdmsCatalogue node) {
+    deleteRdf(catalogueContext(node));
   }
 
   /**
@@ -215,9 +231,8 @@ public class LodCacheManager {
 
     int rdfAdded = 0;
     // Resource resource = null;
-    RepositoryConnection repoConnection = null;
-
     for (String link : links) {
+      RepositoryConnection repoConnection = null;
       if (checkContentLength(link) && test < 2) {
 
         try {
@@ -266,7 +281,7 @@ public class LodCacheManager {
           logger.error("Exception while adding RDF: " + link + " " + e.getMessage());
 
         } finally {
-          repoConnection.close();
+          if (repoConnection != null) repoConnection.close();
         }
       }
 
@@ -346,7 +361,7 @@ public class LodCacheManager {
     } catch (RepositoryException e) {
       throw e;
     } finally {
-      repoConnection.close();
+      if (repoConnection != null) repoConnection.close();
     }
     // logger.info("Deleted Context:" + context);
   }

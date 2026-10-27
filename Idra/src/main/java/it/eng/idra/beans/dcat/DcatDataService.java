@@ -55,6 +55,14 @@ import javax.persistence.Transient;
 public class DcatDataService implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private String resourceUri;
+    private String brokerId;
+    @Column(name = "brokerId", length = 2048)
+    public String getBrokerId() { return brokerId; }
+    public void setBrokerId(String value) { brokerId = value; }
+    @Column(name = "resourceUri", length = 2048)
+    public String getResourceUri() { return resourceUri; }
+    public void setResourceUri(String value) { resourceUri = value; }
 
     /** The Constant RDFClass. */
     private static final transient Resource RDFClass = DCAT.DataService;
@@ -104,6 +112,15 @@ public class DcatDataService implements Serializable {
 
     /** The title. */
     private DcatProperty title;
+
+    // DCAT-AP 3 fields carried by the Solr/API/broker projection (no SQL columns, like applicableLegislation).
+    private List<DcatDetails> dataServiceDetails; // Multilingual dct:title / dct:description
+    private List<DcatKeyword> keywordDetails; // dcat:keyword
+    private List<DcatProperty> theme; // dcat:theme (concept IRIs)
+    private List<DcatProperty> conformsTo; // dct:conformsTo
+    private List<DcatProperty> landingPage; // dcat:landingPage
+    private List<DcatProperty> format; // dct:format
+    private FoafAgent publisher; // dct:publisher
 
     /**
      * Instantiates a new dcat data service.
@@ -389,7 +406,7 @@ public class DcatDataService implements Serializable {
             // @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
             @JoinColumn(name = "data_service_id", referencedColumnName = "data_service_id"),
             @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
-    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "servesDataset")) })
+    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "servesDataset", columnDefinition = "TEXT")) })
     public List<DcatProperty> getServesDataset() {
         return servesDataset;
     }
@@ -413,6 +430,28 @@ public class DcatDataService implements Serializable {
      *
      * @return the rdf class
      */
+    @Transient
+    public List<DcatDetails> getDataServiceDetails() { return dataServiceDetails; }
+    public void setDataServiceDetails(List<DcatDetails> value) { dataServiceDetails = value; }
+    @Transient
+    public List<DcatKeyword> getKeywordDetails() { return keywordDetails; }
+    public void setKeywordDetails(List<DcatKeyword> value) { keywordDetails = value; }
+    @Transient
+    public List<DcatProperty> getTheme() { return theme; }
+    public void setTheme(List<DcatProperty> value) { theme = value; }
+    @Transient
+    public List<DcatProperty> getConformsTo() { return conformsTo; }
+    public void setConformsTo(List<DcatProperty> value) { conformsTo = value; }
+    @Transient
+    public List<DcatProperty> getLandingPage() { return landingPage; }
+    public void setLandingPage(List<DcatProperty> value) { landingPage = value; }
+    @Transient
+    public List<DcatProperty> getFormat() { return format; }
+    public void setFormat(List<DcatProperty> value) { format = value; }
+    @Transient
+    public FoafAgent getPublisher() { return publisher; }
+    public void setPublisher(FoafAgent value) { publisher = value; }
+
     @Transient
     public static Resource getRdfClass() {
         return RDFClass;
@@ -538,9 +577,31 @@ public class DcatDataService implements Serializable {
                                     : Arrays.asList(""),
                             obj.optString("title"),
                             nodeId));
+            restoreProjection(result.get(result.size() - 1), obj);
         }
 
         return result;
+    }
+
+    /** Fields the positional constructor above does not carry; without them identity and contacts were lost on reload. */
+    private static void restoreProjection(DcatDataService service, JSONObject obj) {
+        try {
+            if (obj.has("resourceUri")) service.setResourceUri(obj.optString("resourceUri", null));
+            if (obj.has("contactPoint")) service.setContactPoint(GsonUtil.json2Obj(obj.get("contactPoint").toString(),
+                    new com.google.gson.reflect.TypeToken<List<VcardOrganization>>() { }.getType()));
+            if (obj.has("dataServiceDetails")) service.setDataServiceDetails(GsonUtil.json2Obj(obj.get("dataServiceDetails").toString(),
+                    new com.google.gson.reflect.TypeToken<List<DcatDetails>>() { }.getType()));
+            if (obj.has("keywordDetails")) service.setKeywordDetails(GsonUtil.json2Obj(obj.get("keywordDetails").toString(),
+                    new com.google.gson.reflect.TypeToken<List<DcatKeyword>>() { }.getType()));
+            java.lang.reflect.Type properties = new com.google.gson.reflect.TypeToken<List<DcatProperty>>() { }.getType();
+            if (obj.has("theme")) service.setTheme(GsonUtil.json2Obj(obj.get("theme").toString(), properties));
+            if (obj.has("conformsTo")) service.setConformsTo(GsonUtil.json2Obj(obj.get("conformsTo").toString(), properties));
+            if (obj.has("landingPage")) service.setLandingPage(GsonUtil.json2Obj(obj.get("landingPage").toString(), properties));
+            if (obj.has("format")) service.setFormat(GsonUtil.json2Obj(obj.get("format").toString(), properties));
+            if (obj.has("publisher")) service.setPublisher(GsonUtil.json2Obj(obj.get("publisher").toString(), FoafAgent.class));
+        } catch (GsonUtilException e) {
+            throw new IllegalStateException("Invalid stored data service " + service.getResourceUri(), e);
+        }
     }
 
     @Override

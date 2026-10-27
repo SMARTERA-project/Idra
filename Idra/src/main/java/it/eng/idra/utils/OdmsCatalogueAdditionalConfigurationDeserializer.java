@@ -50,7 +50,9 @@ public class OdmsCatalogueAdditionalConfigurationDeserializer
     // TODO Auto-generated method stub
     try {
       JSONObject j = new JSONObject(arg0.toString());
-      if (j.has("orionDatasetDumpString") && j.optString("orionDatasetDumpString",null) != null) {
+      String type = j.optString("type", "");
+      if ("ORION".equalsIgnoreCase(type)
+          || (type.isEmpty() && j.has("orionDatasetDumpString"))) {
         boolean isAuth = false;
         String datasets = j.optString("orionDatasetDumpString", "");
         String dumpPath = j.optString("orionDatasetFilePath", "");
@@ -59,12 +61,8 @@ public class OdmsCatalogueAdditionalConfigurationDeserializer
         String clientId = "";
         String clientSecret = "";
         boolean isNgsild = false;
-        try {
-          isAuth = j.getBoolean("isAuthenticated");
-          isNgsild = j.getBoolean("ngsild");
-        } catch (JSONException e) {
-          e.printStackTrace();
-        }
+        isAuth = j.optBoolean("isAuthenticated", false);
+        isNgsild = j.optBoolean("ngsild", false);
         if (isAuth) {
           authToken = j.optString("authToken");
           oauth2Endpoint = j.optString("oauth2Endpoint");
@@ -75,7 +73,8 @@ public class OdmsCatalogueAdditionalConfigurationDeserializer
         // oauth2Endpoint, client_id, client_secret, datasets,dumpPath);
         return new OrionCatalogueConfiguration(isAuth, authToken, oauth2Endpoint, clientId,
             clientSecret, datasets, dumpPath, isNgsild);
-      } else if (j.has("sparqlDatasetDumpString") && j.optString("sparqlDatasetDumpString",null) != null) {
+      } else if ("SPARQL".equalsIgnoreCase(type)
+          || (type.isEmpty() && j.has("sparqlDatasetDumpString"))) {
         String datasets = j.optString("sparqlDatasetDumpString", "");
         String dumpPath = j.optString("sparqlDatasetFilePath", "");
         return new SparqlCatalogueConfiguration(datasets, dumpPath);

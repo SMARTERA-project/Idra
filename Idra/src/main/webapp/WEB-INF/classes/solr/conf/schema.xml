@@ -94,6 +94,7 @@
         multiValued="false" />
  
     <!-- common fields -->
+    <field name="metadataEnvelope" type="string" indexed="false" stored="true"/>
     <field name="resourceUri" type="string" indexed="true" stored="true"
         required="false" multiValued="false" />
     <field name="uri" type="string" indexed="true" stored="true"
@@ -125,6 +126,12 @@
         required="false" multiValued="true" />
     <field name="isVersionOf" type="string" indexed="true" stored="true"
         required="false" multiValued="true" />
+    <!-- DCAT 3 fields already emitted by DcatDataset.toDoc(). -->
+    <field name="hasCurrentVersion" type="string" indexed="true" stored="true" required="false" multiValued="true" />
+    <field name="previousVersion" type="string" indexed="true" stored="true" required="false" multiValued="true" />
+    <field name="prev" type="string" indexed="true" stored="true" required="false" multiValued="true" />
+    <field name="next" type="string" indexed="true" stored="true" required="false" multiValued="true" />
+    <field name="versionNoteDetails" type="string" indexed="false" stored="true" required="false" multiValued="false" />
     <field name="landingPage" type="string" indexed="true" stored="true"
         required="false" multiValued="false" />
     <field name="language" type="string" indexed="true" stored="true"

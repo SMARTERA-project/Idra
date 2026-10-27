@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.rdf.model.LiteralRequiredException;
 import org.apache.jena.rdf.model.Property;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
@@ -182,17 +183,14 @@ public class DcatApItDeserializer extends DcatApDeserializer {
       }
     }
 
-    // Manage required landingPage property
-    String landingPage = null;
-    if (datasetResource.hasProperty(DCAT.landingPage)) {
-      Resource landingR = datasetResource.getPropertyResourceValue(DCAT.landingPage);
-      if (landingR != null && StringUtils.isNotBlank(landingPage = landingR.getURI())) {
-        System.out.println(landingR.getURI());
-      } else {
-        landingPage = datasetResource.getURI();
-      }
-    } else {
-      landingPage = datasetResource.getURI();
+    // dcat:landingPage is optional: only the source value (IRI or literal URL) is kept,
+    // the dataset IRI is never used in its place.
+    String landingPage = "";
+    Statement landingStatement = datasetResource.getProperty(DCAT.landingPage);
+    if (landingStatement != null) {
+      RDFNode landingNode = landingStatement.getObject();
+      landingPage = landingNode.isURIResource() ? landingNode.asResource().getURI()
+          : landingNode.isLiteral() ? landingNode.asLiteral().getLexicalForm().trim() : "";
     }
     List<String> language = null;
     language = deserializeLanguage(datasetResource);
@@ -420,6 +418,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, rightsHolder, creator, subject, relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    DcatRdfMetadata.read(mapped, datasetResource, this);
     mapped.setKeywordDetails(keywordDetails);
     mapped.setDatasetDetails(
         DcatDetailsUtil.extractDatasetDetails(datasetResource, DCTerms.title, DCTerms.description));
@@ -450,6 +449,7 @@ public class DcatApItDeserializer extends DcatApDeserializer {
     wasGeneratedBy = null;
     HVDCategory = null;
 
+    DcatMetadataEnvelope.capture(mapped, datasetResource, "RDF:" + nodeId);
     return mapped;
 
   }

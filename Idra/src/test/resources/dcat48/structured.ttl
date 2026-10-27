@@ -1,0 +1,25 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix vcard: <http://www.w3.org/2006/vcard/ns#> .
+@prefix ex: <https://example.org/plan48/> .
+
+ex:dataset a dcat:Dataset ;
+  dct:identifier "plan48-structured" ; dct:title "Données"@fr ; dct:description "Fixture"@en ;
+  dct:language "fr" ; dct:accessRights "otherRestrictions" ;
+  dct:publisher ex:publisher1, ex:publisher2 ;
+  dcat:theme [ a skos:Concept ; skos:prefLabel "Citoyenneté"@fr ] ;
+  dcat:contactPoint [ a vcard:Organization ; vcard:fn "Support"@fr ; vcard:hasEmail <mailto:help@example.org> ;
+    ex:role ex:curator ; ex:telephone "+33-123" ] ;
+  dcat:distribution ex:distribution ;
+  ex:annotation [ a ex:Measurement ; ex:value "01.250"^^xsd:decimal ; ex:unit ex:metre ] ;
+  ex:multi "un"@fr, "deux"@fr ;
+  <https://other.example/property> "namespace preserved" .
+ex:publisher1 a foaf:Agent ; foaf:name "Publisher one" .
+ex:publisher2 a foaf:Agent ; foaf:name "Publisher two" ; ex:role "owner" .
+ex:distribution a dcat:Distribution ; dcat:accessURL ex:download ;
+  dct:format "csv" ; dcat:mediaType "csv" ;
+  dct:license [ a dct:LicenseDocument ; dct:identifier "source-licence" ;
+    dct:title "Licence originale"@fr ; ex:restriction "retain attribution" ; ex:version "2"^^xsd:integer ] .

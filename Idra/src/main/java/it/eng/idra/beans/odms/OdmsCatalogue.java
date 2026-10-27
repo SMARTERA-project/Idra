@@ -24,6 +24,7 @@ import it.eng.idra.beans.dcat.DcatApProfile;
 import it.eng.idra.beans.dcat.DcatApVersion;
 import it.eng.idra.beans.dcat.DcatCatalogueRecord;
 import it.eng.idra.beans.dcat.DcatDataService;
+import it.eng.idra.beans.dcat.DcatDatasetSeries;
 import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DctLocation;
 import it.eng.idra.beans.dcat.DctPeriodOfTime;
@@ -70,6 +71,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.jena.vocabulary.DCTerms;
 import org.hibernate.annotations.LazyCollection;
 import org.hibernate.annotations.LazyCollectionOption;
+import org.hibernate.annotations.Where;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -89,7 +91,7 @@ public class OdmsCatalogue {
 
   /** The name. */
   @JsonRequired
-  @Column(name = "name", unique = true, nullable = false) // TODO: levare unique + mettere url-api
+  @Column(name = "name", nullable = false)
   @Expose
   private String name;
 
@@ -101,7 +103,7 @@ public class OdmsCatalogue {
 
   /** The homepage. */
   @JsonRequired
-  @Column(name = "homepage", unique = false, nullable = false)
+  @Column(name = "homepage", unique = false, nullable = false, columnDefinition = "TEXT")
   @Expose
   private String homepage;
 
@@ -130,7 +132,7 @@ public class OdmsCatalogue {
   private String publisherName;
 
   /** The publisher url. */
-  @Column(name = "publisher_url", unique = false, nullable = true)
+  @Column(name = "publisher_url", unique = false, nullable = true, columnDefinition = "TEXT")
   @Expose
   private String publisherUrl;
 
@@ -299,7 +301,7 @@ public class OdmsCatalogue {
   @ElementCollection
   @CollectionTable(name = "odms_applicable_legislation", joinColumns = {
       @JoinColumn(name = "nodeID", referencedColumnName = "id") })
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "applicableLegislation")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "applicableLegislation", columnDefinition = "TEXT")) })
   private List<DcatProperty> applicableLegislation;
 
   /** The catalogue. */
@@ -317,6 +319,7 @@ public class OdmsCatalogue {
   @OneToMany(cascade = { CascadeType.ALL })
   // @Fetch(FetchMode.SELECT)
   @JoinColumn(name = "nodeID")
+  @Where(clause = "dataset_series_id IS NULL AND location_id NOT IN (SELECT coverage.spatialCoverage_id FROM dcat_spatial_coverage coverage)")
   // @JoinColumn(name = "location_id", referencedColumnName =
   // "geographicalCoverage_id") // FK in dcat_location
   // @JoinColumns({ @JoinColumn(name = "location_id", referencedColumnName =
@@ -329,7 +332,7 @@ public class OdmsCatalogue {
   @LazyCollection(LazyCollectionOption.FALSE)
   @OneToMany(cascade = { CascadeType.ALL })
   // @Fetch(FetchMode.SELECT)
-  @JoinColumns({ @JoinColumn(name = "nodeID", referencedColumnName = "id") })
+  @JoinColumns({ @JoinColumn(name = "nodeID", referencedColumnName = "id", insertable = false, updatable = false) })
   private List<DcatCatalogueRecord> record;
 
   /** The service. */
@@ -337,8 +340,35 @@ public class OdmsCatalogue {
   @LazyCollection(LazyCollectionOption.FALSE)
   @OneToMany(cascade = { CascadeType.ALL })
   // @Fetch(FetchMode.SELECT)
-  @JoinColumns({ @JoinColumn(name = "nodeID", referencedColumnName = "id") })
+  @JoinColumns({ @JoinColumn(name = "nodeID", referencedColumnName = "id", insertable = false, updatable = false) })
+  @Where(clause = "distribution_id IS NULL")
   private List<DcatDataService> service;
+
+  /** Source graph for an acquisition with no Dataset; persisted independently of the dump file. */
+  @Expose
+  @Column(name = "standaloneRdf", columnDefinition = "LONGTEXT")
+  private String standaloneRdf;
+
+  /** Source dcat:Catalog description (DcatCatalogueSource); Idra's own name/description/publisher stay separate. */
+  @Expose
+  @Column(name = "sourceMetadata", columnDefinition = "LONGTEXT")
+  private String sourceMetadata;
+
+  @Expose
+  @LazyCollection(LazyCollectionOption.FALSE)
+  @OneToMany(cascade = { CascadeType.ALL })
+  @JoinColumn(name = "nodeID", referencedColumnName = "id", insertable = false, updatable = false,
+      foreignKey = @javax.persistence.ForeignKey(javax.persistence.ConstraintMode.NO_CONSTRAINT))
+  @Where(clause = "dataset_id IS NULL")
+  private List<DcatDatasetSeries> datasetSeries;
+
+  public String getStandaloneRdf() { return standaloneRdf; }
+  public void setStandaloneRdf(String value) { standaloneRdf = value; }
+  public String getSourceMetadata() { return sourceMetadata; }
+  public void setSourceMetadata(String value) { sourceMetadata = value; }
+  public List<DcatDatasetSeries> getDatasetSeries() { return datasetSeries; }
+  public void setDatasetSeries(List<DcatDatasetSeries> value) { datasetSeries = value; }
+
 
   /** The temporal coverage. */
   @Expose
@@ -346,6 +376,7 @@ public class OdmsCatalogue {
   @OneToMany(cascade = { CascadeType.ALL })
   // @Fetch(FetchMode.SELECT)
   @JoinColumn(name = "nodeID")
+  @Where(clause = "dataset_series_id IS NULL AND periodOfTime_id NOT IN (SELECT coverage.temporalCoverage_id FROM dcat_temporal_coverage coverage)")
   // @JoinColumn(name = "periodOfTime_id", referencedColumnName =
   // "temporalCoverage_id") // FK in dcat_periodoftime
   // @JoinColumns({ @JoinColumn(name = "periodOfTime_id", referencedColumnName =

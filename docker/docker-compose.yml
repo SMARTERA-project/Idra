@@ -215,6 +215,7 @@ services:
             - idra.cache.loadfromdb=true
             # Full sync of every catalogue at each boot: off by default (heavy right after startup)
             - idra.synch.onstart=${IDRA_SYNCH_ONSTART:-false}
+            - idra.ngsi.context.url=${DCAT_CONTEXT_URL:-http://ngsi-broker:8082/dcat3-context.jsonld}
             # Internal hosts allowed by the SSRF guard (comma-separated host names)
             - IDRA_URL_ALLOWLIST=${IDRA_URL_ALLOWLIST:-}
             - idra.odms.dump.file.path=/opt/idra/dump/
@@ -293,6 +294,7 @@ services:
         environment:
         - SERVER_DEBUG=${NGSI_SERVER_DEBUG}
         - IDRA_BASE_PATH=${NGSI_IDRA_BASE_PATH}
+        - DCAT_CONTEXT_URL=${DCAT_CONTEXT_URL:-http://ngsi-broker:8082/dcat3-context.jsonld}
         - HOST_ORION=${NGSI_HOST_ORION}
         - PORT_ORION=${NGSI_PORT_ORION}
         # Context Broker hosts exempt from the SSRF private-address check

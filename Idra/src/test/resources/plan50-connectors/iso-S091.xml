@@ -1,0 +1,502 @@
+<ns0:MD_Metadata xmlns:ns0="http://www.isotc211.org/2005/gmd" xmlns:ns1="http://www.isotc211.org/2005/gco" xmlns:ns2="http://www.isotc211.org/2005/gmx" xmlns:ns3="http://www.w3.org/1999/xlink" xmlns:ns4="http://www.opengis.net/gml/3.2">
+      <ns0:fileIdentifier>
+        <ns1:CharacterString>cmto:078cf243-d6dd-4f0b-afad-4bc5306b193e</ns1:CharacterString>
+      </ns0:fileIdentifier>
+      <ns0:language>
+        <ns0:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeListValue="ita">ita</ns0:LanguageCode>
+      </ns0:language>
+      <ns0:characterSet>
+        <ns0:MD_CharacterSetCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_CharacterSetCode" codeListValue="utf8">utf8</ns0:MD_CharacterSetCode>
+      </ns0:characterSet>
+      <ns0:hierarchyLevel>
+        <ns0:MD_ScopeCode codeList="http://standards.iso.org/iso/19139/resources/gmxCodelists.xml#MD_ScopeCode" codeListValue="dataset">dataset</ns0:MD_ScopeCode>
+      </ns0:hierarchyLevel>
+      <ns0:contact>
+        <ns0:CI_ResponsibleParty>
+          <ns0:organisationName>
+            <ns1:CharacterString>Città metropolitana di Torino</ns1:CharacterString>
+          </ns0:organisationName>
+          <ns0:contactInfo>
+            <ns0:CI_Contact>
+              <ns0:phone>
+                <ns0:CI_Telephone>
+                  <ns0:voice ns1:nilReason="missing">
+                    <ns1:CharacterString />
+                  </ns0:voice>
+                </ns0:CI_Telephone>
+              </ns0:phone>
+              <ns0:address>
+                <ns0:CI_Address>
+                  <ns0:electronicMailAddress>
+                    <ns1:CharacterString>territorio@cittametropolitana.torino.it</ns1:CharacterString>
+                  </ns0:electronicMailAddress>
+                </ns0:CI_Address>
+              </ns0:address>
+              <ns0:onlineResource>
+                <ns0:CI_OnlineResource>
+                  <ns0:linkage>
+                    <ns0:URL>https://www.cittametropolitana.torino.it</ns0:URL>
+                  </ns0:linkage>
+                </ns0:CI_OnlineResource>
+              </ns0:onlineResource>
+            </ns0:CI_Contact>
+          </ns0:contactInfo>
+          <ns0:role>
+            <ns0:CI_RoleCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_RoleCode" codeListValue="pointOfContact">pointOfContact</ns0:CI_RoleCode>
+          </ns0:role>
+        </ns0:CI_ResponsibleParty>
+      </ns0:contact>
+      <ns0:dateStamp>
+        <ns1:Date>2026-05-11</ns1:Date>
+      </ns0:dateStamp>
+      <ns0:metadataStandardName>
+        <ns1:CharacterString>Linee Guida RNDT</ns1:CharacterString>
+      </ns0:metadataStandardName>
+      <ns0:metadataStandardVersion>
+        <ns1:CharacterString>2.0</ns1:CharacterString>
+      </ns0:metadataStandardVersion>
+      <ns0:referenceSystemInfo>
+        <ns0:MD_ReferenceSystem>
+          <ns0:referenceSystemIdentifier>
+            <ns0:RS_Identifier>
+              <ns0:code>
+                <ns2:Anchor ns3:href="http://www.opengis.net/def/crs/EPSG/0/32632">WGS84/UTM 32N</ns2:Anchor>
+              </ns0:code>
+            </ns0:RS_Identifier>
+          </ns0:referenceSystemIdentifier>
+        </ns0:MD_ReferenceSystem>
+      </ns0:referenceSystemInfo>
+      <ns0:identificationInfo>
+        <ns0:MD_DataIdentification>
+          <ns0:citation>
+            <ns0:CI_Citation>
+              <ns0:title>
+                <ns1:CharacterString>PTC 2 - Aree boscate</ns1:CharacterString>
+              </ns0:title>
+              <ns0:date>
+                <ns0:CI_Date>
+                  <ns0:date>
+                    <ns1:Date>2010-03-01</ns1:Date>
+                  </ns0:date>
+                  <ns0:dateType>
+                    <ns0:CI_DateTypeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_DateTypeCode" codeListValue="creation">creation</ns0:CI_DateTypeCode>
+                  </ns0:dateType>
+                </ns0:CI_Date>
+              </ns0:date>
+              <ns0:identifier>
+                <ns0:MD_Identifier>
+                  <ns0:code>
+                    <ns1:CharacterString>cmto:078cf243-d6dd-4f0b-afad-4bc5306b193e</ns1:CharacterString>
+                  </ns0:code>
+                </ns0:MD_Identifier>
+              </ns0:identifier>
+              <ns0:citedResponsibleParty>
+                <ns0:CI_ResponsibleParty>
+                  <ns0:organisationName>
+                    <ns1:CharacterString>Città metropolitana di Torino</ns1:CharacterString>
+                  </ns0:organisationName>
+                  <ns0:contactInfo>
+                    <ns0:CI_Contact>
+                      <ns0:phone>
+                        <ns0:CI_Telephone>
+                          <ns0:voice ns1:nilReason="missing">
+                            <ns1:CharacterString />
+                          </ns0:voice>
+                        </ns0:CI_Telephone>
+                      </ns0:phone>
+                      <ns0:address>
+                        <ns0:CI_Address>
+                          <ns0:electronicMailAddress>
+                            <ns1:CharacterString>protocollo@cert.cittametropolitana.torino.it</ns1:CharacterString>
+                          </ns0:electronicMailAddress>
+                        </ns0:CI_Address>
+                      </ns0:address>
+                      <ns0:onlineResource>
+                        <ns0:CI_OnlineResource>
+                          <ns0:linkage>
+                            <ns0:URL>https://www.cittametropolitana.torino.it</ns0:URL>
+                          </ns0:linkage>
+                        </ns0:CI_OnlineResource>
+                      </ns0:onlineResource>
+                    </ns0:CI_Contact>
+                  </ns0:contactInfo>
+                  <ns0:role>
+                    <ns0:CI_RoleCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_RoleCode" codeListValue="owner">owner</ns0:CI_RoleCode>
+                  </ns0:role>
+                </ns0:CI_ResponsibleParty>
+              </ns0:citedResponsibleParty>
+              <ns0:presentationForm>
+                <ns0:CI_PresentationFormCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_PresentationFormCode" codeListValue="mapDigital">mapDigital</ns0:CI_PresentationFormCode>
+              </ns0:presentationForm>
+              <ns0:series>
+                <ns0:CI_Series>
+                  <ns0:issueIdentification>
+                    <ns1:CharacterString>cmto:078cf243-d6dd-4f0b-afad-4bc5306b193e</ns1:CharacterString>
+                  </ns0:issueIdentification>
+                </ns0:CI_Series>
+              </ns0:series>
+              <ns0:otherCitationDetails ns1:nilReason="missing">
+                <ns1:CharacterString />
+              </ns0:otherCitationDetails>
+            </ns0:CI_Citation>
+          </ns0:citation>
+          <ns0:abstract>
+            <ns1:CharacterString>Copertura forestale in ambito provinciale</ns1:CharacterString>
+          </ns0:abstract>
+          <ns0:pointOfContact>
+            <ns0:CI_ResponsibleParty>
+              <ns0:organisationName>
+                <ns1:CharacterString>Città metropolitana di Torino</ns1:CharacterString>
+              </ns0:organisationName>
+              <ns0:contactInfo>
+                <ns0:CI_Contact>
+                  <ns0:phone>
+                    <ns0:CI_Telephone>
+                      <ns0:voice ns1:nilReason="missing">
+                        <ns1:CharacterString />
+                      </ns0:voice>
+                    </ns0:CI_Telephone>
+                  </ns0:phone>
+                  <ns0:address>
+                    <ns0:CI_Address>
+                      <ns0:electronicMailAddress>
+                        <ns1:CharacterString>territorio@cittametropolitana.torino.it</ns1:CharacterString>
+                      </ns0:electronicMailAddress>
+                    </ns0:CI_Address>
+                  </ns0:address>
+                  <ns0:onlineResource>
+                    <ns0:CI_OnlineResource>
+                      <ns0:linkage>
+                        <ns0:URL>https://www.cittametropolitana.torino.it</ns0:URL>
+                      </ns0:linkage>
+                    </ns0:CI_OnlineResource>
+                  </ns0:onlineResource>
+                </ns0:CI_Contact>
+              </ns0:contactInfo>
+              <ns0:role>
+                <ns0:CI_RoleCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_RoleCode" codeListValue="pointOfContact">pointOfContact</ns0:CI_RoleCode>
+              </ns0:role>
+            </ns0:CI_ResponsibleParty>
+          </ns0:pointOfContact>
+          <ns0:resourceMaintenance>
+            <ns0:MD_MaintenanceInformation>
+              <ns0:maintenanceAndUpdateFrequency>
+                <ns0:MD_MaintenanceFrequencyCode codeListValue="notPlanned" codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_MaintenanceFrequencyCode">notPlanned</ns0:MD_MaintenanceFrequencyCode>
+              </ns0:maintenanceAndUpdateFrequency>
+            </ns0:MD_MaintenanceInformation>
+          </ns0:resourceMaintenance>
+          <ns0:graphicOverview>
+            <ns0:MD_BrowseGraphic>
+              <ns0:fileName>
+                <ns1:CharacterString>https://www.geoportale.cittametropolitana.torino.it/geonetwork/cmto/api/records/cmto:078cf243-d6dd-4f0b-afad-4bc5306b193e/attachments/ptc2_aree_boscate_s.png</ns1:CharacterString>
+              </ns0:fileName>
+              <ns0:fileDescription>
+                <ns1:CharacterString>thumbnail</ns1:CharacterString>
+              </ns0:fileDescription>
+              <ns0:fileType>
+                <ns1:CharacterString>png</ns1:CharacterString>
+              </ns0:fileType>
+            </ns0:MD_BrowseGraphic>
+          </ns0:graphicOverview>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns1:CharacterString>RNDT</ns1:CharacterString>
+              </ns0:keyword>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns1:CharacterString>EU</ns1:CharacterString>
+              </ns0:keyword>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns1:CharacterString>opendata</ns1:CharacterString>
+              </ns0:keyword>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns1:CharacterString>Copertura, forestale, foreste, PTF, boschi</ns1:CharacterString>
+              </ns0:keyword>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns1:CharacterString>Piano, Territoriale, Coordinamento, PTC, PTC2</ns1:CharacterString>
+              </ns0:keyword>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:descriptiveKeywords>
+            <ns0:MD_Keywords>
+              <ns0:keyword>
+                <ns2:Anchor ns3:href="http://inspire.ec.europa.eu/theme/am">Zone sottoposte a gestione/limitazioni/regolamentazione e unità con obbligo di comunicare dati</ns2:Anchor>
+              </ns0:keyword>
+              <ns0:type>
+                <ns0:MD_KeywordTypeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_KeywordTypeCode" codeListValue="theme">theme</ns0:MD_KeywordTypeCode>
+              </ns0:type>
+              <ns0:thesaurusName>
+                <ns0:CI_Citation>
+                  <ns0:title>
+                    <ns2:Anchor ns3:href="http://inspire.ec.europa.eu/theme">GEMET - INSPIRE themes, version 1.0</ns2:Anchor>
+                  </ns0:title>
+                  <ns0:date>
+                    <ns0:CI_Date>
+                      <ns0:date>
+                        <ns1:Date>2008-06-01</ns1:Date>
+                      </ns0:date>
+                      <ns0:dateType>
+                        <ns0:CI_DateTypeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_DateTypeCode" codeListValue="publication">publication</ns0:CI_DateTypeCode>
+                      </ns0:dateType>
+                    </ns0:CI_Date>
+                  </ns0:date>
+                  <ns0:identifier>
+                    <ns0:MD_Identifier>
+                      <ns0:code>
+                        <ns2:Anchor ns3:href="http://app-admin.igr.piemonte.it:443/geonetwork/srv/api/registries/vocabularies/external.theme.httpinspireeceuropaeutheme-theme">geonetwork.thesaurus.external.theme.httpinspireeceuropaeutheme-theme</ns2:Anchor>
+                      </ns0:code>
+                    </ns0:MD_Identifier>
+                  </ns0:identifier>
+                </ns0:CI_Citation>
+              </ns0:thesaurusName>
+            </ns0:MD_Keywords>
+          </ns0:descriptiveKeywords>
+          <ns0:resourceConstraints>
+            <ns0:MD_LegalConstraints>
+              <ns0:accessConstraints>
+                <ns0:MD_RestrictionCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_RestrictionCode" codeListValue="otherRestrictions">otherRestrictions</ns0:MD_RestrictionCode>
+              </ns0:accessConstraints>
+              <ns0:otherConstraints>
+                <ns2:Anchor ns3:href="http://inspire.ec.europa.eu/metadata-codelist/LimitationsOnPublicAccess/noLimitations">no limitations to public access</ns2:Anchor>
+              </ns0:otherConstraints>
+            </ns0:MD_LegalConstraints>
+          </ns0:resourceConstraints>
+          <ns0:resourceConstraints>
+            <ns0:MD_LegalConstraints>
+              <ns0:useConstraints>
+                <ns0:MD_RestrictionCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_RestrictionCode" codeListValue="otherRestrictions">otherRestrictions</ns0:MD_RestrictionCode>
+              </ns0:useConstraints>
+              <ns0:otherConstraints>
+                <ns1:CharacterString>https://creativecommons.org/licenses/by/4.0/deed.it</ns1:CharacterString>
+              </ns0:otherConstraints>
+            </ns0:MD_LegalConstraints>
+          </ns0:resourceConstraints>
+          <ns0:spatialRepresentationType>
+            <ns0:MD_SpatialRepresentationTypeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeListValue="vector">vector</ns0:MD_SpatialRepresentationTypeCode>
+          </ns0:spatialRepresentationType>
+          <ns0:spatialResolution>
+            <ns0:MD_Resolution>
+              <ns0:equivalentScale>
+                <ns0:MD_RepresentativeFraction>
+                  <ns0:denominator>
+                    <ns1:Integer>10000</ns1:Integer>
+                  </ns0:denominator>
+                </ns0:MD_RepresentativeFraction>
+              </ns0:equivalentScale>
+            </ns0:MD_Resolution>
+          </ns0:spatialResolution>
+          <ns0:language>
+            <ns0:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeListValue="ita">ita</ns0:LanguageCode>
+          </ns0:language>
+          <ns0:characterSet>
+            <ns0:MD_CharacterSetCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_CharacterSetCode" codeListValue="utf8">utf8</ns0:MD_CharacterSetCode>
+          </ns0:characterSet>
+          <ns0:topicCategory>
+            <ns0:MD_TopicCategoryCode>environment</ns0:MD_TopicCategoryCode>
+          </ns0:topicCategory>
+          <ns0:extent>
+            <ns0:EX_Extent>
+              <ns0:geographicElement>
+                <ns0:EX_GeographicBoundingBox>
+                  <ns0:westBoundLongitude>
+                    <ns1:Decimal>6.602116445312501</ns1:Decimal>
+                  </ns0:westBoundLongitude>
+                  <ns0:eastBoundLongitude>
+                    <ns1:Decimal>8.17865453125</ns1:Decimal>
+                  </ns0:eastBoundLongitude>
+                  <ns0:southBoundLatitude>
+                    <ns1:Decimal>44.683640429688</ns1:Decimal>
+                  </ns0:southBoundLatitude>
+                  <ns0:northBoundLatitude>
+                    <ns1:Decimal>45.650437304688</ns1:Decimal>
+                  </ns0:northBoundLatitude>
+                </ns0:EX_GeographicBoundingBox>
+              </ns0:geographicElement>
+              <ns0:temporalElement>
+                <ns0:EX_TemporalExtent>
+                  <ns0:extent>
+                    <ns4:TimePeriod ns4:id="TP1">
+                      <ns4:beginPosition>2010-03-01</ns4:beginPosition>
+                      <ns4:endPosition>2010-03-01</ns4:endPosition>
+                    </ns4:TimePeriod>
+                  </ns0:extent>
+                </ns0:EX_TemporalExtent>
+              </ns0:temporalElement>
+              <ns0:verticalElement>
+                <ns0:EX_VerticalExtent>
+                  <ns0:minimumValue>
+                    <ns1:Real>NaN</ns1:Real>
+                  </ns0:minimumValue>
+                  <ns0:maximumValue>
+                    <ns1:Real>NaN</ns1:Real>
+                  </ns0:maximumValue>
+                  <ns0:verticalCRS ns3:href="http://www.epsg-registry.org/export.htm?gml=urn:ogc:def:crs:EPSG::4979" />
+                </ns0:EX_VerticalExtent>
+              </ns0:verticalElement>
+            </ns0:EX_Extent>
+          </ns0:extent>
+          <ns0:supplementalInformation>
+            <ns1:CharacterString>Copertura di poligoni utilizzata nella redazione del PTC 2</ns1:CharacterString>
+          </ns0:supplementalInformation>
+        </ns0:MD_DataIdentification>
+      </ns0:identificationInfo>
+      <ns0:distributionInfo>
+        <ns0:MD_Distribution>
+          <ns0:distributionFormat>
+            <ns0:MD_Format>
+              <ns0:name>
+                <ns1:CharacterString>Shapefile (SHP)</ns1:CharacterString>
+              </ns0:name>
+              <ns0:version ns1:nilReason="">
+                <ns1:CharacterString>0</ns1:CharacterString>
+              </ns0:version>
+            </ns0:MD_Format>
+          </ns0:distributionFormat>
+          <ns0:distributor>
+            <ns0:MD_Distributor>
+              <ns0:distributorContact>
+                <ns0:CI_ResponsibleParty>
+                  <ns0:organisationName>
+                    <ns1:CharacterString>Città metropolitana di Torino</ns1:CharacterString>
+                  </ns0:organisationName>
+                  <ns0:contactInfo>
+                    <ns0:CI_Contact>
+                      <ns0:phone>
+                        <ns0:CI_Telephone>
+                          <ns0:voice ns1:nilReason="missing">
+                            <ns1:CharacterString />
+                          </ns0:voice>
+                        </ns0:CI_Telephone>
+                      </ns0:phone>
+                      <ns0:address>
+                        <ns0:CI_Address>
+                          <ns0:electronicMailAddress>
+                            <ns1:CharacterString>territorio@cittametropolitana.torino.it</ns1:CharacterString>
+                          </ns0:electronicMailAddress>
+                        </ns0:CI_Address>
+                      </ns0:address>
+                      <ns0:onlineResource>
+                        <ns0:CI_OnlineResource>
+                          <ns0:linkage>
+                            <ns0:URL>https://www.cittametropolitana.torino.it</ns0:URL>
+                          </ns0:linkage>
+                        </ns0:CI_OnlineResource>
+                      </ns0:onlineResource>
+                    </ns0:CI_Contact>
+                  </ns0:contactInfo>
+                  <ns0:role>
+                    <ns0:CI_RoleCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_RoleCode" codeListValue="distributor">distributor</ns0:CI_RoleCode>
+                  </ns0:role>
+                </ns0:CI_ResponsibleParty>
+              </ns0:distributorContact>
+            </ns0:MD_Distributor>
+          </ns0:distributor>
+          <ns0:transferOptions>
+            <ns0:MD_DigitalTransferOptions>
+              <ns0:onLine>
+                <ns0:CI_OnlineResource>
+                  <ns0:linkage>
+                    <ns0:URL>https://www.cittametropolitana.torino.it/sites/default/files/pagina/risorse/territorio/dwd/pianificazione-territoriale/ptc2/shape_tavole/tav31/copertura_forestale.zip</ns0:URL>
+                  </ns0:linkage>
+                  <ns0:protocol>
+                    <ns2:Anchor ns3:href="https://registry.geodati.gov.it/metadata-codelist/ProtocolValue/www-download">WWW:DOWNLOAD-1.0-http--download</ns2:Anchor>
+                  </ns0:protocol>
+                  <ns0:applicationProfile>
+                    <ns2:Anchor ns3:href="http://inspire.ec.europa.eu/metadata-codelist/SpatialDataServiceType/other">Altri servizi</ns2:Anchor>
+                  </ns0:applicationProfile>
+                  <ns0:name>
+                    <ns1:CharacterString>PTC 2 - Aree boscate</ns1:CharacterString>
+                  </ns0:name>
+                  <ns0:description>
+                    <ns2:Anchor ns3:href="http://inspire.ec.europa.eu/metadata-codelist/OnLineDescriptionCode/accessPoint">access point</ns2:Anchor>
+                  </ns0:description>
+                </ns0:CI_OnlineResource>
+              </ns0:onLine>
+            </ns0:MD_DigitalTransferOptions>
+          </ns0:transferOptions>
+        </ns0:MD_Distribution>
+      </ns0:distributionInfo>
+      <ns0:dataQualityInfo>
+        <ns0:DQ_DataQuality>
+          <ns0:scope>
+            <ns0:DQ_Scope>
+              <ns0:level>
+                <ns0:MD_ScopeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#MD_ScopeCode" codeListValue="dataset">dataset</ns0:MD_ScopeCode>
+              </ns0:level>
+            </ns0:DQ_Scope>
+          </ns0:scope>
+          <ns0:report>
+            <ns0:DQ_AbsoluteExternalPositionalAccuracy>
+              <ns0:result>
+                <ns0:DQ_QuantitativeResult>
+                  <ns0:valueUnit>
+                    <ns4:BaseUnit ns4:id="UD1">
+                      <ns4:identifier codeSpace="http://www.bipm.fr/en/si/base_units">m</ns4:identifier>
+                      <ns4:unitsSystem ns3:href="http://www.bipm.fr/en/si" />
+                    </ns4:BaseUnit>
+                  </ns0:valueUnit>
+                  <ns0:value>
+                    <ns1:Record>
+                      <ns1:Real>10</ns1:Real>
+                    </ns1:Record>
+                  </ns0:value>
+                </ns0:DQ_QuantitativeResult>
+              </ns0:result>
+            </ns0:DQ_AbsoluteExternalPositionalAccuracy>
+          </ns0:report>
+          <ns0:report>
+            <ns0:DQ_DomainConsistency>
+              <ns0:result>
+                <ns0:DQ_ConformanceResult>
+                  <ns0:specification>
+                    <ns0:CI_Citation>
+                      <ns0:title>
+                        <ns2:Anchor ns3:href="http://data.europa.eu/eli/reg/2010/1089">REGOLAMENTO (UE) N. 1089/2010 DELLA COMMISSIONE del 23 novembre 2010 recante attuazione della direttiva 2007/2/CE del Parlamento europeo e del Consiglio per quanto riguarda l'interoperabilità dei set di dati territoriali e dei servizi di dati territoriali</ns2:Anchor>
+                      </ns0:title>
+                      <ns0:date>
+                        <ns0:CI_Date>
+                          <ns0:date>
+                            <ns1:Date>2010-12-08</ns1:Date>
+                          </ns0:date>
+                          <ns0:dateType>
+                            <ns0:CI_DateTypeCode codeList="http://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_19139_Schemas/resources/Codelist/ML_gmxCodelists.xml#CI_DateTypeCode" codeListValue="publication">publication</ns0:CI_DateTypeCode>
+                          </ns0:dateType>
+                        </ns0:CI_Date>
+                      </ns0:date>
+                    </ns0:CI_Citation>
+                  </ns0:specification>
+                  <ns0:explanation>
+                    <ns1:CharacterString>Fare riferimento alle specifiche indicate</ns1:CharacterString>
+                  </ns0:explanation>
+                  <ns0:pass ns1:nilReason="unknown" />
+                </ns0:DQ_ConformanceResult>
+              </ns0:result>
+            </ns0:DQ_DomainConsistency>
+          </ns0:report>
+          <ns0:lineage>
+            <ns0:LI_Lineage>
+              <ns0:statement>
+                <ns1:CharacterString>Estrazione dati IPLA – Istituto per le Piante da Legno e l’Ambiente</ns1:CharacterString>
+              </ns0:statement>
+            </ns0:LI_Lineage>
+          </ns0:lineage>
+        </ns0:DQ_DataQuality>
+      </ns0:dataQualityInfo>
+    </ns0:MD_Metadata>
+    

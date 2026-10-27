@@ -110,6 +110,12 @@ public class DcatApDumpManager {
     // IOUtils.closeQuietly(out);
     // }
 
+    if(StringUtils.isNotBlank(nodeId)) {
+      int id=Integer.parseInt(nodeId);
+      OdmsCatalogue node=it.eng.idra.management.FederationCore.getOdmsCatalogues().stream()
+          .filter(n -> n.getId()==id).findFirst().orElse(null);
+      requirePublishedCatalogue(node);
+    }
     try {
       if (forceDump) {
         if (StringUtils.isBlank(nodeId)) {
@@ -162,11 +168,27 @@ public class DcatApDumpManager {
    * @param node the node
    * @throws Exception the exception
    */
+  static void requirePublishedCatalogue(OdmsCatalogue node) {
+    if(node==null || !Boolean.TRUE.equals(node.isActive()))
+      throw new javax.ws.rs.NotFoundException("Catalogue is not published");
+  }
+
+  public static void invalidateCatalogueDump(int nodeId) throws IOException {
+    Files.deleteIfExists(Paths.get(globalDumpFilePath+globalDumpFileName+"_node_"+nodeId));
+    Files.deleteIfExists(Paths.get(globalDumpFilePath+globalDumpFileName+"_node_"+nodeId+".zip"));
+    invalidateGlobalDump();
+  }
+
+  public static void invalidateGlobalDump() throws IOException {
+    Files.deleteIfExists(Paths.get(globalDumpFilePath+globalDumpFileName));
+    Files.deleteIfExists(Paths.get(globalDumpFilePath+globalDumpFileName+".zip"));
+  }
+
   public static void sendDumpToRepository(OdmsCatalogue node) throws Exception {
     byte[] file = Files
         .readAllBytes(Paths.get(globalDumpFilePath + globalDumpFileName + "_node_" + node.getId()));
-    // Context of the RDF equals the catalogue's host
-    LodCacheManager.deleteRdf(node.getHost());
+    // Match the absolute context used by addCatalogueDump, including technical dump IDs.
+    LodCacheManager.deleteCatalogueDump(node);
     LodCacheManager.addCatalogueDump(node, file);
   }
 }

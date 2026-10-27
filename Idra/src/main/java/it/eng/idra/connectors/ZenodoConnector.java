@@ -500,6 +500,9 @@ public class ZenodoConnector implements IodmsConnector {
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
+    if (StringUtils.isNotBlank(zenodoDataset.getDoi())) mapped.setResourceUri("https://doi.org/" + zenodoDataset.getDoi());
+    // Concept DOI groups versions, not independently published dataset-series members.
+    // Do not fabricate inSeries or HVD from Zenodo's record type.
     return mapped;
   }
 
@@ -901,7 +904,7 @@ public class ZenodoConnector implements IodmsConnector {
 
     DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, null, format, datasetLicense, byteSize,
         checksum, new ArrayList<String>(), downloadUrl, new ArrayList<String>(),
-        new ArrayList<DctStandard>(), mimeType, "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z", null, null, title,
+        new ArrayList<DctStandard>(), mimeType, "", "", null, null, title,
         accessService,
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);

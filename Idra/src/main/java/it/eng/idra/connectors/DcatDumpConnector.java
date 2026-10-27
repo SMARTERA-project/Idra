@@ -242,6 +242,7 @@ public class DcatDumpConnector implements IodmsConnector {
 
     // Pass the Node Host as base URI for the model
     Model m = deserializer.dumpToModel(dumpString, node);
+    deserializer.readCatalogue(m,node);
     StmtIterator sit = m.listStatements(null, RDF.type, DCAT.Dataset);
     // Matcher matcher =
     // deserializer.getDatasetPattern(node.getDcatFormat()).matcher(dumpString);
@@ -281,7 +282,10 @@ public class DcatDumpConnector implements IodmsConnector {
       }
     }
 
-    if (datasetsList.size() != 0) {
+    boolean standalone = !m.contains(null,RDF.type,DCAT.Dataset)
+        && ((node.getService()!=null && !node.getService().isEmpty())
+            || (node.getDatasetSeries()!=null && !node.getDatasetSeries().isEmpty()));
+    if (!datasetsList.isEmpty() || standalone) {
       DcatApSerializer.writeModelToFile(m, DcatApFormat.RDFXML, odmsDumpFilePath,
           "dumpFileString_" + nodeId);
       node.setDumpFilePath(odmsDumpFilePath + "dumpFileString_" + nodeId);
@@ -290,7 +294,7 @@ public class DcatDumpConnector implements IodmsConnector {
       OdmsManager.updateOdmsCatalogue(node, true);
       return datasetsList;
     } else {
-      throw new Exception("No Datasets retrieved from the provided DUMP!");
+      throw new Exception("No supported Dataset, standalone DataService or DatasetSeries retrieved from the provided DUMP!");
     }
   }
 

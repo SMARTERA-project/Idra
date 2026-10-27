@@ -57,26 +57,37 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
     }
 
     ErrorCode code = classify(t);
+    int status = code.httpStatus();
+    // Other JAX-RS client errors (415, 405, 406...) keep their status: they are request
+    // problems, not server failures. The generic bad-request key is already translated.
+    if (code == ErrorCode.ERR_INTERNAL && t instanceof WebApplicationException
+        && ((WebApplicationException) t).getResponse() != null) {
+      int requested = ((WebApplicationException) t).getResponse().getStatus();
+      if (requested >= 400 && requested < 500) {
+        code = ErrorCode.ERR_BAD_REQUEST;
+        status = requested;
+      }
+    }
     // ExceptionMapper is singleton-scoped, so @Context ContainerRequestContext can't be
     // injected at construction time. The CorrelationIdFilter puts the id in SLF4J MDC
     // for the current thread — read it from there.
     String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
 
-    if (code.httpStatus() >= 500) {
+    if (status >= 500) {
       logger.error("[errorCode={}] {}", code.name(), t.getMessage(), t);
     } else {
       logger.warn("[errorCode={}] {}", code.name(), t.getMessage());
     }
 
     ErrorResponse body = new ErrorResponse(
-        String.valueOf(code.httpStatus()),
+        String.valueOf(status),
         DEBUG_ERRORS ? safeMessage(t) : null,
         code.name(),
         null,
         correlationId);
     body.setUserMessageKey(code.userMessageKey());
 
-    return Response.status(code.httpStatus())
+    return Response.status(status)
         .entity(body.toJson())
         .type(MediaType.APPLICATION_JSON)
         .build();

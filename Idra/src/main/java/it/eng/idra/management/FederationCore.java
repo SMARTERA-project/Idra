@@ -685,7 +685,7 @@ public class FederationCore {
     if (node.isCacheable()) {
       MetadataCacheManager.deleteAllDatasetsByOdmsCatalogue(node);
       try {
-        LodCacheManager.deleteRdf(node.getHost());
+        LodCacheManager.deleteCatalogueDump(node);
       } catch (Exception e) {
         logger.error("Error while deleting catalogue's " + node.getName() + "rdf");
       }
@@ -911,6 +911,7 @@ public class FederationCore {
       DatasetNotFoundException {
     node.setActive(false);
     OdmsManager.updateOdmsCatalogue(node, true);
+    DcatApDumpManager.invalidateGlobalDump();
     // remove node synch timer from timers list
     try {
       IdraScheduler odfScheduler = IdraScheduler.getSingletonInstance();
@@ -933,7 +934,7 @@ public class FederationCore {
       if (node.isCacheable()) {
         MetadataCacheManager.deleteAllDatasetsByOdmsCatalogue(node);
         try {
-          LodCacheManager.deleteRdf(node.getHost());
+          LodCacheManager.deleteCatalogueDump(node);
         } catch (Exception e) {
           logger.error("Error while deleting catalogue's " + node.getName() + "rdf");
         }
@@ -1017,6 +1018,10 @@ public class FederationCore {
    */
   public static Integer getOdmsCatalogueIdbyName(String nodeName) {
     return OdmsManager.getOdmsCatalogueIdbyName(nodeName);
+  }
+
+  public static List<Integer> getOdmsCatalogueIdsByName(String nodeName) {
+    return OdmsManager.getOdmsCatalogueIdsByName(nodeName);
   }
 
   /**

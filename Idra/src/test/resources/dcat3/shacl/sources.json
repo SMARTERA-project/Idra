@@ -1,0 +1,44 @@
+[
+  {
+    "file": "shapes.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/html/shacl/shapes.ttl",
+    "sha256": "7FE9815E0F32B10F5CBCE74FA6CCD0290AAE3EF9E5080FB84E2D8093EB984D1D"
+  },
+  {
+    "file": "range.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/html/shacl/range.ttl",
+    "sha256": "24D3BFD0FA17A3D0E877C9EBB91C8174124E5038538E1BF081B2CB679AD0F1B2"
+  },
+  {
+    "file": "shapes_recommended.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/html/shacl/shapes_recommended.ttl",
+    "sha256": "9afbf23f1f56d10d6839259684934137e20506a9aedce0249b619bbc593b9abd",
+    "bytes": 10170,
+    "license": "CC BY 4.0 (SEMIC repository)",
+    "release": "DCAT-AP 3.0.1"
+  },
+  {
+    "file": "mdr-vocabularies.shape.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/html/shacl/mdr-vocabularies.shape.ttl",
+    "sha256": "2362f83971766a15cc20b2b54420022dc10547dd2c483da02080847c61b4b45a",
+    "bytes": 19592,
+    "license": "CC BY 4.0 (SEMIC repository)",
+    "release": "DCAT-AP 3.0.1"
+  },
+  {
+    "file": "hvd-full.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/2.2.0-hvd/html/hvd-SHACL-full.ttl",
+    "sha256": "e4795da0a12ab2afe47e268d74f36f93419d4114274aa5506f126648a0ae18cf",
+    "bytes": 49988,
+    "license": "CC BY 4.0 (SEMIC repository)",
+    "release": "DCAT-AP HVD 2.2.0"
+  },
+  {
+    "file": "hvd3-full.ttl",
+    "url": "https://semiceu.github.io/DCAT-AP/releases/3.0.0-hvd/html/hvd-SHACL-full.ttl",
+    "sha256": "44cdd8e97dfc8b9cbd0f920893191d68b2dffceb4899f2b34b48ea86dd9e2e51",
+    "bytes": 62850,
+    "license": "CC BY 4.0",
+    "release": "DCAT-AP HVD 3.0.0"
+  }
+]

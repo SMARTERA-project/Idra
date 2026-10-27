@@ -1,0 +1,189 @@
+[
+  {
+    "id": "plan48-explicit-1",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "CSV",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/CSV",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-2",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "csv",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/CSV",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-3",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "JSON",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/JSON",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-4",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "json",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/JSON",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-5",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "XML",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/XML",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-6",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "xml",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/XML",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-7",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "ZIP",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/ZIP",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-8",
+    "predicate": "http://purl.org/dc/terms/format",
+    "raw": "zip",
+    "canonical": "http://publications.europa.eu/resource/authority/file-type/ZIP",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/file-type",
+      "sha256": "328a242552105a5143ae3d4dfebdb6b7490eb33a871ee361ca45908b14993fb3",
+      "file": "import-83df7495bb4b.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-9",
+    "predicate": "http://purl.org/dc/terms/language",
+    "raw": "fr",
+    "canonical": "http://publications.europa.eu/resource/authority/language/FRA",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/language",
+      "sha256": "7fe0ff847a86a75b08b00873187fda66d04658b2fdb358c0b4e357494b2bc521",
+      "file": "import-9100cf3f5941.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-10",
+    "predicate": "http://purl.org/dc/terms/language",
+    "raw": "en",
+    "canonical": "http://publications.europa.eu/resource/authority/language/ENG",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/language",
+      "sha256": "7fe0ff847a86a75b08b00873187fda66d04658b2fdb358c0b4e357494b2bc521",
+      "file": "import-9100cf3f5941.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-11",
+    "predicate": "http://purl.org/dc/terms/language",
+    "raw": "it",
+    "canonical": "http://publications.europa.eu/resource/authority/language/ITA",
+    "evidence": {
+      "url": "http://publications.europa.eu/resource/authority/language",
+      "sha256": "7fe0ff847a86a75b08b00873187fda66d04658b2fdb358c0b4e357494b2bc521",
+      "file": "import-9100cf3f5941.ttl"
+    }
+  },
+  {
+    "id": "plan48-explicit-12",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "csv",
+    "canonical": "https://www.iana.org/assignments/media-types/text/csv",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  },
+  {
+    "id": "plan48-explicit-13",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "text/csv",
+    "canonical": "https://www.iana.org/assignments/media-types/text/csv",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  },
+  {
+    "id": "plan48-explicit-14",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "json",
+    "canonical": "https://www.iana.org/assignments/media-types/application/json",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  },
+  {
+    "id": "plan48-explicit-15",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "application/json",
+    "canonical": "https://www.iana.org/assignments/media-types/application/json",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  },
+  {
+    "id": "plan48-explicit-16",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "application/xml",
+    "canonical": "https://www.iana.org/assignments/media-types/application/xml",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  },
+  {
+    "id": "plan48-explicit-17",
+    "predicate": "http://www.w3.org/ns/dcat#mediaType",
+    "raw": "application/zip",
+    "canonical": "https://www.iana.org/assignments/media-types/application/zip",
+    "evidence": {
+      "url": "https://www.iana.org/assignments/media-types/media-types.xml",
+      "sha256": "ea860f979d3b8ea00a141ef6e2e80aa8747e2406a7ffbea5e492558a1d4c97cb",
+      "file": "iana-media-types.xml"
+    }
+  }
+]

@@ -98,7 +98,7 @@ public class DcatDetails {
      *
      * @return the catalogue record id
      */
-    @Column(name = "catalogue_record_id")
+    @Column(name = "catalogue_record_id", insertable = false, updatable = false)
     public String getCatalogueRecordId() {
         return catalogueRecordId;
     }
@@ -117,7 +117,8 @@ public class DcatDetails {
      *
      * @return the dataset series id
      */
-    @Column(name = "dataset_series_id")
+    // The series collection owns this FK; detached detail snapshots must not clear it.
+    @Column(name = "dataset_series_id", insertable = false, updatable = false)
     public String getDatasetSeriesId() {
         return datasetSeriesId;
     }

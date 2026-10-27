@@ -34,6 +34,7 @@ import it.eng.idra.beans.search.SearchResult;
 import it.eng.idra.cache.CachePersistenceManager;
 import it.eng.idra.cache.LodCacheManager;
 import it.eng.idra.cache.MetadataCacheManager;
+import it.eng.idra.cache.SyncIndexBatch;
 import it.eng.idra.dcat.dump.DcatApDumpManager;
 import it.eng.idra.dcat.dump.DcatApSerializer;
 import it.eng.idra.management.FederationCore;
@@ -123,7 +124,9 @@ public class OdmsSynchJob implements InterruptableJob {
   public void execute(JobExecutionContext context) throws JobExecutionException {
     // TODO Auto-generated method stub
     logger.info("\nIn Execute");
-    try {
+    try (it.eng.idra.management.CatalogueOperationLock operation =
+        it.eng.idra.management.CatalogueOperationLock.acquire(
+            (int) context.getJobDetail().getJobDataMap().get("nodeID"))) {
       logger.info("Starting synch job for catalogue: "
           + context.getJobDetail().getJobDataMap().get("nodeID"));
       OdmsCatalogue node = OdmsManager
@@ -132,8 +135,10 @@ public class OdmsSynchJob implements InterruptableJob {
         node.setSynchLock(OdmsSynchLock.PERIODIC);
         OdmsManager.updateOdmsCatalogue(node, false);
         try {
-          synchOdmsNode(node, false,
-              context.getMergedJobDataMap().getBooleanValue(FULL_SYNC_KEY));
+          if (!synchOdmsNode(node, false,
+              context.getMergedJobDataMap().getBooleanValue(FULL_SYNC_KEY))) {
+            throw new JobExecutionException("Catalogue synchronization failed: " + node.getId());
+          }
         } catch (OdmsCatalogueNotFoundException e) {
           logger.error(e.getMessage(), e);
         } catch (OdmsCatalogueForbiddenException e) {
@@ -152,6 +157,7 @@ public class OdmsSynchJob implements InterruptableJob {
     } catch (Exception e) {
 
       logger.error(e.getMessage(), e);
+      throw new JobExecutionException(e);
     }
   }
 
@@ -324,6 +330,7 @@ public class OdmsSynchJob implements InterruptableJob {
               presentDatasets = MetadataCacheManager.getAllDatasetsByOdmsCatalogue(node.getId());
             }
 
+            long fetchStart = System.nanoTime();
             if (fullSync) {
               // Ask the connector for every remote dataset (no known datasets, no start date),
               // then update the ones already present and add the others.
@@ -335,18 +342,29 @@ public class OdmsSynchJob implements InterruptableJob {
               synchroResult = getChangedDatasets(node, presentDatasets,
                   CommonUtil.formatDate(lastUpdate));
             }
+            logger.info("SYNC fetch catalogue=" + node.getId() + " elapsedMs="
+                + (System.nanoTime() - fetchStart) / 1000000);
 
-            for (DcatDataset dataset : synchroResult.getDeletedDatasets()) {
-              deletedRdf += OdmsSynchJob.deleteDataset(node, dataset);
+            // CKAN incremental previously skipped this read; batch identity needs the full snapshot.
+            if (!fullSync && node.getNodeType().equals(OdmsCatalogueType.CKAN)) {
+              presentDatasets = MetadataCacheManager.getAllDatasetsByOdmsCatalogue(node.getId());
             }
-
-            for (DcatDataset dataset : synchroResult.getAddedDatasets()) {
-              addedRdf += OdmsSynchJob.addDataset(node, dataset);
+            long persistenceStart = System.nanoTime();
+            try (SyncIndexBatch batch = MetadataCacheManager.newSyncIndexBatch(node.getId(), presentDatasets)) {
+              for (DcatDataset dataset : synchroResult.getDeletedDatasets()) {
+                deletedRdf += OdmsSynchJob.deleteDataset(node, dataset, batch);
+              }
+              for (DcatDataset dataset : synchroResult.getAddedDatasets()) {
+                addedRdf += OdmsSynchJob.addDataset(node, dataset, batch);
+              }
+              for (DcatDataset dataset : synchroResult.getChangedDatasets()) {
+                updatedRdf += OdmsSynchJob.updateDataset(node, dataset, batch);
+              }
+              // Publish before version detection, broker export, dump generation and RDF import.
+              batch.flush();
             }
-
-            for (DcatDataset dataset : synchroResult.getChangedDatasets()) {
-              updatedRdf += OdmsSynchJob.updateDataset(node, dataset);
-            }
+            logger.info("SYNC persistence/index/RDF-distributions catalogue=" + node.getId()
+                + " elapsedMs=" + (System.nanoTime() - persistenceStart) / 1000000);
 
             // Refresh DCAT-AP version detection. If we already have a v3 verdict keep it
             // (detection is monotonic); otherwise scan added+changed first, and if those
@@ -415,10 +433,16 @@ public class OdmsSynchJob implements InterruptableJob {
         }
       }
 
+      // A failed DB/index unit must not export a partial catalogue to the broker.
+      if (!synchCompleted) return false;
+
       try {
         logger.info("ADDING the Catalogue in the Context Broker calling the BROKER MANAGER "
             + "component");
-        addCatalogueInCb(node);
+        long brokerStart = System.nanoTime();
+        try { addCatalogueInCb(node); }
+        finally { logger.info("SYNC broker catalogue=" + node.getId() + " elapsedMs="
+            + (System.nanoTime() - brokerStart) / 1000000); }
       } catch (Exception e) {
         // TODO Auto-generated catch block
         logger.error(e.getMessage(), e);
@@ -466,14 +490,20 @@ public class OdmsSynchJob implements InterruptableJob {
 
         // Creating the dump file for the node after the synchronization
         try {
+          long dumpStart = System.nanoTime();
           SearchResult result = MetadataCacheManager.getAllDatasetsByOdmsCatalogueId(node.getId());
           DcatApSerializer.searchResultToDcatApByNode(Integer.toString(node.getId()), result,
               DcatApFormat.fromString(PropertyManager.getProperty(IdraProperty.DUMP_FORMAT)),
               DcatApProfile.fromString(PropertyManager.getProperty(IdraProperty.DUMP_PROFILE)),
               DcatApWriteType.FILE);
+          logger.info("SYNC dump catalogue=" + node.getId() + " elapsedMs="
+              + (System.nanoTime() - dumpStart) / 1000000);
 
           // Write Catalogue's DCAT Dump into RDF4J
-          DcatApDumpManager.sendDumpToRepository(node);      
+          long importStart = System.nanoTime();
+          try { DcatApDumpManager.sendDumpToRepository(node); }
+          finally { logger.info("SYNC RDF import catalogue=" + node.getId() + " elapsedMs="
+              + (System.nanoTime() - importStart) / 1000000); }
 
         } catch (Exception e1) {
           logger.error(e1.getMessage(), e1);
@@ -557,11 +587,15 @@ public class OdmsSynchJob implements InterruptableJob {
    * @return the int
    */
   static int deleteDataset(OdmsCatalogue node, DcatDataset dataset) {
+    return deleteDataset(node, dataset, null);
+  }
+
+  static int deleteDataset(OdmsCatalogue node, DcatDataset dataset, SyncIndexBatch batch) {
     int deletedRdf = 0;
     CachePersistenceManager jpa = new CachePersistenceManager();
     try {
       List<DcatDistribution> distributionList = dataset.getDistributions();
-      MetadataCacheManager.deleteDataset(node.getId(), dataset);
+      MetadataCacheManager.deleteDataset(node.getId(), dataset, batch);
 
       if (distributionList != null && !distributionList.isEmpty()) {
         for (DcatDistribution d : distributionList) {
@@ -587,9 +621,7 @@ public class OdmsSynchJob implements InterruptableJob {
       // if (deletedRDF != 0)
       // logger.info("deletedRDF: " + deletedRDF);
     } catch (DatasetNotFoundException | SolrServerException | IOException ex) {
-      logger.error(ex.getMessage(), ex);
-      logger.info("\nDataset is already deleted\n");
-      logger.error("Dataset is already deleted");
+      throw new IllegalStateException("Unable to delete dataset " + dataset.getId(), ex);
     } finally {
       jpa.jpaClose();
     }
@@ -605,20 +637,28 @@ public class OdmsSynchJob implements InterruptableJob {
    * @return the int
    */
   public static int addDataset(OdmsCatalogue node, DcatDataset dataset) {
+    return addDataset(node, dataset, null);
+  }
+
+  static int addDataset(OdmsCatalogue node, DcatDataset dataset, SyncIndexBatch batch) {
     int addedRdf = 0;
 
     logger.info("\n--- Creating dataset ---" + dataset.getId() + " " + dataset.getTitle().getValue()
         + "\n");
     try {
       // MetadataCacheManager.getDataset(dataset.getId(),false);
-      MetadataCacheManager.getDatasetByIdentifier(node.getId(), dataset.getIdentifier().getValue());
+      if (batch == null) {
+        MetadataCacheManager.getDatasetByIdentifier(node.getId(), dataset.getIdentifier().getValue());
+      } else {
+        batch.find(dataset.getIdentifier().getValue());
+      }
       logger.info("Dataset is already present");
     } catch (DatasetNotFoundException ex) {
       // If a dataset is not found, create one
       logger.info(ex.getMessage() + "\n - Adding new dataset -\n");
 
       try {
-        MetadataCacheManager.addDataset(dataset);
+        MetadataCacheManager.addDataset(dataset, batch);
         List<DcatDistribution> distributionList = dataset.getDistributions();
         // Add all RDF distributions on LOD
         // Repository
@@ -650,11 +690,10 @@ public class OdmsSynchJob implements InterruptableJob {
         }
 
       } catch (EntityExistsException | SolrServerException | IOException e) {
-        logger
-            .error("--- The dataset" + dataset.getId() + "is already present and then skipped ---");
+        throw new IllegalStateException("Unable to add dataset " + dataset.getId(), e);
       }
     } catch (SolrServerException | IOException eex) {
-      logger.debug(eex.getLocalizedMessage());
+      throw new IllegalStateException("Unable to find dataset " + dataset.getId(), eex);
     }
 
     return addedRdf;
@@ -668,9 +707,13 @@ public class OdmsSynchJob implements InterruptableJob {
    * @return the int
    */
   public static int updateDataset(OdmsCatalogue node, DcatDataset dataset) {
+    return updateDataset(node, dataset, null);
+  }
+
+  static int updateDataset(OdmsCatalogue node, DcatDataset dataset, SyncIndexBatch batch) {
     int updatedRdf = 0;
     try {
-      MetadataCacheManager.updateDataset(node.getId(), dataset);
+      MetadataCacheManager.updateDataset(node.getId(), dataset, batch);
       List<DcatDistribution> distributionList = dataset.getDistributions();
 
       // Update all RDF distributions on LOD
@@ -701,9 +744,9 @@ public class OdmsSynchJob implements InterruptableJob {
         logger.info("updatedRDF: " + updatedRdf);
       }
     } catch (DatasetNotFoundException e) {
-      return addDataset(node, dataset);
+      return addDataset(node, dataset, batch);
     } catch (SolrServerException | IOException e) {
-      logger.error("Unable to update dataset: " + dataset.getId() + " " + e.getLocalizedMessage());
+      throw new IllegalStateException("Unable to update dataset " + dataset.getId(), e);
     }
     return updatedRdf;
   }

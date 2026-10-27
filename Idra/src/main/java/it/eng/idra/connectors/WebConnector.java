@@ -281,6 +281,7 @@ public class WebConnector implements IodmsConnector {
     int distrNumber = distributionList.size();
     int shift = distrNumber > 1 ? distrNumber - 1 : distrNumber == 0 ? -1 : 0;
 
+    org.json.JSONObject dcatExtensions = new org.json.JSONObject();
     for (DatasetSelector selector : selectors) {
 
       /*
@@ -313,6 +314,15 @@ public class WebConnector implements IodmsConnector {
         continue;
       }
 
+      if (!extractedValues.isEmpty()) {
+        String raw = extractedValues.get(0).trim();
+        Object value = raw;
+        if (raw.startsWith("[") || raw.startsWith("{")) {
+          try { value = new org.json.JSONTokener(raw).nextValue(); }
+          catch (org.json.JSONException invalid) { /* Ordinary text may start with a bracket. */ }
+        }
+        dcatExtensions.put(selector.getName(), value);
+      }
       switch (selector.getName()) {
 
         case "title":
@@ -723,6 +733,7 @@ public class WebConnector implements IodmsConnector {
     publisher = null;
     contactPointList = null;
 
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, dcatExtensions);
     return mapped;
   }
 

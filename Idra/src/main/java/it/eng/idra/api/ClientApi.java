@@ -250,14 +250,15 @@ public class ClientApi {
 
         // Call to the CB to obtain the entire Dataset
         Map<String, String> headers = new HashMap<String, String>();
+        it.eng.idra.utils.NgsiDcatReader.contextHeaders(headers);
         headers.put("Content-Type", "application/json");
         RestClient client = new RestClientImpl();
 
         // CASE 1. The notification concerns the modification/addition of a Dataset
-        if (data[i].getType().equals("Dataset")) {
+        if (data[i].getType().equals("Dataset") || data[i].getType().equals("http://www.w3.org/ns/dcat#Dataset") || data[i].getType().equals("https://uri.etsi.org/ngsi-ld/default-context/Dataset")) {
 
           HttpResponse response = client.sendGetRequest(node.getHost()
-              + "/ngsi-ld/v1/entities?type=Dataset&id=" + ngsiEntitytId, headers);
+              + "/ngsi-ld/v1/entities/" + java.net.URLEncoder.encode(ngsiEntitytId,java.nio.charset.StandardCharsets.UTF_8), headers);
 
           int status = client.getStatus(response);
           if (status != 200 && status != 207 && status != 204 && status != -1
@@ -270,8 +271,13 @@ public class ClientApi {
               .getDatasetFromJson(returnedJson, node);
 
           try {
-            DcatDataset datasetToUpdateInIdra = MetadataCacheManager.getDatasetByIdentifier(Integer
-                .parseInt(nodeId), ngsiEntitytId);
+            DcatDataset datasetToUpdateInIdra;
+            try {
+              datasetToUpdateInIdra = MetadataCacheManager.getDatasetById(ngsiEntitytId);
+              if(!nodeId.equals(datasetToUpdateInIdra.getNodeId())) throw new DatasetNotFoundException(ngsiEntitytId);
+            } catch(DatasetNotFoundException missing) {
+              datasetToUpdateInIdra = MetadataCacheManager.getDatasetByIdentifier(Integer.parseInt(nodeId), ngsiEntitytId);
+            }
             logger.info("Dataset already present with ID: " + datasetToUpdateInIdra.getId()
                 + ", to be updated");
 
@@ -292,219 +298,14 @@ public class ClientApi {
           }
         }
 
-        // CASE 2. The notification concerns the modification/addition of a Distribution
-        if (data[i].getType().equals("DistributionDCAT-AP")) {
-
-          HttpResponse response = client.sendGetRequest(node.getHost()
-              + "/ngsi-ld/v1/entities?type=DistributionDCAT-AP&id=" + ngsiEntitytId, headers);
-
-          int status = client.getStatus(response);
-          if (status != 200 && status != 207 && status != 204 && status != -1
-              && status != 201 && status != 301) {
-            throw new Exception("STATUS search Distribution in Orion"
-                + " after a notify: " + status);
-          }
-          String returnedJson = client.getHttpResponseBody(response);
-          JSONArray distribArray = new JSONArray(returnedJson);
-
-          // Getting the DcatDistribution
-          DcatDistribution distributionFromCb = NgsiLdCbDcatDeserializer
-              .distributionToDcat(distribArray.get(0), node);
-
-          logger.info("Distribution which has been modified in the CB: "
-              + distributionFromCb.getTitle().getValue());
-
-          String datasetIdentif = "";
-          for (DcatDataset ds : MetadataCacheManager.getAllDatasetsByOdmsCatalogue(node.getId())) {
-            for (DcatDistribution d : ds.getDistributions()) {
-              if (d.getIdentifier().getValue().equals(ngsiEntitytId)) {
-                datasetIdentif = ds.getIdentifier().getValue();
-              }
-            }
-          }
-
-          // N.B. If you ADD in the CB a Distribution whose id is not present in any
-          // Dataset,
-          // it is not possible to create its DcatDistribution in Idra.
-          // As soon as a Dataset will be added/modified in the CB which in its
-          // Distribution list
-          // presents the Id of the new Distribution, then the DcatDistribution
-          // will be created in Idra.
-          // You must therefore always create the Distribution in the CB first and then
-          // the
-          // Dataset that contains it.
-          if (datasetIdentif == "") {
-            logger.info("The Distribution added in the CB is not present in any Dataset in Idra. "
-                + "Exit.");
-            return Response.status(Response.Status.OK).build();
-          }
-
-          DcatDataset datasetToUpdateInIdra = MetadataCacheManager
-              .getDatasetByIdentifier(node.getId(), datasetIdentif);
-
-          logger.info("Dataset to which the distribution belongs: "
-              + datasetToUpdateInIdra.getTitle().getValue());
-
-          List<DcatDistribution> distributions = datasetToUpdateInIdra.getDistributions();
-          List<DcatDistribution> distributionsToUpdate = new ArrayList<DcatDistribution>();
-
-          for (DcatDistribution dis : distributions) {
-            if (!(dis.getIdentifier().getValue().equals(ngsiEntitytId))) {
-              dis.setId(null);
-              distributionsToUpdate.add(dis);
-            }
-            if ((dis.getIdentifier().getValue().equals(ngsiEntitytId))) {
-
-              logger.info("Modified Distribution: "
-                  + dis.getTitle().getValue() + " with: "
-                  + distributionFromCb.getTitle().getValue());
-
-              distributionFromCb.setId(null);
-              distributionFromCb.setIdentifier(ngsiEntitytId);
-              distributionsToUpdate.add(distributionFromCb);
-            }
-          }
-
-          List<String> doc = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getDocumentation()) {
-            doc.add(prop.getValue());
-          }
-          List<String> hasVersion = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getHasVersion()) {
-            hasVersion.add(prop.getValue());
-          }
-          List<String> isVersionOf = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getIsVersionOf()) {
-            isVersionOf.add(prop.getValue());
-          }
-          List<String> language = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getLanguage()) {
-            language.add(prop.getValue());
-          }
-          List<String> provenance = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getProvenance()) {
-            provenance.add(prop.getValue());
-          }
-          List<String> otherIdentifier = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getOtherIdentifier()) {
-            otherIdentifier.add(prop.getValue());
-          }
-          List<String> sample = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getSample()) {
-            sample.add(prop.getValue());
-          }
-          List<String> source = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getSource()) {
-            source.add(prop.getValue());
-          }
-          List<String> versionNotes = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getVersionNotes()) {
-            versionNotes.add(prop.getValue());
-          }
-
-          List<VcardOrganization> contactPointList = new ArrayList<VcardOrganization>();
-          List<VcardOrganization> contactPointListOld = datasetToUpdateInIdra.getContactPoint();
-          for (int k = 0; k < contactPointListOld.size(); k++) {
-            contactPointList.add(
-                new VcardOrganization(DCAT.contactPoint.getURI(),
-                    null, "", contactPointListOld.get(k).getHasEmail().getValue(),
-                    "", "", "", String.valueOf(node.getId())));// datasetIdentif
-          }
-
-          List<SkosConceptTheme> themeList = new ArrayList<SkosConceptTheme>();
-          List<SkosConceptTheme> themeListOld = datasetToUpdateInIdra.getTheme();
-          List<String> themes = new ArrayList<String>();
-          for (int k = 0; k < themeListOld.size(); k++) {
-            for (SkosPrefLabel lab : themeListOld.get(k).getPrefLabel()) {
-              themes.add(lab.getValue());
-            }
-          }
-          themeList.addAll(NgsiLdCbDcatDeserializer.extractConceptList(DCAT.theme.getURI(),
-              themes, SkosConceptTheme.class, node));
-
-          List<String> keywords = datasetToUpdateInIdra.getKeywords();
-
-          List<DctStandard> conformsTo = datasetToUpdateInIdra.getConformsTo();
-          FoafAgent publisherOld = datasetToUpdateInIdra.getPublisher();
-          FoafAgent publisher = new FoafAgent(DCTerms.publisher.getURI(), "",
-              publisherOld.getName().stream()
-                  .map(DcatProperty::getValue)
-                  .collect(Collectors.toList()),
-              "", "", null,
-              "", String.valueOf(node.getId()));
-          FoafAgent creatorOld = datasetToUpdateInIdra.getCreator();
-          FoafAgent creator = new FoafAgent(DCTerms.creator.getURI(), "",
-              creatorOld.getName().stream()
-                  .map(DcatProperty::getValue)
-                  .collect(Collectors.toList()),
-              "", "", null,
-              "", String.valueOf(node.getId()));
-
-          List<String> applicableLegislation = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getApplicableLegislation()) {
-            applicableLegislation.add(prop.getValue());
-          }
-
-          List<String> wasgeneratedby = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getWasGeneratedBy()) {
-            wasgeneratedby.add(prop.getValue());
-          }
-
-          List<String> HVDCategory = new ArrayList<String>();
-          for (DcatProperty prop : datasetToUpdateInIdra.getHVDCategory()) {
-            HVDCategory.add(prop.getValue());
-          }
-
-          DcatDataset datasetUpdated = new DcatDataset(String.valueOf(node.getId()),
-              datasetToUpdateInIdra.getIdentifier().getValue(),
-              datasetToUpdateInIdra.getTitle().getValue(),
-              datasetToUpdateInIdra.getDescription().getValue(),
-              distributionsToUpdate, themeList, publisher,
-              contactPointList, keywords,
-              datasetToUpdateInIdra.getAccessRights().getValue(), conformsTo,
-              doc, datasetToUpdateInIdra.getFrequency().getValue(),
-              hasVersion, isVersionOf,
-              datasetToUpdateInIdra.getLandingPage().getValue(), language,
-              provenance, datasetToUpdateInIdra.getReleaseDate().getValue(),
-              datasetToUpdateInIdra.getUpdateDate().getValue(), otherIdentifier,
-              sample, source,
-              datasetToUpdateInIdra.getSpatialCoverage(),
-              datasetToUpdateInIdra.getTemporalCoverage(),
-              datasetToUpdateInIdra.getType().getValue(),
-              datasetToUpdateInIdra.getVersion().getValue(),
-              versionNotes, datasetToUpdateInIdra.getRightsHolder(),
-              creator, datasetToUpdateInIdra.getSubject(), null,
-              applicableLegislation,
-              null,datasetToUpdateInIdra.getQualifiedRelation(),//datasetToUpdateInIdra.getInSeries(), 
-              datasetToUpdateInIdra.getTemporalResolution().getValue(),
-              wasgeneratedby,
-              HVDCategory);
-          List<DcatDetails> preservedDetails =
-              DcatDetailsUtil.cloneDatasetDetails(datasetToUpdateInIdra.getDatasetDetails());
-          List<DcatKeyword> preservedKeywordDetails =
-              DcatDetailsUtil.cloneKeywordDetails(datasetToUpdateInIdra.getKeywordDetails());
-          if (preservedDetails.isEmpty()) {
-            datasetUpdated.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
-                datasetToUpdateInIdra.getTitle().getValue(),
-                datasetToUpdateInIdra.getDescription().getValue()));
-          } else {
-            datasetUpdated.setDatasetDetails(preservedDetails);
-          }
-          if (!preservedKeywordDetails.isEmpty()) {
-            datasetUpdated.setKeywordDetails(preservedKeywordDetails);
-          }
-
-          logger.info("Updated Dataset, to be inserted in Idra: " + datasetUpdated
-              .getTitle().getValue());
-
-          MetadataCacheManager.updateDataset(Integer.parseInt(nodeId),
-              datasetUpdated);
-
-          // OdmsSynchJob.updateDataset(node, datasetUpdated);
-
-          logger.info("Dataset after notification on a Distribution, "
-              + " updated in Idra");
+        if (data[i].getType().contains("Series") || data[i].getType().contains("DataService")) {
+          it.eng.idra.utils.NgsiNotificationRefresh.refresh(node,ngsiEntitytId,data[i].getType());
         }
+
+        // CASE 2. The notification concerns the modification/addition of a Distribution
+        if (data[i].getType().equals("DistributionDCAT-AP") || data[i].getType().equals("http://www.w3.org/ns/dcat#Distribution") || data[i].getType().equals("https://uri.etsi.org/ngsi-ld/default-context/DistributionDCAT-AP")) {
+          it.eng.idra.utils.NgsiNotificationRefresh.refresh(node,ngsiEntitytId,"DistributionDCAT-AP");
+  }
       }
     }
     return Response.status(Response.Status.OK).build();
@@ -647,7 +448,7 @@ public class ClientApi {
               .splitFilterValues((String) searchParameters.remove("catalogues")).stream()
               .distinct().collect(Collectors.toList());
 
-          ids = catalogues.stream().map(x -> FederationCore.getOdmsCatalogueIdbyName(x)).distinct()
+          ids = catalogues.stream().flatMap(x -> FederationCore.getOdmsCatalogueIdsByName(x).stream()).distinct()
               .collect(Collectors.toList());
         } else {
 
@@ -787,7 +588,7 @@ public class ClientApi {
               .asList(((String) searchParameters.remove("catalogues")).split(",")).stream()
               .distinct().collect(Collectors.toList());
 
-          ids = catalogues.stream().map(x -> FederationCore.getOdmsCatalogueIdbyName(x)).distinct()
+          ids = catalogues.stream().flatMap(x -> FederationCore.getOdmsCatalogueIdsByName(x).stream()).distinct()
               .collect(Collectors.toList());
         } else {
 
@@ -909,7 +710,7 @@ public class ClientApi {
               .asList(((String) searchParameters.remove("catalogues")).split(",")).stream()
               .distinct().collect(Collectors.toList());
 
-          ids = catalogues.stream().map(x -> FederationCore.getOdmsCatalogueIdbyName(x)).distinct()
+          ids = catalogues.stream().flatMap(x -> FederationCore.getOdmsCatalogueIdsByName(x).stream()).distinct()
               .collect(Collectors.toList());
         } else {
 

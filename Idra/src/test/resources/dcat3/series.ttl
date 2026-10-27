@@ -1,0 +1,13 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.org/dataset/v2> a dcat:Dataset ;
+  dct:identifier "v2" ; dct:title "Bilancio"@it, "Budget"@en ;
+  dct:description "Dati annuali"@it, "Annual data"@en ;
+  dcat:version "2.0" ; dcat:previousVersion <https://example.org/dataset/v1> ;
+  dcat:inSeries ex:series ; dcat:temporalResolution "P1Y"^^xsd:duration .
+ex:series a dcat:DatasetSeries ; dct:title "Bilanci"@it, "Budgets"@en ;
+  dct:description "Serie di bilanci"@it ;
+  dcat:first <https://example.org/dataset/v1> ; dcat:last <https://example.org/dataset/v2> .

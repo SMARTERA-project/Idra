@@ -120,7 +120,7 @@ public class PersistenceManager {
    * Jpa rollback transaction.
    */
   public void jpaRollbackTransaction() {
-    if (em.getTransaction().getRollbackOnly()) {
+    if (em.getTransaction().isActive()) {
       em.getTransaction().rollback();
     }
   }
@@ -177,7 +177,7 @@ public class PersistenceManager {
     // + (withImage ? "JOIN FETCH d.image i" : "")+" where d.isActive=true or
     // d.isActive is null",
     TypedQuery<OdmsCatalogue> q = em.createQuery(
-        "SELECT d FROM OdmsCatalogue d " + (withImage ? "JOIN FETCH d.image i" : ""),
+        "SELECT d FROM OdmsCatalogue d " + (withImage ? "LEFT JOIN FETCH d.image i" : ""),
         OdmsCatalogue.class);
     return q.getResultList();
   }
@@ -226,7 +226,7 @@ public class PersistenceManager {
     // + (withImage ? " JOIN FETCH d.image i" : "") + " where id=" + id +" and
     // (d.isActive=true or d.isActive is null)",
     TypedQuery<OdmsCatalogue> q = em.createQuery("SELECT d FROM OdmsCatalogue d"
-        + (withImage ? " JOIN FETCH d.image i" : "") + " where id=" + id, OdmsCatalogue.class);
+        + (withImage ? " LEFT JOIN FETCH d.image i" : "") + " where id=" + id, OdmsCatalogue.class);
     return q.getResultList().get(0);
   }
 
@@ -239,7 +239,7 @@ public class PersistenceManager {
    */
   public OdmsCatalogue jpaGetInactiveOdmsCatalogue(int id, boolean withImage) {
     TypedQuery<OdmsCatalogue> q = em.createQuery("SELECT d FROM OdmsCatalogue d"
-        + (withImage ? " JOIN FETCH d.image i" : "") + " where id=" + id + " and d.isActive=false",
+        + (withImage ? " LEFT JOIN FETCH d.image i" : "") + " where id=" + id + " and d.isActive=false",
         OdmsCatalogue.class);
     return q.getResultList().get(0);
   }
@@ -252,7 +252,7 @@ public class PersistenceManager {
    */
   public List<OdmsCatalogue> jpaGetAllInactiveOdmsCatalogue(boolean withImage) {
     TypedQuery<OdmsCatalogue> q = em.createQuery("SELECT d FROM OdmsCatalogue d"
-        + (withImage ? " JOIN FETCH d.image i" : "") + " where d.isActive=false",
+        + (withImage ? " LEFT JOIN FETCH d.image i" : "") + " where d.isActive=false",
         OdmsCatalogue.class);
     return q.getResultList();
   }
@@ -291,6 +291,55 @@ public class PersistenceManager {
       managed.setLocationDescription(node.getLocationDescription());
       managed.setDcatProfile(node.getDcatProfile());
       managed.setDcatVersion(node.getDcatVersion());
+      if(node.getApplicableLegislation()!=null)managed.setApplicableLegislation(new java.util.ArrayList<>(node.getApplicableLegislation()));
+      if(node.getCreator()!=null) {
+        // The creator is re-read from the source at every sync: keep the stored row identity and merge,
+        // otherwise the cascade persists a detached agent and the whole catalogue update fails.
+        it.eng.idra.beans.dcat.FoafAgent creator=node.getCreator();
+        if(creator.getId()==null && managed.getCreator()!=null)creator.setId(managed.getCreator().getId());
+        managed.setCreator(em.merge(creator));
+        node.setCreator(managed.getCreator());
+      }
+      if(node.getGeographicalCoverage()!=null)managed.setGeographicalCoverage(node.getGeographicalCoverage().stream().map(em::merge).collect(Collectors.toList()));
+      if(node.getTemporalCoverage()!=null)managed.setTemporalCoverage(node.getTemporalCoverage().stream().map(em::merge).collect(Collectors.toList()));
+      if(node.getService()!=null) {
+        managed.setService(node.getService().stream().map(service -> {
+          if(service.getDataServiceId()==null && service.getResourceUri()!=null && !service.getResourceUri().isBlank()) {
+            List<?> ids=em.createNativeQuery("SELECT data_service_id FROM dcat_data_service WHERE nodeID=:node AND resourceUri=:uri AND distribution_id IS NULL")
+                .setParameter("node",String.valueOf(node.getId())).setParameter("uri",service.getResourceUri()).getResultList();
+            if(ids.size()>1)throw new IllegalStateException("Ambiguous catalogue service identity");
+            if(!ids.isEmpty())service.setDataServiceId(ids.get(0).toString());
+          }
+          return em.merge(service);
+        }).collect(Collectors.toList()));
+        node.setService(managed.getService());
+      }
+      if(node.getRecord()!=null) {
+        managed.setRecord(node.getRecord().stream().map(record -> {
+          if(record.getCatalogueRecordId()==null && record.getResourceUri()!=null && !record.getResourceUri().isBlank()) {
+            List<?> ids=em.createNativeQuery("SELECT catalogue_record_id FROM dcat_catalogue_record WHERE nodeID=:node AND resourceUri=:uri")
+                .setParameter("node",String.valueOf(node.getId())).setParameter("uri",record.getResourceUri()).getResultList();
+            if(ids.size()>1)throw new IllegalStateException("Ambiguous catalogue record identity");
+            if(!ids.isEmpty())record.setCatalogueRecordId(ids.get(0).toString());
+          }
+          return em.merge(record);
+        }).collect(Collectors.toList()));
+        node.setRecord(managed.getRecord());
+      }
+      managed.setStandaloneRdf(node.getStandaloneRdf());
+      managed.setSourceMetadata(node.getSourceMetadata());
+      if(node.getDatasetSeries()!=null) {
+        managed.setDatasetSeries(node.getDatasetSeries().stream().map(series -> {
+          if(series.getDatasetSeriesId()==null && series.getResourceUri()!=null && !series.getResourceUri().isBlank()) {
+            List<?> ids=em.createNativeQuery("SELECT dataset_series_id FROM dcat_dataset_series WHERE nodeID=:node AND resourceUri=:uri AND dataset_id IS NULL")
+                .setParameter("node",String.valueOf(node.getId())).setParameter("uri",series.getResourceUri()).getResultList();
+            if(ids.size()>1)throw new IllegalStateException("Ambiguous standalone series identity");
+            if(!ids.isEmpty())series.setDatasetSeriesId(ids.get(0).toString());
+          }
+          return em.merge(series);
+        }).collect(Collectors.toList()));
+        node.setDatasetSeries(managed.getDatasetSeries());
+      }
       managed.setDumpFilePath(node.getDumpFilePath());
       managed.setDumpUrl(node.getDumpUrl());
       managed.setDumpString(node.getDumpString());
@@ -1280,12 +1329,14 @@ public class PersistenceManager {
    * Jpa close.
    */
   public void jpaClose() {
-    if (em.isOpen()) {
-      em.clear();
-      em.close();
+    if (em != null && em.isOpen()) {
+      try {
+        if (em.getTransaction().isActive()) em.getTransaction().rollback();
+      } finally {
+        em.close();
+        em = null;
+      }
     }
-    em = null;
-
   }
 
   /**

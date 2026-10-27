@@ -168,6 +168,8 @@ public class VcardOrganization {
    *
    * @return the resource uri
    */
+  // Source IRIs can exceed 255 characters; a single long value used to fail the whole catalogue sync.
+  @Column(name = "resourceUri", columnDefinition = "TEXT")
   public String getResourceUri() {
     return resourceUri;
   }
@@ -266,7 +268,7 @@ public class VcardOrganization {
    * @return the checks for url
    */
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "hasURL")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "hasURL", columnDefinition = "TEXT")) })
   public DcatProperty getHasUrl() {
     return hasUrl;
   }

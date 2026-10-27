@@ -99,19 +99,18 @@ public class RestClientImpl extends RestClientBaseImpl implements RestClient {
    */
   @SuppressWarnings("deprecation")
   public String getHttpResponseBody(HttpResponse httpresponse) throws Exception {
-
-    BufferedReader rd = new BufferedReader(
-        new InputStreamReader(httpresponse.getEntity().getContent()));
-
-    StringBuffer result = new StringBuffer();
-    String line = "";
-    while ((line = rd.readLine()) != null) {
-      result.append(line);
+    try {
+      if (httpresponse == null || httpresponse.getEntity() == null) return "";
+      try (BufferedReader rd = new BufferedReader(
+          new InputStreamReader(httpresponse.getEntity().getContent()))) {
+        StringBuilder result = new StringBuilder();
+        String line;
+        while ((line = rd.readLine()) != null) result.append(line);
+        return result.toString();
+      }
+    } finally {
+      if (httpclient != null) httpclient.getConnectionManager().shutdown();
     }
-
-    httpclient.getConnectionManager().shutdown();
-
-    return result.toString();
   }
 
   /**

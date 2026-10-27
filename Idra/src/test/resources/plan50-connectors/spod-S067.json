@@ -1,0 +1,46 @@
+{
+  "license_title": "Creative Commons Attribution",
+  "id": "a44f4ddb-99ab-4911-87a7-6b784dc0b0a3",
+  "private": false,
+  "metadata_created": "2017-05-26T11:13:32.000000",
+  "license": "cc-by",
+  "metadata_modified": "2017-05-26T11:14:04.000000",
+  "author": "Comune di Pisa",
+  "state": "active",
+  "license_id": "cc-by",
+  "resources": [
+    {
+      "package_id": "a44f4ddb-99ab-4911-87a7-6b784dc0b0a3",
+      "id": "873",
+      "format": "csv",
+      "mimetype": "text/csv",
+      "name": "a44f4ddb-99ab-4911-87a7-6b784dc0b0a3.csv",
+      "url": "http://opendata.comune.pisa.it/SpodCkanApi/api/2/rest/dataset/a44f4ddb-99ab-4911-87a7-6b784dc0b0a3.csv",
+      "position": 0
+    }
+  ],
+  "tags": [
+    "Servizio Pisa Wifi"
+  ],
+  "tracking_summary": {
+    "total": 0,
+    "recent": 0
+  },
+  "groups": [
+    "56"
+  ],
+  "organization": {
+    "name": "Comune di Pisa",
+    "is_organization": true,
+    "id": "70"
+  },
+  "name": "accessi_a_pisa_wifi_anno_2016",
+  "isopen": true,
+  "notes_rendered": "\u003cp\u003e\u003cp\u003eDataset relativi alle statistiche Web della testata giornalistica Pisa Informa Flash dell\u0027anno indicato.\u0026nbsp;\u003cbr /\u003e\r\nOrigine: rilevazione tramite sistema di gestione e amministrazione del servizio \"Pisa Informa Flash\"\u003c/p\u003e\r\n\u003c/p\u003e",
+  "ckan_url": "http://opendata.comune.pisa.it/opendata/Accessi_a_Pisa_WiFi_anno_2016",
+  "notes": "Dataset relativi alle statistiche Web della testata giornalistica Pisa Informa Flash dell\u0027anno indicato. \r\nOrigine: rilevazione tramite sistema di gestione e amministrazione del servizio \"Pisa Informa Flash\"\r\n",
+  "title": "Accessi a Pisa WiFi anno 2016",
+  "extras": {},
+  "license_url": "http://www.opendefinition.org/licenses/cc-by",
+  "ratings_cout": 0
+}

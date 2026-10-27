@@ -47,6 +47,16 @@ public class DcatDatasetSeries implements Serializable {
 
     /** The id. */
     private String datasetSeriesId;
+    private String resourceUri;
+    private String brokerId;
+    @Column(name = "brokerId", length = 2048)
+    public String getBrokerId() { return brokerId; }
+    public void setBrokerId(String value) { brokerId = value; }
+    private List<String> first = new ArrayList<String>();
+    private List<String> last = new ArrayList<String>();
+    private List<String> prev = new ArrayList<String>();
+    private List<String> next = new ArrayList<String>();
+
 
     /** The node id. */
     @SerializedName(value = "nodeID")
@@ -57,19 +67,19 @@ public class DcatDatasetSeries implements Serializable {
     private String datasetId;
 
     /** The applicable legislation(s) related to the dataset series. */
-    private List<DcatProperty> applicableLegislation;
+    private List<DcatProperty> applicableLegislation = new ArrayList<>();
 
     /** The contact point(s) for the dataset series. */
-    private List<VcardOrganization> contactPoint;
+    private List<VcardOrganization> contactPoint = new ArrayList<>();
 
     /** The description(s) of the dataset series. */
-    private List<DcatDetails> description;
+    private List<DcatDetails> description = new ArrayList<>();
 
     /** The frequency of updates for the dataset series. */
     private DcatProperty frequency;
 
     /** The geographical coverage of the dataset series. */
-    private List<DctLocation> geographicalCoverage;
+    private List<DctLocation> geographicalCoverage = new ArrayList<>();
 
     /** The modification date of the dataset series. */
     private DcatProperty modificationDate;
@@ -81,10 +91,10 @@ public class DcatDatasetSeries implements Serializable {
     private DcatProperty releaseDate;
 
     /** The temporal coverage of the dataset series. */
-    private List<DctPeriodOfTime> temporalCoverage;
+    private List<DctPeriodOfTime> temporalCoverage = new ArrayList<>();
 
     /** The title(s) of the dataset series. */
-    private List<DcatDetails> title;
+    private List<DcatDetails> title = new ArrayList<>();
 
     /**
      * Instantiates a new dcat dataset series.
@@ -148,6 +158,39 @@ public class DcatDatasetSeries implements Serializable {
         setDatasetId(datasetId);
     }
 
+
+    @Column(name = "resourceUri", length = 2048)
+    public String getResourceUri() { return resourceUri; }
+    public void setResourceUri(String value) { resourceUri = value; }
+
+    @LazyCollection(LazyCollectionOption.FALSE)
+    @ElementCollection
+    @CollectionTable(name = "dcat_series_first", joinColumns = @JoinColumn(name = "dataset_series_id"))
+    @Column(name = "resourceUri", length = 2048)
+    public List<String> getFirst() { return first; }
+    public void setFirst(List<String> value) { first = value != null ? value : new ArrayList<String>(); }
+
+    @LazyCollection(LazyCollectionOption.FALSE)
+    @ElementCollection
+    @CollectionTable(name = "dcat_series_last", joinColumns = @JoinColumn(name = "dataset_series_id"))
+    @Column(name = "resourceUri", length = 2048)
+    public List<String> getLast() { return last; }
+    public void setLast(List<String> value) { last = value != null ? value : new ArrayList<String>(); }
+
+    @LazyCollection(LazyCollectionOption.FALSE)
+    @ElementCollection
+    @CollectionTable(name = "dcat_series_prev", joinColumns = @JoinColumn(name = "dataset_series_id"))
+    @Column(name = "resourceUri", length = 2048)
+    public List<String> getPrev() { return prev; }
+    public void setPrev(List<String> value) { prev = value != null ? value : new ArrayList<String>(); }
+
+    @LazyCollection(LazyCollectionOption.FALSE)
+    @ElementCollection
+    @CollectionTable(name = "dcat_series_next", joinColumns = @JoinColumn(name = "dataset_series_id"))
+    @Column(name = "resourceUri", length = 2048)
+    public List<String> getNext() { return next; }
+    public void setNext(List<String> value) { next = value != null ? value : new ArrayList<String>(); }
+
     // Getters and Setters
     @Id
     @GeneratedValue(generator = "uuid")
@@ -181,10 +224,8 @@ public class DcatDatasetSeries implements Serializable {
 
     @LazyCollection(LazyCollectionOption.FALSE)
     @ElementCollection
-    @CollectionTable(name = "dcat_applicable_legislation", joinColumns = {
-            @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
-            @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
-    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "applicableLegislation")) })
+    @CollectionTable(name = "dcat_series_legislation", joinColumns = @JoinColumn(name = "dataset_series_id"))
+    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "applicableLegislation", columnDefinition = "TEXT")) })
     public List<DcatProperty> getApplicableLegislation() {
         return applicableLegislation;
     }
@@ -194,11 +235,10 @@ public class DcatDatasetSeries implements Serializable {
     }
 
     @LazyCollection(LazyCollectionOption.FALSE)
-    @OneToMany(cascade = { CascadeType.ALL })
+    @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
     // @Fetch(FetchMode.SELECT), foreignKey =
     // @ForeignKey(ConstraintMode.NO_CONSTRAINT)
-    @JoinColumns({ @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
-            @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+    @JoinColumn(name = "dataset_series_id", referencedColumnName = "dataset_series_id")
     public List<VcardOrganization> getContactPoint() {
         return contactPoint;
     }
@@ -207,17 +247,14 @@ public class DcatDatasetSeries implements Serializable {
         this.contactPoint = contactPoint;
     }
 
-    @LazyCollection(LazyCollectionOption.FALSE)
-    @OneToMany(cascade = { CascadeType.ALL })
-    // @Fetch(FetchMode.SELECT)
-    @JoinColumns({ @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
-            @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+    @javax.persistence.Transient
     public List<DcatDetails> getDescription() {
-        return description;
+        return title;
     }
 
     public void setDescription(List<DcatDetails> description) {
         this.description = description;
+        mergeDescriptions();
     }
 
     @Embedded
@@ -231,8 +268,8 @@ public class DcatDatasetSeries implements Serializable {
     }
 
     @LazyCollection(LazyCollectionOption.FALSE)
-    @OneToMany(cascade = { CascadeType.ALL })
-    @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id") // FK in dcat_location
+    @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
+    @JoinColumn(name = "dataset_series_id", referencedColumnName = "dataset_series_id") // FK in dcat_location
     // @JoinColumns({ @JoinColumn(name = "geographicalCoverage_id",
     // referencedColumnName = "location_id") })
     // @JoinColumns({ @JoinColumn(name = "location_id", referencedColumnName =
@@ -288,8 +325,8 @@ public class DcatDatasetSeries implements Serializable {
     }
 
     @LazyCollection(LazyCollectionOption.FALSE)
-    @OneToMany(cascade = { CascadeType.ALL })
-    @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id") // FK in dcat_periodoftime
+    @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
+    @JoinColumn(name = "dataset_series_id", referencedColumnName = "dataset_series_id") // FK in dcat_periodoftime
     // @JoinColumns({ @JoinColumn(name = "temporalCoverage_id", referencedColumnName
     // = "periodOfTime_id") })
     // @JoinColumns({ @JoinColumn(name = "periodOfTime_id", referencedColumnName =
@@ -305,12 +342,29 @@ public class DcatDatasetSeries implements Serializable {
     }
 
     @LazyCollection(LazyCollectionOption.FALSE)
-    @OneToMany(cascade = { CascadeType.ALL })
+    @OneToMany(cascade = { CascadeType.ALL }, orphanRemoval = true)
     // @Fetch(FetchMode.SELECT)
-    @JoinColumns({ @JoinColumn(name = "dataset_id", referencedColumnName = "dataset_id"),
-            @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+    @JoinColumn(name = "dataset_series_id", referencedColumnName = "dataset_series_id")
     public List<DcatDetails> getTitle() {
+        mergeDescriptions();
         return title;
+    }
+
+    private void mergeDescriptions() {
+        if (title == null) title = new ArrayList<DcatDetails>();
+        if (description == null || description == title) return;
+        for (DcatDetails incoming : description) {
+            if (incoming == null) continue;
+            DcatDetails existing = null;
+            for (DcatDetails candidate : title) {
+                if (java.util.Objects.equals(candidate.getLanguage(), incoming.getLanguage())
+                        && (incoming.getTitle() == null || java.util.Objects.equals(candidate.getTitle(), incoming.getTitle()))) {
+                    existing = candidate; break;
+                }
+            }
+            if (existing == null) title.add(incoming);
+            else if (existing.getDescription() == null) existing.setDescription(incoming.getDescription());
+        }
     }
 
     public void setTitle(List<DcatDetails> title) {

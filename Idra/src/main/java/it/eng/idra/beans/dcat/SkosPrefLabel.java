@@ -23,6 +23,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import org.apache.jena.rdf.model.Resource;
@@ -39,7 +40,8 @@ import org.json.JSONObject;
  */
 
 @Entity
-@Table(name = "dcat_concept_prefLabel")
+@Table(name = "dcat_concept_prefLabel", indexes = {
+    @Index(name = "idx_preflabel_concept_node", columnList = "concept_id,nodeID") })
 public class SkosPrefLabel {
 
   /** The id. */

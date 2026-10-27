@@ -28,7 +28,7 @@ import org.json.JSONObject;
 public final class DcatDetailsUtil {
 
   private static final Pattern LANGUAGE_KEY_PATTERN =
-      Pattern.compile("^[A-Za-z]{2,8}([_-][A-Za-z0-9]{2,8})*$");
+      Pattern.compile("^[A-Za-z]{2,8}([_-][A-Za-z0-9]{1,8})*$");
   private static final Pattern LITERAL_LANGUAGE_SUFFIX_PATTERN =
       Pattern.compile("@([A-Za-z0-9][A-Za-z0-9_-]*)$");
 
@@ -276,6 +276,10 @@ public final class DcatDetailsUtil {
       return;
     }
 
+    if (jsonObject.has("languageMap")) {
+      parseAny(jsonObject.opt("languageMap"), languageFromObject, target);
+      return;
+    }
     if (jsonObject.has("value")) {
       parseAny(jsonObject.opt("value"), languageFromObject, target);
       return;
@@ -329,6 +333,7 @@ public final class DcatDetailsUtil {
     }
 
     for (String key : jsonObject.keySet()) {
+      if ("@none".equals(key)) continue;
       if (RESERVED_KEYS.contains(key)) {
         return false;
       }
@@ -345,6 +350,7 @@ public final class DcatDetailsUtil {
     }
 
     for (String key : map.keySet()) {
+      if ("@none".equals(key)) continue;
       if (RESERVED_KEYS.contains(key)) {
         return false;
       }
@@ -438,6 +444,7 @@ public final class DcatDetailsUtil {
 
   private static String normalizeLanguage(String language) {
     String normalized = StringUtils.trimToNull(language);
+    if ("@none".equals(normalized)) return null;
     if (normalized == null) {
       return null;
     }

@@ -134,7 +134,7 @@ public class Relationship {
      */
     // @Transient
     @Embedded
-    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "relation")) })
+    @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "relation", columnDefinition = "TEXT")) })
     public DcatProperty getRelation() {
         return relation;
     }

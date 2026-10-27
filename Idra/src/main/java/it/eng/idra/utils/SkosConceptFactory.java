@@ -68,6 +68,12 @@ public final class SkosConceptFactory {
    */
   public static <T extends SkosConcept> List<T> build(String propertyUri, List<String> entries,
       Class<T> type, String nodeId) {
+    return build(propertyUri, entries, type, nodeId, "");
+  }
+
+  /** Source language is supplied by the connector; missing language is never guessed. */
+  public static <T extends SkosConcept> List<T> build(String propertyUri, List<String> entries,
+      Class<T> type, String nodeId, String sourceLanguage) {
     List<T> result = new ArrayList<T>();
     if (entries == null || entries.isEmpty()) {
       return result;
@@ -81,7 +87,7 @@ public final class SkosConceptFactory {
       String resourceUri = "";
       String label;
       String labelLang = "";
-      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      if (trimmed.matches("^[a-zA-Z][a-zA-Z0-9+.-]*:.*")) {
         resourceUri = trimmed;
         int slash = trimmed.lastIndexOf('/');
         String segment = slash >= 0 && slash + 1 < trimmed.length()
@@ -99,6 +105,13 @@ public final class SkosConceptFactory {
             resourceUri = EU_DATA_THEME_BASE + identifier;
           }
         }
+      }
+      // An unmatched source label is still metadata; do not replace it with null.
+      // Keep it untagged when the source language is not available here.
+      if (label == null) {
+        label = entry;
+        labelLang = sourceLanguage == null ? "" : sourceLanguage;
+        if (resourceUri.isEmpty()) resourceUri = it.eng.idra.dcat.dump.DcatMetadataEnvelope.localConceptUri(nodeId, entry, labelLang);
       }
       try {
         result.add(type.getDeclaredConstructor(SkosConcept.class).newInstance(new SkosConcept(

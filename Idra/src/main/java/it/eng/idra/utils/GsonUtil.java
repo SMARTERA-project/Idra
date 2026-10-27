@@ -347,7 +347,9 @@ public final class GsonUtil {
           } else if (json.isJsonObject()) {
             JsonObject obj = json.getAsJsonObject();
             String value = obj.has("value") ? obj.get("value").getAsString() : null;
-            return new DcatProperty((String) null, value);
+            DcatProperty property = new DcatProperty((String) null, value);
+            if (obj.has("language") && !obj.get("language").isJsonNull()) property.setLanguage(obj.get("language").getAsString());
+            return property;
           }
           return new DcatProperty();
         }
@@ -376,8 +378,16 @@ public final class GsonUtil {
   private static Gson gson = gsonBuilder.create();
 
   /** The gson exclude fields. */
-  private static Gson gsonExcludeFields = gsonBuilder.excludeFieldsWithoutExposeAnnotation()
-      .create();
+  private static Gson gsonExcludeFields = gson.newBuilder()
+      .addSerializationExclusionStrategy(new com.google.gson.ExclusionStrategy() {
+        @Override public boolean shouldSkipField(com.google.gson.FieldAttributes field) {
+          // Public catalogue fields keep their allowlist; DCAT children use the same
+          // representation as dataset APIs, rather than becoming empty objects.
+          return !field.getDeclaringClass().getPackageName().equals("it.eng.idra.beans.dcat")
+              && field.getAnnotation(com.google.gson.annotations.Expose.class)==null;
+        }
+        @Override public boolean shouldSkipClass(Class<?> type) {return false;}
+      }).create();
 
   /**
    * Json 2 obj.
@@ -520,6 +530,11 @@ public final class GsonUtil {
       // In particular, allow OdmsCatalogue.sitemap to be either an object or a JSON string.
       if (je != null && je.isJsonObject()) {
         JsonObject root = je.getAsJsonObject();
+        // Remote lists may omit a distinct homepage (e.g. Open EXPO). The supplied
+        // catalogue entry point is the default; never change its endpoint/dump URL.
+        if (OdmsCatalogue.class.equals(type) && !root.has("homepage") && root.has("host")) {
+          root.add("homepage", root.get("host").deepCopy());
+        }
         if (root.has("sitemap")) {
           JsonElement sitemapEl = root.get("sitemap");
           if (sitemapEl != null && sitemapEl.isJsonPrimitive() && sitemapEl.getAsJsonPrimitive().isString()) {
@@ -566,7 +581,9 @@ public final class GsonUtil {
               } else if (json.isJsonObject()) {
                 JsonObject obj = json.getAsJsonObject();
                 String value = obj.has("value") ? obj.get("value").getAsString() : null;
-                return new DcatProperty((String) null, value);
+                DcatProperty property = new DcatProperty((String) null, value);
+                if (obj.has("language") && !obj.get("language").isJsonNull()) property.setLanguage(obj.get("language").getAsString());
+                return property;
               }
               return new DcatProperty();
             }

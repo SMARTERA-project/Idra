@@ -124,6 +124,7 @@ public enum IdraProperty {
   
   /** The context broker manager url. */
   ORION_MANAGER_URL("idra.orion.manager.url"),
+  NGSI_DCAT_CONTEXT_URL("idra.ngsi.context.url"),
 
   /** The context broker (Orion) direct URL — authoritative source when UI setting is empty. */
   ORION_CB_URL("idra.orion.cb.url"),

@@ -20,6 +20,7 @@ import it.eng.idra.beans.dcat.DcatApFormat;
 import it.eng.idra.beans.dcat.DcatApProfileNotValidException;
 import it.eng.idra.beans.dcat.DcatDataService;
 import it.eng.idra.beans.dcat.DcatDataset;
+import it.eng.idra.beans.dcat.DcatProperty;
 import it.eng.idra.beans.dcat.DcatDatasetSeries;
 import it.eng.idra.beans.dcat.DcatDetails;
 import it.eng.idra.beans.dcat.DcatDistribution;
@@ -60,6 +61,7 @@ import org.apache.jena.rdf.model.LiteralRequiredException;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.rdf.model.ResourceRequiredException;
@@ -120,12 +122,6 @@ public class DcatApDeserializer implements IdcatApDeserialize {
   public Model dumpToModel(String modelText, OdmsCatalogue node) throws RiotException {
 
     String nodeBaseUri = node.getHost();
-    // Jena's RDF/XML parser rejects BCP 47 extension language tags such as
-    // "cs-t-en-t0-mtec" (Extension T / transformed-content), silently dropping
-    // those triples — which makes multilingual dct:title / dct:description /
-    // dcat:keyword literals invisible to the deserializer. Reduce extension
-    // tags to their primary language subtag before parsing.
-    modelText = normalizeRdfLanguageTags(modelText);
     // create an empty model
     Model model = ModelFactory.createDefaultModel();
     for (DcatApFormat format : DcatApFormat.values()) {
@@ -144,23 +140,6 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       }
     }
     return model;
-  }
-
-  private static final java.util.regex.Pattern EXTENDED_LANG_TAG = java.util.regex.Pattern
-      .compile("(xml:lang\\s*=\\s*\")([A-Za-z]{2,3})-[tT]-[^\"]*(\")");
-
-  /**
-   * Strip BCP 47 Extension T transformed-content tags ("xx-t-..."), which Jena
-   * rejects, replacing them with the primary subtag so the literal is kept.
-   *
-   * @param modelText raw RDF/XML payload
-   * @return modelText with extension tags reduced to the primary subtag
-   */
-  static String normalizeRdfLanguageTags(String modelText) {
-    if (modelText == null || modelText.isEmpty()) {
-      return modelText;
-    }
-    return EXTENDED_LANG_TAG.matcher(modelText).replaceAll("$1$2$3");
   }
 
   /**
@@ -279,17 +258,14 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       }
     }
 
-    // Manage required landingPage property
-    String landingPage = null;
-    if (datasetResource.hasProperty(DCAT.landingPage)) {
-      Resource landingR = datasetResource.getPropertyResourceValue(DCAT.landingPage);
-      if (landingR != null && StringUtils.isNotBlank(landingPage = landingR.getURI())) {
-        System.out.println(landingR.getURI());
-      } else {
-        landingPage = datasetResource.getURI();
-      }
-    } else {
-      landingPage = datasetResource.getURI();
+    // dcat:landingPage is optional: only the source value (IRI or literal URL) is kept,
+    // the dataset IRI is never used in its place.
+    String landingPage = "";
+    Statement landingStatement = datasetResource.getProperty(DCAT.landingPage);
+    if (landingStatement != null) {
+      RDFNode landingNode = landingStatement.getObject();
+      landingPage = landingNode.isURIResource() ? landingNode.asResource().getURI()
+          : landingNode.isLiteral() ? landingNode.asLiteral().getLexicalForm().trim() : "";
     }
     List<String> language = null;
     language = deserializeLanguage(datasetResource);
@@ -510,6 +486,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         otherIdentifier, sample, source, geographicalCoverage, temporalCoverageList, type, version,
         versionNotes, null, null, subjects != null ? subjects : new ArrayList<SkosConceptSubject>(), relatedResource, applicableLegislation,
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
+    DcatRdfMetadata.read(mapped, datasetResource, this);
     mapped.setKeywordDetails(keywordDetails);
     mapped.setDatasetDetails(
         DcatDetailsUtil.extractDatasetDetails(datasetResource, DCTerms.title, DCTerms.description));
@@ -539,6 +516,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     wasGeneratedBy = null;
     HVDCategory = null;
 
+    DcatMetadataEnvelope.capture(mapped, datasetResource, "RDF:" + nodeId);
     return mapped;
 
   }
@@ -639,13 +617,14 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         } else if (toExtractP.getURI().equals(DCAT.theme.getURI())) {
           String extractedLabel = extractThemeFromUri(conceptUri);
           labelList = new ArrayList<SkosPrefLabel>();
-          labelList.add(new SkosPrefLabel("ENG", FederationCore.getEnglishDcatTheme(extractedLabel), nodeId));
+          String knownLabel = FederationCore.getEnglishDcatTheme(extractedLabel);
+          if (StringUtils.isNotBlank(knownLabel)) {
+            labelList.add(new SkosPrefLabel("ENG", knownLabel, nodeId));
+          }
 
           // For subject, the label is the entire URI. e.g. http://eurovoc.europa.eu/106
         } else if (toExtractP.getURI().equals(DCTerms.subject.getURI())) {
-          String extractedLabel = conceptUri;
           labelList = new ArrayList<SkosPrefLabel>();
-          labelList.add(new SkosPrefLabel("ENG", extractedLabel, nodeId));
         }
 
         try {
@@ -684,7 +663,7 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         String languageUri = null;
         if (languageR != null && StringUtils.isNotBlank(languageUri = languageR.getURI())) {
           if (!IRIFactory.iriImplementation().create(languageUri).hasViolation(false)) {
-            language.add(extractLanguageFromUri(languageUri));
+            language.add(languageUri);
           } else {
             language.add(languageUri);
           }
@@ -1072,17 +1051,30 @@ public class DcatApDeserializer implements IdcatApDeserialize {
     String agentType = null;
     Resource agentResource = null;
     List<String> agentNames = new ArrayList<String>();
+    List<String> agentLanguages = new ArrayList<String>();
+
+    // An agent given only as a name keeps the name instead of failing the whole dataset.
+    if (agentStatement != null && agentStatement.getObject().isLiteral()) {
+      agentNames.add(agentStatement.getString());
+      FoafAgent named = new FoafAgent(agentStatement.getPredicate().getURI(), null, agentNames, null, null,
+          null, null, nodeId);
+      named.setNameLanguages(java.util.Collections.singletonList(agentStatement.getLiteral().getLanguage()));
+      return named;
+    }
 
     if (agentStatement != null && (agentResource = agentStatement.getResource()) != null) {
 
       agentUri = agentResource.getURI();
-      if (agentResource.hasProperty(FOAF.name)) {
-        agentName = agentResource.getProperty(FOAF.name).getString();
+      // Every foaf:name (DCAT-AP: one per language), with its language tag.
+      for (Statement nameStatement : agentResource.listProperties(FOAF.name).toList()) {
+        agentName = lexicalOrUri(nameStatement);
+        if (agentName == null) continue;
         agentNames.add(agentName);
+        agentLanguages.add(nameStatement.getObject().isLiteral() ? nameStatement.getLiteral().getLanguage() : "");
       }
 
       if (agentResource.hasProperty(FOAF.mbox)) {
-        agentMbox = agentResource.getProperty(FOAF.mbox).getString();
+        agentMbox = lexicalOrUri(agentResource.getProperty(FOAF.mbox));
       }
 
       if (agentResource.hasProperty(FOAF.homepage)) {
@@ -1093,18 +1085,33 @@ public class DcatApDeserializer implements IdcatApDeserialize {
           agentHomepage = agentResource.getProperty(FOAF.homepage).getString();
         }
       }
+      // DCAT-AP gives the agent type as a concept IRI (e.g. a publisher-type), older dumps as text.
       if (agentResource.hasProperty(DCTerms.type)) {
-        agentType = agentResource.getProperty(DCTerms.type).getString();
+        agentType = lexicalOrUri(agentResource.getProperty(DCTerms.type));
       }
       if (agentResource.hasProperty(DCTerms.identifier)) {
-        agentIdentifier = agentResource.getProperty(DCTerms.identifier).getString();
+        agentIdentifier = lexicalOrUri(agentResource.getProperty(DCTerms.identifier));
       }
 
-      return new FoafAgent(agentStatement.getPredicate().getURI(), agentUri, agentNames, agentMbox,
+      FoafAgent agent = new FoafAgent(agentStatement.getPredicate().getURI(), agentUri, agentNames, agentMbox,
           agentHomepage, agentType, agentIdentifier, nodeId);
+      agent.setNameLanguages(agentLanguages);
+      return agent;
 
     }
     return null;
+  }
+
+  /** Literal lexical form or IRI of a statement object; null for blank nodes. */
+  private static String lexicalOrUri(Statement statement) {
+    if (statement == null) {
+      return null;
+    }
+    RDFNode object = statement.getObject();
+    if (object.isLiteral()) {
+      return object.asLiteral().getLexicalForm();
+    }
+    return object.isURIResource() ? object.asResource().getURI() : null;
   }
 
   /**
@@ -1136,6 +1143,132 @@ public class DcatApDeserializer implements IdcatApDeserialize {
    * @param nodeId the node id
    * @return the dcat distribution
    */
+  public DcatDataService resourceToDataService(Resource r,String nodeId) {
+    DcatDataService service = new DcatDataService(
+        resourceValues(r,DCATAP.applicableLegislation),deserializeContactPoint(nodeId,r),
+        resourceValues(r,org.apache.jena.sparql.vocabulary.FOAF.page),
+        resourceValues(r,DCAT.endpointDescription),resourceValues(r,DCAT.endpointURL),
+        resourceValues(r,DCATAP.hvdCategory),one(r,DCTerms.license),resourceValues(r,DCTerms.rights),
+        resourceValues(r,DCAT.servesDataset),one(r,DCTerms.title),nodeId);
+    service.setResourceUri(r.isURIResource()?r.getURI():null);readServiceProjection(service,r,nodeId);return service;
+  }
+
+  /** DCAT-AP 3 DataService fields beyond the legacy constructor: multilingual text, keywords, themes, profiles, publisher. */
+  void readServiceProjection(DcatDataService service,Resource r,String nodeId) {
+    java.util.List<it.eng.idra.beans.dcat.DcatDetails> details=it.eng.idra.utils.DcatDetailsUtil.extractDatasetDetails(r,DCTerms.title,DCTerms.description);
+    details.forEach(detail -> detail.setNodeId(nodeId));
+    service.setDataServiceDetails(details);
+    service.setKeywordDetails(it.eng.idra.utils.DcatDetailsUtil.extractKeywordDetails(r,DCAT.keyword));
+    service.setTheme(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,DCAT.theme),DCAT.theme.getURI()));
+    service.setConformsTo(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,DCTerms.conformsTo),DCTerms.conformsTo.getURI()));
+    service.setLandingPage(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,DCAT.landingPage),DCAT.landingPage.getURI()));
+    service.setFormat(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,DCTerms.format),DCTerms.format.getURI()));
+    if(service.getDocumentation()==null || service.getDocumentation().stream().allMatch(p -> p==null || StringUtils.isBlank(p.getValue())))
+      service.setDocumentation(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,org.apache.jena.sparql.vocabulary.FOAF.page),org.apache.jena.sparql.vocabulary.FOAF.page.getURI()));
+    if(r.hasProperty(DCTerms.publisher))service.setPublisher(deserializeFoafAgent(nodeId,r.getProperty(DCTerms.publisher)));
+  }
+
+  private static String one(Resource r,org.apache.jena.rdf.model.Property p) {
+    java.util.List<String> values=resourceValues(r,p);return values.isEmpty()?null:values.get(0);
+  }
+
+  public void readCatalogue(Model model,OdmsCatalogue node) {
+    java.util.List<Resource> catalogues=model.listResourcesWithProperty(org.apache.jena.vocabulary.RDF.type,DCAT.Catalog).toList();
+    Resource catalogue=null;
+    for(Resource r:catalogues) if(r.isURIResource() && (r.getURI().equals(node.getHost()) || r.getURI().equals(node.getHomepage()))) catalogue=r;
+    if(catalogue==null && catalogues.size()==1)catalogue=catalogues.get(0);
+    if(catalogue==null && catalogues.size()>1) catalogue=rootCatalogue(model,catalogues);
+    boolean noDatasets = !model.contains(null,org.apache.jena.vocabulary.RDF.type,DCAT.Dataset);
+    if(catalogue==null && catalogues.size()>1) {
+      if(noDatasets) throw new IllegalArgumentException("Ambiguous multi-catalogue dump without a matching catalogue");
+      logger.warn("Catalogue {}: {} dcat:Catalog nodes and no single root; catalogue-level metadata (records, services, coverage) not read",
+          node.getId(), catalogues.size());
+      node.setSourceMetadata(null);
+      return;
+    }
+    String nodeId=String.valueOf(node.getId());
+    java.util.List<DcatDatasetSeries> standaloneSeries=new java.util.ArrayList<>();
+    model.listResourcesWithProperty(org.apache.jena.vocabulary.RDF.type,
+        model.createResource("http://www.w3.org/ns/dcat#DatasetSeries")).forEachRemaining(r -> {
+      if(!model.contains(null,model.createProperty("http://www.w3.org/ns/dcat#inSeries"),r))
+        standaloneSeries.add(DcatRdfMetadata.readSeries(r,nodeId,null,this));
+    });
+    node.setDatasetSeries(standaloneSeries);
+    if(!standaloneSeries.isEmpty()) node.setDcatVersion(it.eng.idra.beans.dcat.DcatApVersion.DCAT_AP_3);
+    node.setStandaloneRdf(noDatasets ? DcatApSerializer.writeModelToString(model,DcatApFormat.TURTLE) : null);
+    if(catalogue==null) {
+      java.util.List<DcatDataService> services=new java.util.ArrayList<>();
+      model.listResourcesWithProperty(org.apache.jena.vocabulary.RDF.type,DCAT.DataService).forEachRemaining(r -> {
+        if(!model.contains(null,DCAT.accessService,r))services.add(resourceToDataService(r,nodeId));
+      });
+      node.setService(services);node.setRecord(new java.util.ArrayList<>());
+      node.setSourceMetadata(null);
+      return;
+    }
+    node.setSourceMetadata(DcatCatalogueSource.capture(catalogue));
+    node.setApplicableLegislation(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(catalogue,DCATAP.applicableLegislation),DCATAP.applicableLegislation.getURI()));
+    if(catalogue.hasProperty(DCTerms.creator))node.setCreator(deserializeFoafAgent(nodeId,catalogue.getProperty(DCTerms.creator)));
+    node.setGeographicalCoverage(deserializeAllSpatialCoverage(nodeId,catalogue));
+    DctPeriodOfTime period=deserializeTemporalCoverage(nodeId,catalogue);
+    node.setTemporalCoverage(period==null?new java.util.ArrayList<>():new java.util.ArrayList<>(java.util.Arrays.asList(period)));
+    java.util.List<DcatDataService> services=new java.util.ArrayList<>();
+    catalogue.listProperties(DCAT.service).forEachRemaining(st->{if(st.getObject().isResource())services.add(resourceToDataService(st.getResource(),nodeId));});
+    if(noDatasets) model.listResourcesWithProperty(org.apache.jena.vocabulary.RDF.type,DCAT.DataService).forEachRemaining(r -> {
+      if(!catalogueServicePresent(services,r) && !model.contains(null,DCAT.accessService,r)) services.add(resourceToDataService(r,nodeId));
+    });
+    node.setService(services);
+    java.util.List<it.eng.idra.beans.dcat.DcatCatalogueRecord> records=new java.util.ArrayList<>();
+    catalogue.listProperties(DCAT.record).forEachRemaining(st->{
+      if(!st.getObject().isResource())return;
+      Resource r=st.getResource();
+      java.util.List<it.eng.idra.beans.dcat.DcatDetails> details=it.eng.idra.utils.DcatDetailsUtil.extractDatasetDetails(r,DCTerms.title,DCTerms.description);
+      details.forEach(detail -> detail.setNodeId(nodeId));
+      it.eng.idra.beans.dcat.DcatCatalogueRecord record=new it.eng.idra.beans.dcat.DcatCatalogueRecord(
+          deserializeDctStandard(nodeId,r),one(r,org.apache.jena.rdf.model.ResourceFactory.createProperty("http://www.w3.org/ns/adms#status")),details,new java.util.ArrayList<>(),
+          one(r,DCTerms.issued),one(r,DCTerms.modified),one(r,org.apache.jena.sparql.vocabulary.FOAF.primaryTopic),details,nodeId);
+      record.setResourceUri(r.isURIResource()?r.getURI():null);
+      Statement source=r.getProperty(DCTerms.source);
+      // DCAT-AP: dct:source is the original CatalogRecord; an unnamed (blank) original has no identity to keep.
+      if(source!=null && source.getObject().isURIResource())
+        record.setSource(new it.eng.idra.beans.dcat.DcatProperty(DCTerms.source,DCAT.CatalogRecord,source.getResource().getURI()));
+      record.setLanguages(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(r,DCTerms.language),DCTerms.language.getURI()));
+      records.add(record);
+    });
+    node.setRecord(records);
+  }
+
+  /**
+   * DCAT 3 dumps may reference other catalogues (dcat:catalog, dct:hasPart/isPartOf). The described catalogue
+   * is the only one listing datasets, services or records; among several listing catalogues, the only one not
+   * contained in another. Otherwise null (ambiguous).
+   */
+  static Resource rootCatalogue(Model model, java.util.List<Resource> catalogues) {
+    java.util.List<Resource> listing=catalogues.stream()
+        .filter(c -> c.hasProperty(DCAT.dataset) || c.hasProperty(DCAT.service) || c.hasProperty(DCAT.record))
+        .collect(java.util.stream.Collectors.toList());
+    if(listing.size()==1)return listing.get(0);
+    java.util.List<Resource> candidates=listing.isEmpty()?catalogues:listing;
+    java.util.Set<Resource> contained=new java.util.HashSet<>();
+    for(Resource c:catalogues) {
+      c.listProperties(DCAT.catalog).forEachRemaining(st -> {if(st.getObject().isResource())contained.add(st.getResource());});
+      c.listProperties(DCTerms.hasPart).forEachRemaining(st -> {if(st.getObject().isResource())contained.add(st.getResource());});
+      c.listProperties(DCTerms.isPartOf).forEachRemaining(st -> {if(st.getObject().isResource() && catalogues.contains(st.getResource()))contained.add(c);});
+    }
+    java.util.List<Resource> roots=candidates.stream().filter(c -> !contained.contains(c)).collect(java.util.stream.Collectors.toList());
+    return roots.size()==1 ? roots.get(0) : null;
+  }
+
+  private static boolean catalogueServicePresent(java.util.List<DcatDataService> services,Resource resource) {
+    return resource.isURIResource() && services.stream().anyMatch(s -> resource.getURI().equals(s.getResourceUri()));
+  }
+
+  private static java.util.List<String> resourceValues(Resource resource, org.apache.jena.rdf.model.Property predicate) {
+    java.util.List<String> values=new java.util.ArrayList<>();
+    resource.listProperties(predicate).forEachRemaining(s -> values.add(s.getObject().isURIResource() ? s.getResource().getURI()
+        : s.getObject().isLiteral() ? s.getLiteral().getLexicalForm() : s.getObject().toString()));
+    return values;
+  }
+
   public DcatDistribution resourceToDcatDistribution(Resource r, String nodeId) {
 
     String accessUrl = null;
@@ -1264,10 +1397,6 @@ public class DcatApDeserializer implements IdcatApDeserialize {
       title = r.getProperty(DCTerms.title).getString();
     }
 
-    if (StringUtils.isBlank(downloadUrl)) {
-      downloadUrl = accessUrl;
-    }
-
     // Handle applicableLegislation
     if (r.hasProperty(DCATAP.applicableLegislation)) {
       StmtIterator legIt = r.listProperties(DCATAP.applicableLegislation);
@@ -1380,6 +1509,12 @@ public class DcatApDeserializer implements IdcatApDeserialize {
               titleAS,
               nodeId);
 
+          dataService.setResourceUri(serviceRes.isURIResource() ? serviceRes.getURI() : null);
+          dataService.setContactPoint(deserializeContactPoint(nodeId,serviceRes));
+          dataService.setApplicableLegislation(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(serviceRes,DCATAP.applicableLegislation),DCATAP.applicableLegislation.getURI()));
+          dataService.setHVDCategory(it.eng.idra.utils.DcatJsonMetadata.properties(resourceValues(serviceRes,DCATAP.hvdCategory),DCATAP.hvdCategory.getURI()));
+          if(serviceRes.hasProperty(DCTerms.license)) dataService.setLicence(new DcatProperty(DCTerms.license,org.apache.jena.vocabulary.RDFS.Resource,getStatementValue(serviceRes.getProperty(DCTerms.license))));
+          readServiceProjection(dataService,serviceRes,nodeId);
           accessService.add(dataService);
         }
       }
@@ -1446,6 +1581,8 @@ public class DcatApDeserializer implements IdcatApDeserialize {
         Arrays.asList(documentation), downloadUrl, Arrays.asList(language), linkedSchemas,
         mediaType, releaseDate, updateDate, rights, status, title, accessService, applicableLegislation,
         availability, compressionFormat, hasPolicy, packagingFormat, spatialResolution, temporalResolution);
+    distribution.setResourceUri(r.isURIResource() ? r.getURI() : null);
+    if(r.hasProperty(DCTerms.identifier))distribution.setIdentifier(one(r,DCTerms.identifier));
     distribution.setDistributionDetails(
         DcatDetailsUtil.extractDatasetDetails(r, DCTerms.title, DCTerms.description));
     return distribution;
@@ -1488,13 +1625,15 @@ public class DcatApDeserializer implements IdcatApDeserialize {
    * @return the string
    */
   public String deserializeFormat(Resource r) {
+    if(r.hasProperty(DCTerms.format)&&r.getProperty(DCTerms.format).getObject().isLiteral())
+      return r.getProperty(DCTerms.format).getLiteral().getLexicalForm();
 
     Resource formatR = r.getPropertyResourceValue(DCTerms.format);
     String formatUri = null;
     String format = null;
     if (formatR != null && StringUtils.isNotBlank(formatUri = formatR.getURI())) {
       if (!IRIFactory.iriImplementation().create(formatUri).hasViolation(false)) {
-        format = extractFormatFromUri(formatUri);
+        format = formatUri;
       } else {
         format = formatUri;
       }
@@ -1504,13 +1643,15 @@ public class DcatApDeserializer implements IdcatApDeserialize {
   }
 
   public String deserializeMediaType(Resource r) {
+    if(r.hasProperty(DCAT.mediaType)&&r.getProperty(DCAT.mediaType).getObject().isLiteral())
+      return r.getProperty(DCAT.mediaType).getLiteral().getLexicalForm();
 
     Resource mediaTypeR = r.getPropertyResourceValue(DCAT.mediaType);
     String mediaTypeUri = null;
     String mediaType = null;
     if (mediaTypeR != null && StringUtils.isNotBlank(mediaTypeUri = mediaTypeR.getURI())) {
       if (!IRIFactory.iriImplementation().create(mediaTypeUri).hasViolation(false)) {
-        mediaType = extractMediaTypeFromUri(mediaTypeUri);
+        mediaType = mediaTypeUri;
       } else {
         mediaType = mediaTypeUri;
       }

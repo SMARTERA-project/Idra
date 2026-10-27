@@ -80,12 +80,12 @@ DROP TABLE IF EXISTS `dcat_agent`;
  SET character_set_client = utf8mb4 ;
 CREATE TABLE `dcat_agent` (
   `agent_id` varchar(255) NOT NULL,
-  `homepage` varchar(255) DEFAULT NULL,
+  `homepage` text,
   `identifier` longtext,
   `mbox` varchar(255) DEFAULT NULL,
   `name` varchar(255) DEFAULT NULL,
   `nodeID` varchar(255) DEFAULT NULL,
-  `resourceUri` varchar(255) DEFAULT NULL,
+  `resourceUri` text,
   `type` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`agent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -109,7 +109,8 @@ DROP TABLE IF EXISTS `dcat_agent_name`;
 CREATE TABLE dcat_agent_name (
   `agent_id`  VARCHAR(255) NOT NULL,
   `nodeID`    VARCHAR(255) NOT NULL,
-  `name`      VARCHAR(255) DEFAULT NULL
+  `name`      VARCHAR(255) DEFAULT NULL,
+  `language`  VARCHAR(64) DEFAULT NULL
   -- KEY `FK_an_agent` (`agent_id`),
   -- CONSTRAINT `FK_an_agent` FOREIGN KEY (`agent_id`) REFERENCES dcat_agent(`agent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -150,7 +151,7 @@ DROP TABLE IF EXISTS `dcat_concept`;
 CREATE TABLE `dcat_concept` (
   `concept_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) DEFAULT NULL,
-  `resourceUri` varchar(255) DEFAULT NULL,
+  `resourceUri` text,
   `dataset_id` varchar(255) DEFAULT NULL,
   `type` varchar(31) NOT NULL,
   PRIMARY KEY (`concept_id`),
@@ -203,9 +204,10 @@ DROP TABLE IF EXISTS `dcat_dataset`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
  SET character_set_client = utf8mb4 ;
 CREATE TABLE `dcat_dataset` (
+  `metadataEnvelope` longtext DEFAULT NULL,
   `dataset_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
-  `accessRights` varchar(255) DEFAULT NULL,
+  `accessRights` text,
   `description` longtext,
   `frequency` varchar(255) DEFAULT NULL,
   `hasStoredRDF` bit(1) NOT NULL,
@@ -274,12 +276,12 @@ CREATE TABLE `dcat_distribution` (
   `mediaType` varchar(255) DEFAULT NULL,
   `identifier` varchar(255) DEFAULT NULL,
   `nodeID` varchar(255) DEFAULT NULL,
-  `releaseDate` varchar(255) DEFAULT '1970-01-01T00:00:00Z',
+  `releaseDate` varchar(255) DEFAULT NULL,
   `rights` varchar(255) DEFAULT NULL,
   `status` varchar(255) DEFAULT NULL,
   `storedRDF` bit(1) NOT NULL,
   `title` longtext,
-  `updateDate` varchar(255) DEFAULT '1970-01-01T00:00:00Z',
+  `updateDate` varchar(255) DEFAULT NULL,
   `checksum_id` varchar(255) DEFAULT NULL,
   `licenseDocument_id` varchar(255) DEFAULT NULL,
   `dataset_id` varchar(255) DEFAULT NULL,
@@ -501,7 +503,7 @@ CREATE TABLE `dcat_licensedocument` (
   `name` varchar(255) DEFAULT NULL,
   `nodeID` varchar(255) DEFAULT NULL,
   `type` varchar(255) DEFAULT NULL,
-  `uri` varchar(255) DEFAULT NULL,
+  `uri` text,
   `versionInfo` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`licenseDocument_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -527,9 +529,9 @@ CREATE TABLE `dcat_location` (
   `location_id` varchar(255) NOT NULL,
   `geographicalIdentifier` varchar(255) DEFAULT NULL,
   `geographicalName` varchar(255) DEFAULT NULL,
-  `geometry` varchar(255) DEFAULT NULL,
+  `geometry` text,
   `nodeID` varchar(255) DEFAULT NULL,
-  `uri` varchar(255) DEFAULT NULL,
+  `uri` text,
   PRIMARY KEY (`location_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -586,7 +588,7 @@ CREATE TABLE `dcat_periodoftime` (
   `endDate` varchar(255) DEFAULT NULL,
   `nodeID` varchar(255) DEFAULT NULL,
   `startDate` varchar(255) DEFAULT NULL,
-  `uri` varchar(255) DEFAULT NULL,
+  `uri` text,
   PRIMARY KEY (`periodOfTime_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -616,7 +618,7 @@ DROP TABLE IF EXISTS `dcat_provenance`;
 CREATE TABLE `dcat_provenance` (
   `dataset_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
-  `provenance` varchar(255) DEFAULT NULL,
+  `provenance` text,
   KEY `FK5x0bcfp7vth8a9qh8j3boqeos` (`dataset_id`,`nodeID`),
   CONSTRAINT `FK5x0bcfp7vth8a9qh8j3boqeos` FOREIGN KEY (`dataset_id`, `nodeID`) REFERENCES `dcat_dataset` (`dataset_id`, `nodeID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -664,7 +666,7 @@ DROP TABLE IF EXISTS `dcat_sample`;
 CREATE TABLE `dcat_sample` (
   `dataset_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
-  `sample` varchar(255) DEFAULT NULL,
+  `sample` text,
   KEY `FK8si2f1qsto1kh4gjwg07tfc9k` (`dataset_id`,`nodeID`),
   CONSTRAINT `FK8si2f1qsto1kh4gjwg07tfc9k` FOREIGN KEY (`dataset_id`, `nodeID`) REFERENCES `dcat_dataset` (`dataset_id`, `nodeID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -689,7 +691,7 @@ DROP TABLE IF EXISTS `dcat_source`;
 CREATE TABLE `dcat_source` (
   `dataset_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
-  `source` varchar(255) DEFAULT NULL,
+  `source` text,
   KEY `FK4lar3lc790mn867rwb5dlykvh` (`dataset_id`,`nodeID`),
   CONSTRAINT `FK4lar3lc790mn867rwb5dlykvh` FOREIGN KEY (`dataset_id`, `nodeID`) REFERENCES `dcat_dataset` (`dataset_id`, `nodeID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -713,14 +715,15 @@ DROP TABLE IF EXISTS `dcat_standard`;
  SET character_set_client = utf8mb4 ;
 CREATE TABLE `dcat_standard` (
   `standard_id` varchar(255) NOT NULL,
+  `catalogue_record_id` varchar(255) DEFAULT NULL,
   `description` longtext,
   `identifier` longtext,
   `nodeID` varchar(255) DEFAULT NULL,
   `referenceDocumentation` varchar(255) DEFAULT NULL,
-  `title` varchar(255) DEFAULT NULL,
+  `title` text,
   `dataset_id` varchar(255) DEFAULT NULL,
   `distribution_id` varchar(255) DEFAULT NULL,
-  `uri` varchar(255) DEFAULT NULL,
+  `uri` text,
   PRIMARY KEY (`standard_id`),
   UNIQUE KEY `UK_p8enujjhq3k694iypn7t2qa0y` (`standard_id`,`nodeID`),
   KEY `FKqmhmm344yy853wt71pltoimes` (`dataset_id`,`nodeID`),
@@ -747,7 +750,7 @@ DROP TABLE IF EXISTS `dcat_standard_referencedocumentation`;
 CREATE TABLE `dcat_standard_referencedocumentation` (
   `standard_id` varchar(255) NOT NULL,
   `nodeID` varchar(255) NOT NULL,
-  `referenceDocumentation` varchar(255) DEFAULT NULL
+  `referenceDocumentation` text
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -822,9 +825,9 @@ CREATE TABLE `dcat_vcard` (
   `fn` varchar(500) DEFAULT NULL,
   `hasEmail` varchar(255) DEFAULT NULL,
   `hasTelephone` varchar(255) DEFAULT NULL,
-  `hasURL` varchar(255) DEFAULT NULL,
+  `hasURL` text,
   `nodeID` varchar(255) DEFAULT NULL,
-  `resourceUri` varchar(255) DEFAULT NULL,
+  `resourceUri` text,
   `dataset_id` varchar(255) DEFAULT NULL,
   `hasTelephoneType` varchar(255) DEFAULT NULL,
   `hasTelephoneValue` varchar(255) DEFAULT NULL,
@@ -1058,6 +1061,7 @@ CREATE TABLE `dcat_catalogue_record` (
   `listingDate`          VARCHAR(255) DEFAULT NULL,
   `modificationDate`     VARCHAR(255) DEFAULT NULL,
   `primaryTopic`         VARCHAR(255) DEFAULT NULL,
+  `sourceRecord`         TEXT DEFAULT NULL,
   PRIMARY KEY (`catalogue_record_id`),
   KEY `FK_r_catalogue` (`nodeID`),
   CONSTRAINT `FK_r_catalogue` FOREIGN KEY (`nodeID`)
@@ -1362,6 +1366,8 @@ DROP TABLE IF EXISTS `odms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
  SET character_set_client = utf8mb4 ;
 CREATE TABLE `odms` (
+  `standaloneRdf` LONGTEXT DEFAULT NULL,
+  `sourceMetadata` LONGTEXT DEFAULT NULL,
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `api_key` varchar(255) DEFAULT NULL,
   `dataset_count` int(11) DEFAULT NULL,
@@ -1380,7 +1386,7 @@ CREATE TABLE `odms` (
   `type` varchar(255) NOT NULL,
   `publisher_email` varchar(255) DEFAULT NULL,
   `publisher_name` varchar(255) NOT NULL,
-  `publisher_url` varchar(255) DEFAULT NULL,
+  `publisher_url` text,
   `rdfCount` int(11) DEFAULT NULL,
   `refresh_period` int(11) DEFAULT NULL,
   `register_date` datetime DEFAULT NULL,
@@ -1392,11 +1398,11 @@ CREATE TABLE `odms` (
   `dcatProfile` int(11) DEFAULT NULL,
   `dcatVersion` varchar(32) DEFAULT NULL,
   `isActive` bit(1) DEFAULT NULL,
-  `homepage` varchar(255) NOT NULL,
+  `homepage` text NOT NULL,
   `additionalconfig_id` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `UK_tafdxrfr7c79l1ojoh9i1t55b` (`host`),
-  UNIQUE KEY `UK_gwl2gjm4jd3wyo4iv52yxogh6` (`name`),
+  KEY `idx_odms_name` (`name`),
   UNIQUE KEY `UK_r9reqhikfumkr5maisxmrp8dx` (`dumpURL`(1000)),
   UNIQUE KEY `UK_qym0hcqduq8o7uukwh7ussd2u` (`dumpFilePath`),
   KEY `FKotg9oxo2ba5ca259x6ukp085t` (`image_id`),
@@ -2300,3 +2306,84 @@ WHERE r.`code` = 'IDRA_VIEWER'
     'admin.dump.read',
     'admin.datalet.read'
   );
+
+-- DCAT 3 additive schema (2026-10-12)
+-- DCAT 3 resource identity and version/series links. Apply before deploying the new WAR.
+-- No existing rows are removed; source IRIs remain distinct from internal database IDs.
+SET @task_schema = DATABASE();
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_dataset' AND column_name='resourceUri'), 'SELECT 1', 'ALTER TABLE dcat_dataset ADD COLUMN resourceUri varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl;
+EXECUTE task_stmt;
+DEALLOCATE PREPARE task_stmt;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_dataset_series' AND column_name='resourceUri'), 'SELECT 1', 'ALTER TABLE dcat_dataset_series ADD COLUMN resourceUri varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl;
+EXECUTE task_stmt;
+DEALLOCATE PREPARE task_stmt;
+CREATE TABLE IF NOT EXISTS dcat_dataset_hascurrentversion (
+  dataset_id varchar(255) NOT NULL, nodeID varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_id, nodeID),
+  FOREIGN KEY (dataset_id, nodeID) REFERENCES dcat_dataset(dataset_id, nodeID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_dataset_previousversion (
+  dataset_id varchar(255) NOT NULL, nodeID varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_id, nodeID),
+  FOREIGN KEY (dataset_id, nodeID) REFERENCES dcat_dataset(dataset_id, nodeID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_dataset_prev (
+  dataset_id varchar(255) NOT NULL, nodeID varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_id, nodeID),
+  FOREIGN KEY (dataset_id, nodeID) REFERENCES dcat_dataset(dataset_id, nodeID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_dataset_next (
+  dataset_id varchar(255) NOT NULL, nodeID varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_id, nodeID),
+  FOREIGN KEY (dataset_id, nodeID) REFERENCES dcat_dataset(dataset_id, nodeID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_series_first (
+  dataset_series_id varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_series_id),
+  FOREIGN KEY (dataset_series_id) REFERENCES dcat_dataset_series(dataset_series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_series_last (
+  dataset_series_id varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_series_id),
+  FOREIGN KEY (dataset_series_id) REFERENCES dcat_dataset_series(dataset_series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_series_prev (
+  dataset_series_id varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_series_id),
+  FOREIGN KEY (dataset_series_id) REFERENCES dcat_dataset_series(dataset_series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS dcat_series_next (
+  dataset_series_id varchar(255) NOT NULL, resourceUri varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_series_id),
+  FOREIGN KEY (dataset_series_id) REFERENCES dcat_dataset_series(dataset_series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_location' AND column_name='dataset_series_id'), 'SELECT 1', 'ALTER TABLE dcat_location ADD COLUMN dataset_series_id varchar(255) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_periodoftime' AND column_name='dataset_series_id'), 'SELECT 1', 'ALTER TABLE dcat_periodoftime ADD COLUMN dataset_series_id varchar(255) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_vcard' AND column_name='dataset_series_id'), 'SELECT 1', 'ALTER TABLE dcat_vcard ADD COLUMN dataset_series_id varchar(255) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+CREATE TABLE IF NOT EXISTS dcat_series_legislation (
+  dataset_series_id varchar(255) NOT NULL, applicableLegislation varchar(2048) DEFAULT NULL,
+  KEY idx_owner (dataset_series_id), FOREIGN KEY (dataset_series_id) REFERENCES dcat_dataset_series(dataset_series_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_data_service' AND column_name='resourceUri'), 'SELECT 1', 'ALTER TABLE dcat_data_service ADD COLUMN resourceUri varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_catalogue_record' AND column_name='resourceUri'), 'SELECT 1', 'ALTER TABLE dcat_catalogue_record ADD COLUMN resourceUri varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+CREATE TABLE IF NOT EXISTS dcat_version_note (
+  dataset_id varchar(255) NOT NULL, nodeID varchar(255) NOT NULL, value LONGTEXT, language varchar(255),
+  KEY idx_owner (dataset_id,nodeID), FOREIGN KEY (dataset_id,nodeID) REFERENCES dcat_dataset(dataset_id,nodeID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_dataset_series' AND column_name='brokerId'), 'SELECT 1', 'ALTER TABLE dcat_dataset_series ADD COLUMN brokerId varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_data_service' AND column_name='brokerId'), 'SELECT 1', 'ALTER TABLE dcat_data_service ADD COLUMN brokerId varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;
+CREATE TABLE IF NOT EXISTS dcat_record_language (
+  catalogue_record_id varchar(255) NOT NULL, languageUri varchar(2048),
+  KEY idx_owner (catalogue_record_id), FOREIGN KEY (catalogue_record_id) REFERENCES dcat_catalogue_record(catalogue_record_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+SET @task_ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=@task_schema AND table_name='dcat_distribution' AND column_name='resourceUri'), 'SELECT 1', 'ALTER TABLE dcat_distribution ADD COLUMN resourceUri varchar(2048) NULL');
+PREPARE task_stmt FROM @task_ddl; EXECUTE task_stmt; DEALLOCATE PREPARE task_stmt;

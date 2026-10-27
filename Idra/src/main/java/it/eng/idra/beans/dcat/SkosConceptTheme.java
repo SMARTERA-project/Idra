@@ -20,7 +20,6 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import org.apache.solr.common.SolrDocument;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 // TODO: Auto-generated Javadoc
@@ -91,9 +90,7 @@ public class SkosConceptTheme extends SkosConcept {
   public static SkosConceptTheme docToSkosConcept(SolrDocument doc, String propertyUri,
       String nodeId) {
     SkosConceptTheme t = new SkosConceptTheme(propertyUri,
-        (String) doc.getFieldValue("resourceUri"), SkosPrefLabel.jsonArrayToPrefLabelList(
-            new JSONArray(doc.getFieldValue("prefLabel").toString()), nodeId),
-        nodeId);
+        (String) doc.getFieldValue("resourceUri"), docToPrefLabels(doc, nodeId), nodeId);
     t.setId(doc.getFieldValue("id").toString());
     return t;
   }

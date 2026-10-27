@@ -1,0 +1,26 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcatap: <http://data.europa.eu/r5r/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix eli: <http://data.europa.eu/eli/ontology#> .
+@prefix ex: <https://example.org/> .
+
+# Fictional minimal Dataset/Distribution example, not a legal HVD declaration.
+ex:dataset a dcat:Dataset ; dct:title "Dataset HVD"@it, "HVD dataset"@en ;
+  dct:description "Fixture"@it ; dcat:distribution ex:distribution ;
+  dcatap:hvdCategory <http://data.europa.eu/bna/c_03ba8d92> ;
+  dcatap:applicableLegislation <http://data.europa.eu/eli/reg_impl/2023/138/oj> .
+ex:distribution a dcat:Distribution ; dcat:accessURL ex:data ;
+  dcat:downloadURL ex:data ;
+  dct:license <https://creativecommons.org/licenses/by/4.0/> ;
+  dct:format <http://publications.europa.eu/resource/authority/file-type/CSV> ;
+  dcat:mediaType <https://www.iana.org/assignments/media-types/text/csv> ;
+  dcatap:applicableLegislation <http://data.europa.eu/eli/reg_impl/2023/138/oj> .
+<http://data.europa.eu/bna/c_03ba8d92> a skos:Concept ; skos:prefLabel "Fixture category"@en ; skos:inScheme <http://data.europa.eu/bna/asd487ae75> .
+<http://data.europa.eu/bna/asd487ae75> a skos:ConceptScheme .
+<http://data.europa.eu/eli/reg_impl/2023/138/oj> a eli:LegalResource, rdfs:Resource .
+<https://creativecommons.org/licenses/by/4.0/> a dct:LicenseDocument, rdfs:Resource .
+ex:data a rdfs:Resource .
+<http://publications.europa.eu/resource/authority/file-type/CSV> a dct:MediaTypeOrExtent .
+<https://www.iana.org/assignments/media-types/text/csv> a dct:MediaType .

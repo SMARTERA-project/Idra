@@ -39,7 +39,7 @@ import org.apache.logging.log4j.Logger;
 /**
  * The Class CachePersistenceManager.
  */
-public class CachePersistenceManager {
+public class CachePersistenceManager implements AutoCloseable {
 
   /** The emf. */
   private static EntityManagerFactory emf;
@@ -93,7 +93,7 @@ public class CachePersistenceManager {
    * Jpa rollback transaction.
    */
   public void jpaRollbackTransaction() {
-    if (em.getTransaction().getRollbackOnly()) {
+    if (em.getTransaction().isActive()) {
       em.getTransaction().rollback();
     }
   }
@@ -241,15 +241,31 @@ public class CachePersistenceManager {
    * @throws EntityExistsException the entity exists exception
    */
   public void jpaPersistAndCommitDataset(DcatDataset obj) throws EntityExistsException {
-    // logger.info(obj.getId());
+    em.getTransaction().begin();
     try {
-      em.getTransaction().begin();
       em.persist(obj);
       em.getTransaction().commit();
-    } catch (IllegalStateException e) {
-      obj.toString();
+    } catch (RuntimeException e) {
+      if (em.getTransaction().isActive()) em.getTransaction().rollback();
+      throw e;
     }
-    // em.clear();
+  }
+
+  public DcatDataset insertDatasetAtomically(DcatDataset dataset) {
+    return new DatasetPersistence(emf).insert(dataset);
+  }
+
+  public List<DcatDataset> insertDatasetPageAtomically(List<DcatDataset> datasets,
+      java.util.function.Consumer<DcatDataset> prepare) {
+    return new DatasetPersistence(emf).insertPage(datasets, prepare);
+  }
+
+  public DcatDataset replaceDatasetAtomically(DcatDataset dataset) {
+    return new DatasetPersistence(emf).replace(dataset);
+  }
+
+  public void deleteDatasetAtomically(DcatDataset dataset) {
+    new DatasetPersistence(emf).delete(dataset);
   }
 
   /**
@@ -514,6 +530,11 @@ public class CachePersistenceManager {
     TypedQuery<DcatDataset> q = em
         .createQuery("SELECT d FROM DcatDataset d where d.nodeId = " + nodeId, DcatDataset.class);
     return q.getResultList();
+  }
+
+  /** Scoped recovery lookup; a missing row means the persisted operation was a deletion. */
+  public DcatDataset jpaGetDatasetByIdAndNode(String id, int nodeId) {
+    return em.find(DcatDataset.class, new DcatDatasetId(id, Integer.toString(nodeId)));
   }
 
   /**
@@ -791,10 +812,57 @@ public class CachePersistenceManager {
    * @param nodeId the node ID
    */
   public void jpaDeleteDatasetsByOdmsNode(int nodeId) {
+    try {
+      deleteDatasetsByOdmsNodeInTransaction(nodeId);
+    } catch (RuntimeException e) {
+      // A failed bulk delete must not leave its transaction open: the row locks would block every
+      // later catalogue write until Idra restarts (plan50 B5: 185604 rows locked after FK_cat_creator).
+      if (em.getTransaction().isActive()) {
+        em.getTransaction().rollback();
+      }
+      logger.error("HIBERNATE: Delete Transaction ROLLBACK for catalogue {}", nodeId, e);
+      throw e;
+    }
+  }
+
+  private void deleteDatasetsByOdmsNodeInTransaction(int nodeId) {
     Query q;
     logger.info("HIBERNATE: Delete Transaction BEGIN");
 
     em.getTransaction().begin();
+
+    // Bulk deletes bypass JPA cascades. Remove DCAT 3 children before their
+    // dataset/distribution parents, including the legacy bidirectional links.
+    em.createNativeQuery("UPDATE dcat_dataset SET data_service_id=NULL, relationship_id=NULL WHERE nodeID=:node")
+        .setParameter("node", nodeId).executeUpdate();
+    for (String table : new String[] {"dcat_dataset_hascurrentversion", "dcat_dataset_previousversion",
+        "dcat_dataset_prev", "dcat_dataset_next", "dcat_version_note", "dcat_applicable_legislation",
+        "dcat_hvd_category", "dcat_was_generated_by", "dcat_theme", "dcat_subject",
+        "dcat_distribution_applicable_legislation", "dcat_endpoint", "dcat_rights", "dcat_serves_dataset"}) {
+      em.createNativeQuery("DELETE FROM " + table + " WHERE nodeID=:node")
+          .setParameter("node", nodeId).executeUpdate();
+    }
+    em.createNativeQuery("DELETE FROM dcat_data_service WHERE nodeID=:node")
+        .setParameter("node", nodeId).executeUpdate();
+    for (String table : new String[] {"dcat_series_first", "dcat_series_last", "dcat_series_prev",
+        "dcat_series_next", "dcat_series_legislation"}) {
+      em.createNativeQuery("DELETE FROM " + table + " WHERE dataset_series_id IN "
+          + "(SELECT dataset_series_id FROM dcat_dataset_series WHERE nodeID=:node)")
+          .setParameter("node", nodeId).executeUpdate();
+    }
+    em.createNativeQuery("DELETE FROM dcat_details WHERE nodeID=:node OR dataset_series_id IN "
+        + "(SELECT dataset_series_id FROM dcat_dataset_series WHERE nodeID=:node) OR catalogue_record_id IN "
+        + "(SELECT catalogue_record_id FROM dcat_catalogue_record WHERE nodeID=:node)")
+        .setParameter("node", nodeId).executeUpdate();
+    for (String table : new String[] {"dcat_location", "dcat_periodoftime", "dcat_vcard"}) {
+      em.createNativeQuery("UPDATE " + table + " SET dataset_series_id=NULL WHERE dataset_series_id IN "
+          + "(SELECT dataset_series_id FROM dcat_dataset_series WHERE nodeID=:node)")
+          .setParameter("node", nodeId).executeUpdate();
+    }
+    em.createNativeQuery("DELETE FROM dcat_dataset_series WHERE nodeID=:node")
+        .setParameter("node", nodeId).executeUpdate();
+    em.createNativeQuery("DELETE FROM dcat_relationship WHERE nodeID=:node")
+        .setParameter("node", nodeId).executeUpdate();
 
     q = em.createNativeQuery("DELETE FROM dcat_keyword where nodeID= " + nodeId);
     q.executeUpdate();
@@ -849,6 +917,12 @@ public class CachePersistenceManager {
     q = em.createQuery("DELETE FROM DctStandard where nodeID= " + nodeId);
     q.executeUpdate();
 
+    em.createNativeQuery("DELETE FROM dcat_record_language WHERE catalogue_record_id IN "
+        + "(SELECT catalogue_record_id FROM dcat_catalogue_record WHERE nodeID=:node)")
+        .setParameter("node", nodeId).executeUpdate();
+    em.createNativeQuery("DELETE FROM dcat_catalogue_record WHERE nodeID=:node")
+        .setParameter("node", nodeId).executeUpdate();
+
     q = em.createQuery("DELETE FROM VcardOrganization where nodeID = " + nodeId);
     q.executeUpdate();
 
@@ -887,6 +961,15 @@ public class CachePersistenceManager {
     q.executeUpdate();
 
     q = em.createQuery("DELETE FROM DctPeriodOfTime where nodeID= " + nodeId);
+    q.executeUpdate();
+
+    q = em.createNativeQuery("DELETE FROM dcat_agent_name WHERE nodeID=:node")
+        .setParameter("node", nodeId);
+    q.executeUpdate();
+
+    // The catalogue creator is one of these agents: release odms.creator_id first (FK_cat_creator).
+    q = em.createNativeQuery("UPDATE odms SET creator_id = NULL WHERE id = :node")
+        .setParameter("node", nodeId);
     q.executeUpdate();
 
     q = em.createQuery("DELETE FROM FoafAgent where nodeID = " + nodeId);
@@ -933,12 +1016,16 @@ public class CachePersistenceManager {
    * Jpa close.
    */
   public void jpaClose() {
-    if (em.isOpen()) {
-      em.clear();
-      em.close();
+    if (em != null && em.isOpen()) {
+      try {
+        if (em.getTransaction().isActive()) em.getTransaction().rollback();
+      } finally {
+        em.close();
+        em = null;
+      }
     }
-    em = null;
-
   }
+
+  @Override public void close() { jpaClose(); }
 
 }

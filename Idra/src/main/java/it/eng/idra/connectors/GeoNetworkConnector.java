@@ -321,6 +321,7 @@ public class GeoNetworkConnector implements IodmsConnector {
     public DcatDataset datasetToDcat(Object recordObj, OdmsCatalogue node) throws Exception {
         final String GMD_NS = "http://www.isotc211.org/2005/gmd";
         final String GML_NS = "http://www.opengis.net/gml";
+        final String GML32_NS = "http://www.opengis.net/gml/3.2";
 
         Element recordElem = (Element) recordObj;
         final String nodeId = Integer.toString(node.getId()); // <-- int → String
@@ -441,9 +442,7 @@ public class GeoNetworkConnector implements IodmsConnector {
             updateDate = updateDate + "T00:00:00Z";
         }
         
-        if (releaseDate == null || releaseDate.isEmpty()) releaseDate = "1970-01-01T00:00:00Z";
-        if (updateDate == null || updateDate.isEmpty()) updateDate = "1970-01-01T00:00:00Z";
-
+                
         // --- Spatial extent (EX_GeographicBoundingBox) ---
        DctLocation spatialCoverage = null;
 org.w3c.dom.NodeList bboxes = recordElem.getElementsByTagNameNS(GMD_NS, "EX_GeographicBoundingBox");
@@ -491,14 +490,16 @@ if (bboxes.getLength() > 0) {
         // --- Temporal extent (gml:TimePeriod) ---
         DctPeriodOfTime temporalCoverage = null;
         org.w3c.dom.NodeList tps = recordElem.getElementsByTagNameNS(GML_NS, "TimePeriod");
+        // ISO 19139 records from current GeoNetwork use GML 3.2: the period was always dropped.
+        if (tps.getLength() == 0) tps = recordElem.getElementsByTagNameNS(GML32_NS, "TimePeriod");
         if (tps.getLength() > 0) {
             Element tp = (Element) tps.item(0);
             String begin = firstNonEmpty(
-                textNS(tp, GML_NS, "beginPosition"),
+                textNS(tp, tp.getNamespaceURI(), "beginPosition"),
                 safeIsoText(tp, new String[][]{{"gml:begin","gml:TimeInstant","gml:timePosition"}})
             );
             String end = firstNonEmpty(
-                textNS(tp, GML_NS, "endPosition"),
+                textNS(tp, tp.getNamespaceURI(), "endPosition"),
                 safeIsoText(tp, new String[][]{{"gml:end","gml:TimeInstant","gml:timePosition"}})
             );
             if ((begin!=null && !begin.isEmpty()) || (end!=null && !end.isEmpty())) {
@@ -510,7 +511,7 @@ if (bboxes.getLength() > 0) {
         String defaultFormat = safeIsoText(recordElem, new String[][]{
             {"gmd:distributionInfo","gmd:MD_Distribution","gmd:distributionFormat","gmd:MD_Format","gmd:name","gco:CharacterString"}
         });
-        if (defaultFormat == null || defaultFormat.isEmpty()) defaultFormat = "UNKNOWN";
+        if (defaultFormat == null) defaultFormat = "";
 
         java.util.List<DcatDistribution> distributionList = new java.util.ArrayList<>();
         java.util.Set<String> seenLinks = new java.util.HashSet<>();
@@ -556,7 +557,7 @@ if (bboxes.getLength() > 0) {
 
                     // Estimate format and media type
                     String format = guessFormat(link, protocol, defaultFormat);
-                    if (format == null || format.isEmpty()) format = "UNKNOWN";
+                    if (format == null) format = "";
                     String mediaType = guessMediaType(link, protocol);
                     if (mediaType == null) mediaType = "";
 
@@ -565,7 +566,7 @@ if (bboxes.getLength() > 0) {
                         (desc != null ? desc.trim() : ""),
                         hostnameOf(link)
                     );
-                    if (titleDist == null || titleDist.isEmpty()) titleDist = "resource";
+                    if (titleDist == null) titleDist = "";
 
                     // Crea distribution pulita e coerente
                     DcatDistribution dist = new DcatDistribution();
@@ -576,8 +577,8 @@ if (bboxes.getLength() > 0) {
                     dist.setMediaType(mediaType);
                     dist.setTitle(titleDist);
                     dist.setDescription(desc != null ? desc : "");
-                    dist.setReleaseDate("1970-01-01T00:00:00Z");
-                    dist.setUpdateDate("1970-01-01T00:00:00Z");
+                    dist.setReleaseDate("");
+                    dist.setUpdateDate("");
 
 
                     distributionList.add(dist);
@@ -592,13 +593,18 @@ if (bboxes.getLength() > 0) {
         FoafAgent publisher = new FoafAgent(
                 DCTerms.publisher.getURI(),
                 null,
-                List.of(node.getPublisherName()),
+                node.getPublisherName() != null ? List.of(node.getPublisherName()) : java.util.Collections.emptyList(),
                 null, null, null,
                 null,
                 nodeId);
 
         java.util.List<VcardOrganization> contactPointList = new java.util.ArrayList<>();
-        if (node.getPublisherEmail() != null && !node.getPublisherEmail().isEmpty()) {
+        // GeoDCAT-AP: dcat:contactPoint is the resource point of contact (else the metadata contact) of the record;
+        // the catalogue configuration is only the fallback.
+        VcardOrganization recordContact = isoContact(recordElem, GMD_NS, nodeId);
+        if (recordContact != null) {
+            contactPointList.add(recordContact);
+        } else if (node.getPublisherEmail() != null && !node.getPublisherEmail().isEmpty()) {
             VcardOrganization contactOrg = new VcardOrganization(
                     DCAT.contactPoint.getURI(),
                     node.getHomepage() != null ? node.getHomepage() : "",
@@ -699,14 +705,14 @@ if (bboxes.getLength() > 0) {
                 accessRightsFinal,
                 new java.util.ArrayList<DctStandard>(),   // conformsTo
                 documentation,                            // documentation
-                null,                                     // frequency
+                isoFrequency(recordElem, GMD_NS),         // frequency (GeoDCAT-AP mapping of ISO 19115 codes)
                 new java.util.ArrayList<String>(),        // hasVersion
                 new java.util.ArrayList<String>(),        // isVersionOf
                 landing,             			          // landing page
                 new java.util.ArrayList<String>(),        // languages
-                new java.util.ArrayList<String>(),        // provenance
-                (releaseDate == null || releaseDate.isEmpty()) ? "1970-01-01T00:00:00Z" : releaseDate,
-                (updateDate  == null || updateDate.isEmpty())  ? "1970-01-01T00:00:00Z" : updateDate,
+                isoLineage(recordElem, GMD_NS),           // provenance (LI_Lineage/statement)
+                releaseDate == null ? "" : releaseDate,
+                updateDate == null ? "" : updateDate,
                 new java.util.ArrayList<String>(),        // otherIdentifier
                 new java.util.ArrayList<String>(),        // sample
                 new java.util.ArrayList<String>(),        // source
@@ -724,10 +730,63 @@ if (bboxes.getLength() > 0) {
                 new java.util.ArrayList<String>(), //wasGeneratedBy
                 new java.util.ArrayList<String>() //HVDCategory
         );
+        if (identifier.matches("^[a-zA-Z][a-zA-Z0-9+.-]*:.*")) dataset.setResourceUri(identifier);
+        String edition = safeIsoText(recordElem, new String[][]{{"gmd:identificationInfo","gmd:MD_DataIdentification","gmd:citation","gmd:CI_Citation","gmd:edition","gco:CharacterString"}});
+        if (edition != null && dataset.getVersion() != null) dataset.getVersion().setValue(edition);
+        it.eng.idra.dcat.dump.DcatMetadataEnvelope.captureTyped(dataset, "ISO19139:" + nodeId + ":" + node.getHost());
         return dataset;
     }
 
     /* =====================  HELPERS   ===================== */
+
+    /** First CI_ResponsibleParty of the resource point of contact, else of the metadata contact; null when none. */
+    private VcardOrganization isoContact(Element recordElem, String gmd, String nodeId) {
+        for (String role : new String[] {"pointOfContact", "contact"}) {
+            NodeList parties = recordElem.getElementsByTagNameNS(gmd, role);
+            for (int i = 0; i < parties.getLength(); i++) {
+                Element party = (Element) parties.item(i);
+                String organisation = firstText(party, gmd, "organisationName");
+                String individual = firstText(party, gmd, "individualName");
+                String email = firstText(party, gmd, "electronicMailAddress");
+                String name = firstNonEmpty(organisation, individual);
+                if ((name != null && !name.isEmpty()) || (email != null && !email.isEmpty())) {
+                    return new VcardOrganization(DCAT.contactPoint.getURI(), "", name, email, "", "", "", nodeId);
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Resource maintenance frequency (identification info first), mapped to the EU vocabulary; null if unmapped. */
+    private String isoFrequency(Element recordElem, String gmd) {
+        NodeList info = recordElem.getElementsByTagNameNS(gmd, "identificationInfo");
+        Element scope = info.getLength() > 0 ? (Element) info.item(0) : recordElem;
+        NodeList codes = scope.getElementsByTagNameNS(gmd, "MD_MaintenanceFrequencyCode");
+        if (codes.getLength() == 0) codes = recordElem.getElementsByTagNameNS(gmd, "MD_MaintenanceFrequencyCode");
+        if (codes.getLength() == 0) return null;
+        Element code = (Element) codes.item(0);
+        String iso = code.getAttribute("codeListValue");
+        return it.eng.idra.beans.dcat.DctFrequency.fromIso19115(iso.isEmpty() ? code.getTextContent() : iso);
+    }
+
+    /** Lineage statements as dct:provenance text. */
+    private java.util.List<String> isoLineage(Element recordElem, String gmd) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        NodeList lineages = recordElem.getElementsByTagNameNS(gmd, "LI_Lineage");
+        for (int i = 0; i < lineages.getLength(); i++) {
+            String statement = firstText((Element) lineages.item(i), gmd, "statement");
+            if (statement != null && !statement.isEmpty() && !result.contains(statement)) result.add(statement);
+        }
+        return result;
+    }
+
+    /** Trimmed text of the first descendant element with that local name (any gco/gmx wrapper below it). */
+    private String firstText(Element parent, String ns, String local) {
+        NodeList found = parent.getElementsByTagNameNS(ns, local);
+        if (found.getLength() == 0) return null;
+        String text = found.item(0).getTextContent();
+        return text == null ? null : text.trim();
+    }
 
     private String firstNonEmpty(String... vals) {
         return GeoNetworkConnectorUtils.firstNonEmpty(vals);

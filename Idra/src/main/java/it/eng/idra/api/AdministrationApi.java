@@ -258,17 +258,18 @@ import java.nio.file.Paths;
            }
          }
  
-         if (StringUtils.isBlank(orionConfig.getOrionDatasetDumpString())
-             && fileInputStream == null) {
-           throw new IOException("Orion Catalogue must have a dump string or a dump file");
-         }
- 
-         if (StringUtils.isBlank(orionConfig.getOrionDatasetDumpString())) {
+         if (StringUtils.isBlank(orionConfig.getOrionDatasetDumpString()) && fileInputStream != null) {
            String dumpString = IOUtils.toString(fileInputStream, StandardCharsets.UTF_8);
            if (StringUtils.isNotBlank(dumpString)) {
              orionConfig.setOrionDatasetDumpString(dumpString);
              node.setAdditionalConfig(orionConfig);
            }
+         }
+         if (StringUtils.isBlank(orionConfig.getOrionDatasetDumpString())) {
+           return Response.status(Response.Status.BAD_REQUEST)
+               .entity(new ErrorResponse("400",
+                   "Provide an Orion dataset dump string or upload its content; a remote file path is not a dump.",
+                   "400", "Orion Catalogue must have a dump string or a dump file").toJson()).build();
          }
        } else if (node.getNodeType().equals(OdmsCatalogueType.SPARQL)) {
  
@@ -284,20 +285,21 @@ import java.nio.file.Paths;
          SparqlCatalogueConfiguration sparqlConfig = (SparqlCatalogueConfiguration) node
              .getAdditionalConfig();
  
-         if (sparqlConfig == null && fileInputStream == null) {
-           throw new IOException("Sparql Catalogue must have a dump string or a dump file");
-         }
- 
          if (sparqlConfig == null) {
            sparqlConfig = new SparqlCatalogueConfiguration();
          }
  
-         if (StringUtils.isBlank(sparqlConfig.getSparqlDatasetDumpString())) {
+         if (StringUtils.isBlank(sparqlConfig.getSparqlDatasetDumpString()) && fileInputStream != null) {
            String dumpString = IOUtils.toString(fileInputStream, StandardCharsets.UTF_8);
            if (StringUtils.isNotBlank(dumpString)) {
              sparqlConfig.setSparqlDatasetDumpString(dumpString);
              node.setAdditionalConfig(sparqlConfig);
            }
+         }
+         if (StringUtils.isBlank(sparqlConfig.getSparqlDatasetDumpString())) {
+           return Response.status(Response.Status.BAD_REQUEST)
+               .entity(new ErrorResponse("400", "Provide a SPARQL dataset dump string or upload its content.",
+                   "400", "Sparql Catalogue must have a dump string or a dump file").toJson()).build();
          }
        }
  
@@ -360,6 +362,13 @@ import java.nio.file.Paths;
   @Path("/catalogues/{id}/activate")
   @Produces("application/json")
   public Response activateOdmsCatalogue(@PathParam("id") String id) throws Exception {
+    try (it.eng.idra.management.CatalogueOperationLock operation =
+        it.eng.idra.management.CatalogueOperationLock.acquire(Integer.parseInt(id))) {
+      return activateCatalogueLocked(id);
+    }
+  }
+
+  private Response activateCatalogueLocked(String id) throws Exception {
     OdmsCatalogue node = null;
     try {
       node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
@@ -437,6 +446,13 @@ import java.nio.file.Paths;
   @Produces("application/json")
   public Response deactivateOdmsCatalogue(@PathParam("id") String id,
       @QueryParam("keepDatasets") @DefaultValue("false") Boolean keepDatasets) throws Exception {
+    try (it.eng.idra.management.CatalogueOperationLock operation =
+        it.eng.idra.management.CatalogueOperationLock.acquire(Integer.parseInt(id))) {
+      return deactivateCatalogueLocked(id, keepDatasets);
+    }
+  }
+
+  private Response deactivateCatalogueLocked(String id, Boolean keepDatasets) throws Exception {
     OdmsCatalogue node = null;
     try {
       node = FederationCore.getOdmsCatalogue(Integer.parseInt(id));
@@ -469,10 +485,9 @@ import java.nio.file.Paths;
          if (response == null) {
            logger.info("STATUS POST Delete in the CB, from BROKER MANAGER: -1"
                + ". The NGSI-LD Broker Manager is not running.");
+           throw new AppException(ErrorCode.ERR_UPSTREAM_UNAVAILABLE, "Broker Manager is not running");
          } else {
-           String body = client.getHttpResponseBody(response);
-           JSONObject objResponse = new JSONObject(body);
-           int status = objResponse.getInt("status");
+           int status = it.eng.idra.utils.restclient.BrokerManagerResponse.requireDeletionSuccess(client, response);
 
            if (status != 200 && status != 207 && status != 204
                && status != 201 && status != 301) {
@@ -704,6 +719,13 @@ import java.nio.file.Paths;
   @Path("/catalogues/{nodeId}")
   @Produces("application/json")
   public Response unregisterOdmsCatalogue(@PathParam("nodeId") String nodeId) throws Exception {
+    try (it.eng.idra.management.CatalogueOperationLock operation =
+        it.eng.idra.management.CatalogueOperationLock.acquire(Integer.parseInt(nodeId))) {
+      return unregisterCatalogueLocked(nodeId);
+    }
+  }
+
+  private Response unregisterCatalogueLocked(String nodeId) throws Exception {
     OdmsCatalogue node = null;
     try {
       node = FederationCore.getOdmsCatalogue(Integer.parseInt(nodeId));
@@ -734,10 +756,9 @@ import java.nio.file.Paths;
          if (response == null) {
            logger.info("STATUS POST Delete in the CB, from BROKER MANAGER: -1" 
                + ". The NGSI-LD Broker Manager is not running.");
+           throw new AppException(ErrorCode.ERR_UPSTREAM_UNAVAILABLE, "Broker Manager is not running");
          } else {
-           String body = client.getHttpResponseBody(response);
-           JSONObject objResponse = new JSONObject(body);
-           int status = objResponse.getInt("status");
+           int status = it.eng.idra.utils.restclient.BrokerManagerResponse.requireDeletionSuccess(client, response);
            
            if (status != 200 && status != 207 && status != 204 
                && status != 201 && status != 301) {

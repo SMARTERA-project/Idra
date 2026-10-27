@@ -76,5 +76,74 @@ public enum DctFrequency {
   QUADRENNIAL,
 
   /** The quinquennial. */
-  QUINQUENNIAL;
+  QUINQUENNIAL,
+
+  // EU frequency codes present in the pinned DCAT-AP 3.0.1 vocabulary and missing above: valid source values
+  // (and the GeoDCAT-AP mapping of ISO 19115 codes) were otherwise exported as UNKNOWN.
+  WEEKLY,
+  WEEKLY_5,
+  AS_NEEDED,
+  NOT_PLANNED,
+  OTHER,
+  BIDECENNIAL,
+  BIHOURLY,
+  SEXENNIAL,
+  TRIDECENNIAL,
+  TRIHOURLY;
+
+  /** EU codes that are not Java identifiers. */
+  private static final java.util.Set<String> NUMERIC_CODES =
+      java.util.Set.of("1MIN", "5MIN", "10MIN", "15MIN", "30MIN", "12HRS");
+
+  /** True for a code of the EU frequency vocabulary (local name, without the authority base IRI). */
+  public static boolean isCode(String code) {
+    if (code == null) return false;
+    if (NUMERIC_CODES.contains(code)) return true;
+    try {
+      valueOf(code);
+      return true;
+    } catch (IllegalArgumentException unknown) {
+      return false;
+    }
+  }
+
+  /** Frequency names written as words by the sources (OpenDataSoft: French and English). */
+  private static final java.util.Map<String, String> LABELS = java.util.Map.ofEntries(
+      java.util.Map.entry("annuelle", "ANNUAL"), java.util.Map.entry("annual", "ANNUAL"),
+      java.util.Map.entry("mensuelle", "MONTHLY"), java.util.Map.entry("monthly", "MONTHLY"),
+      java.util.Map.entry("quotidienne", "DAILY"), java.util.Map.entry("daily", "DAILY"),
+      java.util.Map.entry("hebdomadaire", "WEEKLY"), java.util.Map.entry("weekly", "WEEKLY"),
+      java.util.Map.entry("trimestrielle", "QUARTERLY"), java.util.Map.entry("quarterly", "QUARTERLY"),
+      java.util.Map.entry("semestrielle", "ANNUAL_2"), java.util.Map.entry("irregular", "IRREG"),
+      java.util.Map.entry("irrégulière", "IRREG"), java.util.Map.entry("continuous", "UPDATE_CONT"),
+      java.util.Map.entry("en continu", "UPDATE_CONT"), java.util.Map.entry("pas de mise à jour", "NEVER"),
+      java.util.Map.entry("never", "NEVER"));
+
+  /** EU code of a frequency name with an exact equivalent; null otherwise (the text is kept). */
+  public static String fromLabel(String label) {
+    return label == null ? null : LABELS.get(label.trim().toLowerCase(java.util.Locale.ROOT));
+  }
+
+  /**
+   * GeoDCAT-AP mapping of the ISO 19115 MD_MaintenanceFrequencyCode list to the EU frequency vocabulary;
+   * null for a code without an equivalent (it is then not exported as a frequency).
+   */
+  public static String fromIso19115(String isoCode) {
+    if (isoCode == null) return null;
+    switch (isoCode.trim()) {
+      case "continual": return UPDATE_CONT.name();
+      case "daily": return DAILY.name();
+      case "weekly": return WEEKLY.name();
+      case "fortnightly": return BIWEEKLY.name();
+      case "monthly": return MONTHLY.name();
+      case "quarterly": return QUARTERLY.name();
+      case "biannually": return ANNUAL_2.name();
+      case "annually": return ANNUAL.name();
+      case "asNeeded": return AS_NEEDED.name();
+      case "irregular": return IRREG.name();
+      case "notPlanned": return NOT_PLANNED.name();
+      case "unknown": return UNKNOWN.name();
+      default: return null;
+    }
+  }
 }

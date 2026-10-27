@@ -208,6 +208,8 @@ public class DctLicenseDocument {
    *
    * @return the uri
    */
+  // Source IRIs can exceed 255 characters; a single long value used to fail the whole catalogue sync.
+  @Column(name = "uri", columnDefinition = "TEXT")
   public String getUri() {
     return uri;
   }
@@ -218,7 +220,9 @@ public class DctLicenseDocument {
    * @param uri the new uri
    */
   public void setUri(String uri) {
-    this.uri = StringUtils.isNotBlank(uri) ? uri : DCTerms.license.getURI();
+    // No licence IRI stays empty: the dct:license property IRI was used as placeholder and showed up
+    // in API, broker and portal as if it were a licence; stored placeholders are cleared when read.
+    this.uri = StringUtils.isBlank(uri) || DCTerms.license.getURI().equals(uri.trim()) ? "" : uri;
   }
 
   /**

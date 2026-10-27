@@ -85,6 +85,8 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
 
   /** The datasets array. */
   private JSONArray datasetsArray;
+  private static final String DATASET_TYPES = java.net.URLEncoder.encode("Dataset,https://uri.etsi.org/ngsi-ld/default-context/Dataset,https://smartdatamodels.org/dataModel.DCAT-AP/Dataset", java.nio.charset.StandardCharsets.UTF_8);
+  private final java.util.Map<String,JSONObject> resolvedEntities = new java.util.HashMap<>();
 
   /** The node. */
   private OdmsCatalogue node;
@@ -143,10 +145,11 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
   public int countDatasets() throws Exception {
     // NGSI-LD count=true&limit=0 returns only the NGSILD-Results-Count header.
     Map<String, String> headers = new HashMap<String, String>();
+    it.eng.idra.utils.NgsiDcatReader.contextHeaders(headers);
     headers.put("Content-Type", "application/json");
     RestClient client = new RestClientImpl();
     HttpResponse response = client.sendGetRequest(
-        node.getHost() + "/ngsi-ld/v1/entities?type=Dataset&count=true&limit=0", headers);
+        node.getHost() + "/ngsi-ld/v1/entities?type=" + DATASET_TYPES + "&count=true&limit=0", headers);
     org.apache.http.Header countHeader = response.getFirstHeader("NGSILD-Results-Count");
     // Always consume the body so the connection goes back to the pool.
     client.getHttpResponseBody(response);
@@ -173,156 +176,10 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    */
   public DcatDistribution distributionToDcat(Object distribution,
       OdmsCatalogue node) throws Exception {
-
-    JSONObject j = (JSONObject) distribution;
-    DcatDistribution distro = new DcatDistribution();
-
-    distro.setIdentifier(j.getString("id"));
-
-    distro.setNodeId(nodeId);
-
-    String title = null;
-
-    if (j.has("title")) {
-      JSONObject titleObject = j.getJSONObject("title");
-      title = titleObject.getString("value");
-      distro.setTitle(title);
-
-    }
-    logger.debug("title ok");
-    String description = null;
-    if (j.has("description")) {
-      JSONObject titleObject = j.getJSONObject("description");
-      description = titleObject.getString("value");
-      distro.setDescription(description);
-    }
-
-    String accessUrl = null;
-    if (j.has("accessUrl")) {
-      JSONObject accessObject = j.getJSONObject("accessUrl");
-      accessUrl = accessObject.getString("value");
-      distro.setAccessUrl(accessUrl);
-    }
-
-    logger.debug("accessUrl ok");
-
-    String downloadUrl = null;
-    if (j.has("downloadURL")) {
-      JSONObject downloadObject = j.getJSONObject("downloadURL");
-      downloadUrl = downloadObject.getString("value");
-      distro.setDownloadUrl(downloadUrl);
-    }
-
-    logger.debug("downloadUrl ok");
-    if (j.has("format")) {
-      JSONObject formatObject = j.getJSONObject("format");
-      distro.setFormat(formatObject.getString("value"));
-    }
-    logger.debug("format ok");
-    JSONObject attributeObject = new JSONObject();
-    if (j.has("byteSize")) {
-      attributeObject = j.getJSONObject("byteSize");
-      distro.setByteSize(attributeObject.getString("value"));
-    }
-    logger.debug("byteSize ok");
-    if (j.has("checksum")) {
-      attributeObject = j.getJSONObject("checksum");
-      distro.setChecksum(attributeObject.getString("value"));
-    }
-    logger.debug("checksum ok");
-    if (j.has("rights")) {
-      attributeObject = j.getJSONObject("rights");
-      distro.setRights(attributeObject.getString("value"));
-    }
-    logger.debug("rights ok");
-    if (j.has("mediaType")) {
-      attributeObject = j.getJSONObject("mediaType");
-      distro.setMediaType(attributeObject.getString("value"));
-    }
-    logger.debug("mediaType ok");
-    if (j.has("description")) {
-      attributeObject = j.getJSONObject("description");
-      distro.setDescription(attributeObject.getString("value"));
-    }
-    logger.debug("description ok");
-    if (j.has("license")) {
-      attributeObject = j.getJSONObject("license");
-      distro.setLicense(new DctLicenseDocument("", attributeObject.getString("value"),
-          "", "", nodeId));
-    }
-    logger.debug("license ok");
-    String releaseDate = null;
-    if (j.has("releaseDate")) {
-      JSONObject relDateObject = j.getJSONObject("releaseDate");
-      JSONObject valueObj = relDateObject.getJSONObject("value");
-      String date = valueObj.getString("@value");
-      releaseDate = CommonUtil.fixBadUtcDate(date);
-      distro.setReleaseDate(releaseDate);
-    }
-    logger.debug("releaseDate ok");
-    String updateDate = null;
-    if (j.has("modifiedDate")) {
-      JSONObject updDateObject = j.getJSONObject("modifiedDate");
-      JSONObject valueObj = updDateObject.getJSONObject("value");
-      String date = valueObj.getString("@value");
-      updateDate = CommonUtil.fixBadUtcDate(date);
-      distro.setUpdateDate(updateDate);
-
-    }
-    logger.debug("modifiedDate ok");
-    // if (j.has("status")) {
-    // logger.debug("Distribution status skipped");
-    // }
-    // if (j.has("language")) {
-    // logger.debug("Distribution language skipped");
-    // }
-    // if (j.has("linkedSchemas")) {
-    // logger.debug("Distribution linkedSchemas skipped");
-    // }
-    // if (j.has("documentation")) {
-    // logger.debug("Distribution documentation skipped");
-    // }
-
-    // new
-    if (j.has("accessService")) {
-      distro.setAccessService(GsonUtil.json2Obj(j.getJSONArray("accessService").toString(),
-          GsonUtil.dataServiceListType));
-    }
-
-    if (j.has("applicableLegislation")) {
-      distro.setApplicableLegislation(GsonUtil.json2Obj(j.getJSONArray("applicableLegislation").toString(),
-          GsonUtil.stringListType));
-    }
-
-    if (j.has("availability")) {
-      distro.setAvailability(new DcatProperty(DCATAP.availability, SKOS.Concept, j.getString("availability")));
-    }
-    if (j.has("compressionFormat")) {
-      distro.setCompressionFormat(
-          new DcatProperty(DCAT.compressFormat, DCTerms.MediaType, j.getString("compressionFormat")));
-    }
-    if (j.has("hasPolicy")) {
-      distro.setHasPolicy(
-          new DcatProperty(ResourceFactory.createProperty("https://www.w3.org/ns/odrl/2/"), DCTerms.Policy,
-              j.getString("hasPolicy")));
-    }
-    if (j.has("packagingFormat")) {
-      distro.setPackagingFormat(
-          new DcatProperty(DCAT.packageFormat, DCTerms.MediaType, j.getString("packagingFormat")));
-    }
-    if (j.has("spatialResolution")) {
-      distro.setSpatialResolution(
-          new DcatProperty(DCAT.spatialResolutionInMeters, XSD.decimal, j.getString("spatialResolution")));
-    }
-    if (j.has("temporalResolution")) {
-      distro.setTemporalResolution(
-          new DcatProperty(DCAT.temporalResolution, XSD.duration, j.getString("temporalResolution")));
-    }
-
-    distro.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
-        j.opt("title"), j.opt("description"), title, description));
-
-    return distro;
+    return it.eng.idra.utils.NgsiDcatReader.distribution((JSONObject)distribution, nodeId, id -> {
+      try { return getJsonDistribution(id); }
+      catch (Exception e) { throw new IllegalStateException("Cannot resolve NGSI-LD entity " + id, e); }
+    });
   }
 
   /**
@@ -374,419 +231,12 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    */
   @Override
   public DcatDataset datasetToDcat(Object dataset, OdmsCatalogue node) throws Exception {
-    JSONObject j = (JSONObject) dataset;
-
-    String title = null;
-    String description = null;
-    String identifier = null;
-    List<DctPeriodOfTime> temporalCoverage = new ArrayList<DctPeriodOfTime>();
-    List<String> keywords = new ArrayList<String>();
-    List<String> documentation = new ArrayList<String>();
-    List<String> provenance = new ArrayList<String>();
-    List<String> otherIdentifier = new ArrayList<String>();
-    List<String> versionNotes = new ArrayList<String>();
-    // List<String> relatedResource = new ArrayList<String>();
-
-    List<DcatDistribution> distributionList = new ArrayList<DcatDistribution>();
-
-    // New properties
-    String beginning = null;
-    String end = null;
-    List<String> applicableLegislation = new ArrayList<String>();
-    List<DctLocation> geographicalCoverage = new ArrayList<DctLocation>();
-    List<DcatDetails> descriptions = new ArrayList<DcatDetails>();
-    List<DcatDetails> titles = new ArrayList<DcatDetails>();
-    List<DctPeriodOfTime> temporalCoverageList = new ArrayList<DctPeriodOfTime>();
-    List<DcatDatasetSeries> inSeries = new ArrayList<DcatDatasetSeries>();
-    List<Relationship> qualifiedRelation = new ArrayList<Relationship>();
-    String temporalResolution = null;
-    List<String> wasGeneratedBy = new ArrayList<String>();
-    List<String> HVDCategory = new ArrayList<String>();
-
-    JSONObject titleObject = j.getJSONObject("title");
-    title = titleObject.getString("value");
-    logger.debug("title ok");
-
-    identifier = j.optString("id", null);
-
-    if (j.has("description")) {
-      JSONObject desObject = j.getJSONObject("description");
-      description = desObject.getString("value");
-    }
-    logger.debug("description ok");
-    // landingPage
-    String landingPage = "";
-    if (j.has("landingPage")) {
-      JSONObject lanPageObject = j.getJSONObject("landingPage");
-      landingPage = lanPageObject.getString("value");
-      logger.debug("landingPage ok");
-    }
-
-    // frequency
-    String frequency = "";
-    if (j.has("frequency")) {
-      JSONObject freqObject = j.getJSONObject("frequency");
-      frequency = freqObject.getString("value");
-    }
-    logger.debug("frequency ok");
-    JSONArray values = new JSONArray();
-
-    // Themes
-    List<SkosConceptTheme> themeList = new ArrayList<SkosConceptTheme>();
-    List<String> themes = new ArrayList<String>();
-    if (j.has("theme")) {
-      JSONObject themeObject = j.getJSONObject("theme");
-      if (themeObject.get("value") instanceof JSONArray) {
-        values = themeObject.getJSONArray("value");
-        if (values.length() > 0) {
-          themes = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-          themeList.addAll(extractConceptList(DCAT.theme.getURI(), themes,
-              SkosConceptTheme.class));
-        }
-      } else {
-        themes.add(themeObject.getString("value"));
-        themeList.addAll(extractConceptList(DCAT.theme.getURI(), themes,
-            SkosConceptTheme.class));
-      }
-    }
-    logger.debug("theme ok");
-    // Keywords
-    if (j.has("keyword")) {
-      JSONObject keyObject = j.getJSONObject("keyword");
-      if (keyObject.get("value") instanceof JSONArray) {
-        values = keyObject.getJSONArray("value");
-        if (values.length() > 0) {
-          keywords = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        keywords.add(keyObject.getString("value"));
-      }
-    }
-    logger.debug("keyword ok");
-    // Languages
-    List<String> language = new ArrayList<String>();
-    if (j.has("language")) {
-      JSONObject lanObject = j.getJSONObject("language");
-      if (lanObject.get("value") instanceof JSONArray) {
-        values = lanObject.getJSONArray("value");
-        if (values.length() > 0) {
-          language = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        language.add(lanObject.getString("value"));
-      }
-    }
-    logger.debug("language ok");
-    // Documentation
-    if (j.has("documentation")) {
-      JSONObject docObject = j.getJSONObject("documentation");
-      if (docObject.get("value") instanceof JSONArray) {
-        values = docObject.getJSONArray("value");
-        if (values.length() > 0) {
-          documentation = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        documentation.add(docObject.getString("value"));
-      }
-    }
-    logger.debug("documentation ok");
-    // Provenance
-    if (j.has("provenance")) {
-      JSONObject provObject = j.getJSONObject("provenance");
-      if (provObject.get("value") instanceof JSONArray) {
-        values = provObject.getJSONArray("value");
-        if (values.length() > 0) {
-          provenance = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        provenance.add(provObject.getString("value"));
-      }
-    }
-    logger.debug("provenance ok");
-    // Other Identifiers
-    if (j.has("otherIdentifier")) {
-      JSONObject othIdObject = j.getJSONObject("otherIdentifier");
-      if (othIdObject.get("value") instanceof JSONArray) {
-        values = othIdObject.getJSONArray("value");
-        if (values.length() > 0) {
-          otherIdentifier = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        otherIdentifier.add(othIdObject.getString("value"));
-      }
-    }
-    logger.debug("other ok");
-    // Version
-    String version = "";
-    if (j.has("version")) {
-      JSONObject verObject = j.getJSONObject("version");
-      version = verObject.getString("value");
-    }
-    logger.debug("versione ok");
-    // Version Notes
-    if (j.has("versionNotes")) {
-      JSONObject verNotesObject = j.getJSONObject("versionNotes");
-      if (verNotesObject.get("value") instanceof JSONArray) {
-        values = verNotesObject.getJSONArray("value");
-        if (values.length() > 0) {
-          versionNotes = GsonUtil.json2Obj(values.toString(),
-              GsonUtil.stringListType);
-        }
-      } else {
-        versionNotes.add(verNotesObject.getString("value"));
-      }
-    }
-    logger.debug("versionNote ok");
-    // AccessRights
-    String accessRights = "";
-    if (j.has("accessRights")) {
-      JSONObject accRightsObject = j.getJSONObject("accessRights");
-      accessRights = accRightsObject.getString("value");
-    }
-    logger.debug("access ok");
-    String type = null;
-    type = j.optString("type", null); // ?
-
-    // Release Date
-    String releaseDate = null;
-    if (j.has("releaseDate")) {
-      JSONObject relDateObject = j.getJSONObject("releaseDate");
-      JSONObject valueObj = relDateObject.getJSONObject("value");
-      String date = valueObj.getString("@value");
-      releaseDate = CommonUtil.fixBadUtcDate(date);
-    }
-    logger.debug("release ok");
-    // Update Date
-    String updateDate = null;
-    if (j.has("updateDate")) {
-      JSONObject updDateObject = j.getJSONObject("updateDate");
-      JSONObject valueObj = updDateObject.getJSONObject("value");
-      String date = valueObj.getString("@value");
-      updateDate = CommonUtil.fixBadUtcDate(date);
-    }
-    logger.debug("update ok");
-    List<VcardOrganization> contactPointList = new ArrayList<VcardOrganization>();
-    if (j.has("contactPoint")) {
-      JSONObject contObject = j.getJSONObject("contactPoint");
-      if (contObject.get("value") instanceof JSONArray) {
-        values = contObject.getJSONArray("value");
-        if (values.length() > 0) {
-          for (int i = 0; i < values.length(); i++) {
-            contactPointList.add(
-                new VcardOrganization(DCAT.contactPoint.getURI(),
-                    null, "", values.getString(i),
-                    "", "", "", nodeId));// identifier
-          }
-        }
-      } else {
-        contactPointList.add(
-            new VcardOrganization(DCAT.contactPoint.getURI(),
-                null, "", contObject.getString("value"),
-                "", "", "", nodeId));// identifier
-      }
-    }
-    logger.debug("contactpoint ok");
-    FoafAgent publisher = null;
-    FoafAgent creator = null;
-    // Publisher
-    if (j.has("publisher")) {
-      JSONObject pub = j.getJSONObject("publisher");
-      publisher = new FoafAgent(DCTerms.publisher.getURI(), "",
-          pub.getString("value") != null
-              ? Collections.singletonList(pub.getString("value"))
-              : Collections.emptyList(),
-          "", "", null,
-          "", String.valueOf(node.getId()));
-    }
-    logger.debug("publisher ok");
-    // Creator
-    if (j.has("creator")) {
-      JSONObject creat = j.getJSONObject("creator");
-      creator = new FoafAgent(DCTerms.creator.getURI(), "",
-          creat.getString("value") != null
-              ? Collections.singletonList(creat.getString("value"))
-              : Collections.emptyList(),
-          "", "", null,
-          "", String.valueOf(node.getId()));
-    }
-    logger.debug("creator ok");
-    List<String> sample = new ArrayList<String>();
-    List<String> source = new ArrayList<String>();
-    List<String> hasVersion = new ArrayList<String>();
-    List<String> isVersionOf = new ArrayList<String>();
-
-    List<DctLocation> spatialCoverage = new ArrayList<DctLocation>();
-    spatialCoverage = deserializeSpatial(j, nodeId);
-    List<SkosConceptSubject> subjectList = new ArrayList<SkosConceptSubject>();
-    List<DctStandard> conformsTo = new ArrayList<DctStandard>();
-
-    String startDate = null;
-    String endDate = null;
-    if (StringUtils.isNotBlank(startDate) && StringUtils.isNotBlank(endDate)
-        && StringUtils.isNotBlank(beginning) && StringUtils.isNotBlank(end)) {
-      temporalCoverage.add(
-          new DctPeriodOfTime(DCTerms.temporal.getURI(), startDate, endDate, nodeId, beginning, end));
-    }
-
-    // DISTRIBUTIONS
-    if (j.has("datasetDistribution")) {
-      List<String> distributionsId = new ArrayList<String>();
-      JSONObject distribObject = j.getJSONObject("datasetDistribution");
-      logger.debug(distribObject.toString());
-      if (distribObject.get("value") instanceof JSONArray) {
-        logger.debug("distribution array");
-        JSONArray distrib = distribObject.getJSONArray("value");
-        logger.debug(distrib);
-        for (int i = 0; i < distrib.length(); i++) {
-          logger.debug("nel for");
-          distributionsId.add(distrib.getString(i));
-        }
-
-      } else {
-        distributionsId.add(distribObject.getString("value"));
-      }
-      logger.debug(distributionsId);
-      for (int i = 0; i < distributionsId.size(); i++) {
-        logger.debug(distributionsId);
-        DcatDistribution distro = distributionToDcat(getJsonDistribution(distributionsId.get(i)),
-            node);
-        distributionList.add(distro);
-      }
-
-    }
-    logger.debug("datasetDistr ok");
-    FoafAgent rightsHolder = null;
-    // spatialCoverage e conformsTo non sono previsti nello smart data model
-    // DCATAP/NGSILD
-    // if (j.has("sample")) {
-    // sample = GsonUtil.json2Obj(j.getJSONArray("sample").toString(),
-    // GsonUtil.stringListType);
-    // }
-    //
-    // if (j.has("source")) {
-    // source = GsonUtil.json2Obj(j.getJSONArray("source").toString(),
-    // GsonUtil.stringListType);
-    // }
-    // Subject
-    // if (j.has("subject")) {
-    // List<String> subjects =
-    // GsonUtil.json2Obj(j.getJSONArray("subject").toString(),
-    // GsonUtil.stringListType);
-    // if (subjects.size() > 0) {
-    // subjectList.addAll(
-    // extractConceptList(DCTerms.subject.getURI(), subjects,
-    // SkosConceptSubject.class));
-    // }
-    // }
-
-    // if (j.has("relatedResource")) {
-    // relatedResource =
-    // GsonUtil.json2Obj(j.getJSONArray("relatedResource").toString(),
-    // GsonUtil.stringListType);
-    // }
-    //
-    // if (j.has("hasVersion")) {
-    // hasVersion = GsonUtil.json2Obj(j.getJSONArray("hasVersion").toString(),
-    // GsonUtil.stringListType);
-    // }
-    //
-    // if (j.has("isVersionOf")) {
-    // isVersionOf = GsonUtil.json2Obj(j.getJSONArray("isVersionOf").toString(),
-    // GsonUtil.stringListType);
-    // }
-
-    // Handle new properties
-    if (j.has("applicableLegislation")) {
-      applicableLegislation = GsonUtil.json2Obj(j.getJSONArray("applicableLegislation").toString(),
-          GsonUtil.stringListType);
-    }
-
-    /*
-     * if (j.has("inSeries")) {
-     * JSONArray array = j.optJSONArray("inSeries");
-     * if (array != null) {
-     * for (int i = 0; i < array.length(); i++) {
-     * JSONObject seriesObj = array.getJSONObject(i);
-     * 
-     * DcatDetails dcatDetails = new DcatDetails();
-     * dcatDetails.setTitle(title);
-     * dcatDetails.setDescription(description);
-     * // Extracting properties from JSON
-     * descriptions.add(dcatDetails);// extractValueList(description);
-     * frequency = seriesObj.optString("frequency");
-     * geographicalCoverage.add(spatialCoverage); //
-     * extractValueList(seriesObj.optString("geographicalCoverage"));
-     * temporalCoverageList.add(temporalCoverage);
-     * titles.add(dcatDetails); // extractValueList(title);
-     * 
-     * // Create the DcatDatasetSeries object
-     * DcatDatasetSeries series = new DcatDatasetSeries(
-     * applicableLegislation,
-     * contactPointList,
-     * descriptions,
-     * frequency,
-     * geographicalCoverage,
-     * updateDate,
-     * publisher,
-     * releaseDate,
-     * temporalCoverageList,
-     * titles,
-     * nodeId,
-     * identifier);
-     * 
-     * // Add to the list
-     * inSeries.add(series);
-     * }
-     * }
-     * }
-     */
-
-    if (j.has("qualifiedRelation")) {
-      JSONArray array = j.optJSONArray("qualifiedRelation");
-      if (array != null) {
-        for (int i = 0; i < array.length(); i++) {
-          JSONObject seriesObj = array.getJSONObject(i);
-          // JSONObject obj = j.getJSONObject("qualifiedRelation");
-          Relationship relationship = new Relationship(seriesObj.optString("had_role"),
-              seriesObj.optString("relation"), nodeId);
-          qualifiedRelation.add(relationship); // extractValueList(dataset.optString("qualifiedRelation"));
-        }
-      }
-
-    }
-
-    if (j.has("temporalResolution")) {
-      temporalResolution = j.optString("temporalResolution");
-    }
-
-    if (j.has("wasGeneratedBy")) {
-      wasGeneratedBy = GsonUtil.json2Obj(j.getJSONArray("wasGeneratedBy").toString(),
-          GsonUtil.stringListType);
-      // wasGeneratedBy = extractValueList(j.optString("wasGeneratedBy"));
-    }
-
-    if (j.has("HVDCategory")) {
-      HVDCategory = GsonUtil.json2Obj(j.getJSONArray("HVDCategory").toString(),
-          GsonUtil.stringListType);
-      // HVDCategory = extractValueList(j.optString("HVDCategory"));
-    }
-
-    DcatDataset mapped = new DcatDataset(nodeId, identifier, title, description, distributionList, themeList,
-        publisher, contactPointList, keywords, accessRights, conformsTo, documentation, frequency,
-        hasVersion, isVersionOf, landingPage, language, provenance, releaseDate, updateDate,
-        otherIdentifier, sample, source, spatialCoverage, temporalCoverage, type, version,
-        versionNotes, rightsHolder, creator, subjectList, null,
-        applicableLegislation, inSeries, qualifiedRelation, temporalResolution,
-        wasGeneratedBy, HVDCategory);
-    mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
-        j.opt("title"), j.opt("description"), title, description));
-    return mapped;
+    java.util.Map<String, JSONObject> cache = resolvedEntities;
+    return it.eng.idra.utils.NgsiDcatReader.dataset((JSONObject)dataset, nodeId, id -> {
+      if (cache.containsKey(id)) return cache.get(id);
+      try { JSONObject value = getJsonDistribution(id); cache.put(id, value); return value; }
+      catch (Exception e) { throw new IllegalStateException("Cannot resolve NGSI-LD entity " + id, e); }
+    });
   }
 
   /**
@@ -849,41 +299,22 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    */
   private JSONArray getJsonDatasets()
       throws Exception {
-
-    logger.info("-- ORION DCAT Connector Request for Datasets, sent -- " + node.getHost());
-
     Map<String, String> headers = new HashMap<String, String>();
-    headers.put("Content-Type", "application/json");
+    it.eng.idra.utils.NgsiDcatReader.contextHeaders(headers);
+    headers.put("Accept", "application/json");
     RestClient client = new RestClientImpl();
-
-    // String url = "";
-    // HttpResponse response;
-    // String returnedJson = "";
-    // String tempJSON = "";
-    // int counter = 0;
-    // int offset = 0;
-    // do{
-    // url = node.getHost() +
-    // "/ngsi-ld/v1/entities?type=Dataset&offset="+offset+"&limit=1000";
-
-    // response = client.sendGetRequest(url, headers);
-    // tempJSON = client.getHttpResponseBody(response);
-    // returnedJson = returnedJson + tempJSON;
-    // counter = new JSONArray(tempJSON).length();
-    // offset = offset + counter;
-    // } while(counter > 1000 );
-
-    String url = node.getHost() + "/ngsi-ld/v1/entities?type=Dataset&limit=1000";
-
-    HttpResponse response;
-    String returnedJson = "";
-
-    response = client.sendGetRequest(url, headers);
-    returnedJson = client.getHttpResponseBody(response);
-    // System.out.println(returnedJson);
-    JSONArray jsonArray = new JSONArray(returnedJson);
-    // System.out.println("JSONDATASET: " + jsonArray);
-    return jsonArray;
+    JSONArray result = new JSONArray();
+    int offset = 0, pageSize = 1000;
+    while (true) {
+      HttpResponse response = client.sendGetRequest(node.getHost() + "/ngsi-ld/v1/entities?type=" + DATASET_TYPES + "&limit=" + pageSize + "&offset=" + offset, headers);
+      int status = client.getStatus(response);
+      String body = client.getHttpResponseBody(response);
+      if (status != 200) throw new IllegalStateException("NGSI-LD dataset page failed: HTTP " + status);
+      JSONArray page = new JSONArray(body);
+      for (int i = 0; i < page.length(); i++) result.put(page.get(i));
+      if (page.length() < pageSize) return result;
+      offset += page.length();
+    }
   }
 
   /**
@@ -892,55 +323,9 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    * @throws Exception exception
    */
   public void subscribeToTheContextBroker() throws Exception {
-
-    logger.info("Request for subscription from Idra to CB");
-    logger.info("Catalogue ID: " + node.getId());
-
-    Map<String, String> headers = new HashMap<String, String>();
-    headers.put("Content-Type", "application/json");
-    RestClient client = new RestClientImpl();
-
-    HttpResponse response = client.sendGetRequest(node.getHost()
-        + "/ngsi-ld/v1/subscriptions/urn:ngsi-ld:Subscription:" + node.getId(), headers);
-    int status = client.getStatus(response);
-    if (status != 200) {
-      logger.info("Subscription NOT present, creation");
-
-      String endpoint = (subscriptionBaseUrl.endsWith("/")
-          ? subscriptionBaseUrl
-          : subscriptionBaseUrl + "/")
-          + "Idra/api/v1/client" + "/notification/" + node.getId()
-          + "/" + node.getApiKey() + "/push";
-
-      String req = "{"
-          + "\"description\": \"Notify me on the creation or modification of a Dataset\","
-          + "\"type\": \"Subscription\","
-          + "\"id\": \"urn:ngsi-ld:Subscription:" + node.getId() + "\","
-          + "\"entities\": [{\"type\": \"Dataset\"}, {\"type\": \"DistributionDCAT-AP\"}],"
-          + "\"notification\": {"
-          + "  \"attributes\": [\"title\"],"
-          + "  \"format\": \"normalized\","
-          + "  \"endpoint\": {"
-          + "  \"uri\": \"" + endpoint + "\","
-          + "  \"accept\": \"application/json\""
-          + "  }"
-          + "}"
-          + "}";
-
-      logger.debug("REQUEST NOTIFY: " + req);
-
-      String api = node.getHost() + "/ngsi-ld/v1/subscriptions/";
-      response = client.sendPostRequest(api, req,
-          MediaType.APPLICATION_JSON_TYPE, headers);
-      status = client.getStatus(response);
-
-      if (status != 200 && status != 207 && status != 204 && status != -1
-          && status != 201 && status != 301) {
-        throw new Exception("-- STATUS POST SUBSCRIPTION "
-            + "FROM IDRA: " + status);
-      }
-    }
-    logger.info("Subscription already present, does not need to be created");
+    String endpoint=(subscriptionBaseUrl.endsWith("/")?subscriptionBaseUrl:subscriptionBaseUrl+"/")
+        +"Idra/api/v1/client/notification/"+node.getId()+"/"+node.getApiKey()+"/push";
+    it.eng.idra.utils.NgsiDcatSubscription.ensure(node.getHost(),node.getId(),endpoint);
   }
 
   /*
@@ -954,6 +339,7 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
     ArrayList<DcatDataset> dcatDatasets = new ArrayList<DcatDataset>();
 
     List<String> datasetsNgsiId = new ArrayList<String>();
+    resolvedEntities.clear();
     datasetsArray = getJsonDatasets();
 
     // System.out.println("NUM DATASET: " + datasetsArray.length());
@@ -1000,34 +386,17 @@ public class NgsiLdCbDcatConnector implements IodmsConnector {
    */
   private JSONObject getJsonDistribution(String id)
       throws Exception {
-
-    // logger.info("-- ORION DCAT Connector Request for DIstrib, sent -- " +
-    // node.getHost());
-
     Map<String, String> headers = new HashMap<String, String>();
-    headers.put("Content-Type", "application/json");
+    it.eng.idra.utils.NgsiDcatReader.contextHeaders(headers);
+    headers.put("Accept", "application/json");
     RestClient client = new RestClientImpl();
-
-    // L'Id della distrib che arriva è di tipo
-    // urn:ngsi-ld:Dataset:items:330d6f03-9e95-4335-af06-9b8437f5e084
-    // però l'entity salvata è di tipo
-    // urn:ngsi-ld:DistributionDCAT-AP:id:330d6f03-9e95-4335-af06-9b8437f5e084
-    String[] idSplitted = id.split(":");
-    String distribId = "urn:ngsi-ld:DistributionDCAT-AP:id";
-    for (int i = 4; i < idSplitted.length; i++) {
-      distribId = distribId + ":" + id.split(":")[i];
-    }
-
-    String url = node.getHost() + "/ngsi-ld/v1/entities?type=DistributionDCAT-AP&id=" + distribId;
-    logger.debug(url);
-
+    String url = node.getHost() + "/ngsi-ld/v1/entities/" + java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8);
     HttpResponse response = client.sendGetRequest(url, headers);
-    String returnedJson = client.getHttpResponseBody(response);
-
-    JSONArray jsonArr = new JSONArray(returnedJson);
-    logger.debug(jsonArr);
-    JSONObject jsonObject = jsonArr.getJSONObject(0);
-    return jsonObject;
+    int status = client.getStatus(response);
+    String body = client.getHttpResponseBody(response);
+    if (status == 404) return null;
+    if (status != 200) throw new IllegalStateException("Cannot resolve entity: HTTP " + status);
+    return new JSONObject(body);
   }
 
   /*

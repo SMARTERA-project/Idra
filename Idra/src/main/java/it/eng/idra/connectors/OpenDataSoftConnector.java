@@ -54,6 +54,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -260,6 +261,13 @@ public class OpenDataSoftConnector implements IodmsConnector {
     }
 
     List<String> documentation = new ArrayList<String>();
+    // Dataset attachments (PDF notes, data dictionaries) are its documentation (foaf:page).
+    if (ds.getDataset().getAttachements() != null) {
+      for (Object attachment : ds.getDataset().getAttachements()) {
+        String url = attachment instanceof Map ? asString(((Map<?, ?>) attachment).get("url")) : null;
+        if (url != null && !url.isBlank() && !documentation.contains(url)) documentation.add(url);
+      }
+    }
 
     // Frequency: prefer metas.dcat.accrualperiodicity, fall back to metas.default.update_frequency
     // (which may be a String or a list of strings)
@@ -310,11 +318,11 @@ public class OpenDataSoftConnector implements IodmsConnector {
       spatialCoverage.add(new DctLocation(null, null, null, bboxGeoJson, nodeId, null, null));
     }
 
-    // Temporal coverage: start/end as ISO strings, optional dct:temporal as URI on the period
+    // The period URI field is the relationship predicate, not the source temporal label.
     List<DctPeriodOfTime> temporalCoverage = new ArrayList<DctPeriodOfTime>();
     if ((dcatTemporalStart != null && !dcatTemporalStart.isEmpty())
         || (dcatTemporalEnd != null && !dcatTemporalEnd.isEmpty())) {
-      temporalCoverage.add(new DctPeriodOfTime(dcatTemporal,
+      temporalCoverage.add(new DctPeriodOfTime(org.apache.jena.vocabulary.DCTerms.temporal.getURI(),
           safeFixDate(dcatTemporalStart),
           safeFixDate(dcatTemporalEnd), nodeId, null, null));
     }
@@ -337,8 +345,8 @@ public class OpenDataSoftConnector implements IodmsConnector {
     String title = metadata.getTitle();
     String description = metadata.getDescription();
 
-    List<SkosConceptTheme> datasetTheme = extractConceptList(DCAT.theme.getURI(),
-        metadata.getTheme(), SkosConceptTheme.class);
+    List<SkosConceptTheme> datasetTheme = it.eng.idra.utils.SkosConceptFactory.build(DCAT.theme.getURI(),
+        metadata.getTheme(), SkosConceptTheme.class, nodeId, languages.size()==1?languages.get(0):"");
 
     // Publisher: name from metas.default.publisher, type enriched from metas.dcat.publisher_type
     Optional<String> publisherName = Optional.ofNullable(metadata.getPublisher());
@@ -379,6 +387,10 @@ public class OpenDataSoftConnector implements IodmsConnector {
         inSeries, qualifiedRelation, temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
 
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, new org.json.JSONObject(dcatMeta));
+    it.eng.idra.dcat.dump.DcatMetadataEnvelope.captureTyped(mapped, "OPENDATASOFT:" + nodeId + ":" + node.getHost());
+    it.eng.idra.dcat.dump.DcatMetadataEnvelope.recordTemporalValue(mapped, dcatTemporal);
+    it.eng.idra.dcat.dump.DcatMetadataEnvelope.recordSourceThemes(mapped, metadata.getTheme(), languages);
     return mapped;
   }
 
@@ -412,29 +424,35 @@ public class OpenDataSoftConnector implements IodmsConnector {
     Integer startIndex = 0;
     Integer totDatasets = 0;
     boolean repeat = false;
-    Set<DcatDataset> out = new HashSet<DcatDataset>();
+    Map<String, DcatDataset> out = new LinkedHashMap<>();
+    Integer expectedTotal = null;
 
     do {
-      String url = node.getHost().concat(datasetsPath).concat("?rows=100&start=")
+      String url = node.getHost().concat(datasetsPath).concat("?sort=dataset_id&rows=100&start=")
           .concat(String.valueOf(startIndex));
       logger.debug(url);
       String sjson = sendGetRequest(url);
       DatasetDto datasets = new Gson().fromJson(sjson, DatasetDto.class);
 
       if (datasets == null) {
-        logger.error("Received null datasets from API");
-        break;
+        throw new IllegalStateException("OpenDataSoft returned a null catalogue page");
       }
 
       totDatasets = datasets.getTotalCount();
+      if (totDatasets == null || totDatasets < 0) {
+        throw new IllegalStateException("OpenDataSoft returned an invalid total count");
+      }
+      if (expectedTotal == null) expectedTotal = totDatasets;
+      if (!expectedTotal.equals(totDatasets)) {
+        throw new IllegalStateException("OpenDataSoft catalogue changed during pagination; no deletion delta produced");
+      }
 
       if (startIndex == 0) {
         logger.info(totDatasets + " total datasets found");
       }
 
       if (datasets.getDatasets() == null) {
-        logger.warn("Received null datasets list from API");
-        break;
+        throw new IllegalStateException("OpenDataSoft returned a null dataset list");
       }
 
       Integer currentDatasetNumber = datasets.getDatasets().size();
@@ -443,14 +461,17 @@ public class OpenDataSoftConnector implements IodmsConnector {
         // No more datasets to process, break the loop
         break;
       }
-      datasets.getDatasets().forEach(d -> {
-        try {
-          out.add(datasetToDcat(d, node));
-        } catch (Exception e) {
-          logger.error("Error processing dataset: "
-              + (d != null && d.getDataset() != null ? d.getDataset().getDatasetId() : "null"), e);
+      for (Dataset source : datasets.getDatasets()) {
+        if (source == null || source.getDataset() == null || source.getDataset().getDatasetId() == null) {
+          throw new IllegalStateException("OpenDataSoft returned a dataset without identity");
         }
-      });
+        String identity = source.getDataset().getDatasetId();
+        if (out.containsKey(identity)) {
+          throw new IllegalStateException("OpenDataSoft returned duplicate pages; no deletion delta produced");
+        }
+        // Conversion failure must abort the fetch, never masquerade as a remote deletion.
+        out.put(identity, datasetToDcat(source, node));
+      }
 
       startIndex += currentDatasetNumber;
       logger.info(out.size() + " evaluated");
@@ -459,7 +480,11 @@ public class OpenDataSoftConnector implements IodmsConnector {
       logger.debug("repeat: " + repeat);
     } while (repeat);
 
-    return new ArrayList<DcatDataset>(out);
+    if (out.size() != expectedTotal) {
+      throw new IllegalStateException("OpenDataSoft catalogue is incomplete: expected "
+          + expectedTotal + " unique datasets, received " + out.size() + "; no deletion delta produced");
+    }
+    return new ArrayList<DcatDataset>(out.values());
   }
 
   /**

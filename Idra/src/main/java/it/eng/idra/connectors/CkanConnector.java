@@ -90,6 +90,10 @@ public class CkanConnector implements IodmsConnector {
   // parse with "Expected BEGIN_ARRAY but was STRING at path $.language".
   static {
     com.google.gson.Gson tolerant = new com.google.gson.GsonBuilder()
+        .setExclusionStrategies(new com.google.gson.ExclusionStrategy() {
+          public boolean shouldSkipField(com.google.gson.FieldAttributes field) { return false; }
+          public boolean shouldSkipClass(Class<?> type) { return type == java.lang.Package.class; }
+        })
         .registerTypeAdapter(
             new com.google.gson.reflect.TypeToken<java.util.List<String>>() {}.getType(),
             (com.google.gson.JsonDeserializer<java.util.List<String>>) (json, type, ctx) -> {
@@ -109,8 +113,48 @@ public class CkanConnector implements IodmsConnector {
               }
               return new java.util.ArrayList<>();
             })
+        // ckanext-dcat installations may serialise access_services as a JSON string
+        // (empty when the resource has none) instead of an array.
+        .registerTypeAdapter(
+            new com.google.gson.reflect.TypeToken<java.util.List<org.ckan.AccessService>>() {}.getType(),
+            (com.google.gson.JsonDeserializer<java.util.List<org.ckan.AccessService>>) (json, type, ctx) -> {
+              com.google.gson.JsonElement value = json;
+              if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+                String s = value.getAsString().trim();
+                if (!s.startsWith("[") && !s.startsWith("{")) return new java.util.ArrayList<>();
+                try {
+                  value = com.google.gson.JsonParser.parseString(s);
+                } catch (com.google.gson.JsonParseException e) {
+                  // The raw resource JSON stays in the metadata envelope.
+                  return new java.util.ArrayList<>();
+                }
+              }
+              if (value == null || value.isJsonNull()) return new java.util.ArrayList<>();
+              if (value.isJsonObject()) {
+                com.google.gson.JsonArray single = new com.google.gson.JsonArray();
+                single.add(value);
+                value = single;
+              }
+              java.util.List<org.ckan.AccessService> out = new java.util.ArrayList<>();
+              if (value.isJsonArray()) {
+                for (com.google.gson.JsonElement el : value.getAsJsonArray()) {
+                  if (el != null && el.isJsonObject()) out.add(ctx.deserialize(el, org.ckan.AccessService.class));
+                }
+              }
+              return out;
+            })
         .create();
-    org.ckan.Client.gson = tolerant;
+    org.ckan.Client.gson = new com.google.gson.GsonBuilder()
+        .registerTypeAdapter(org.ckan.Dataset.class, (com.google.gson.JsonDeserializer<org.ckan.Dataset>) (json, type, context) -> {
+          org.ckan.Dataset bean = tolerant.fromJson(json, org.ckan.Dataset.class);
+          it.eng.idra.utils.DcatJsonMetadata.remember(bean, json.toString());
+          com.google.gson.JsonArray resources = json.getAsJsonObject().getAsJsonArray("resources");
+          if (resources != null && bean.getResources() != null) {
+            for (int i=0;i<Math.min(resources.size(),bean.getResources().size());i++)
+              it.eng.idra.utils.DcatJsonMetadata.remember(bean.getResources().get(i),resources.get(i).toString());
+          }
+          return bean;
+        }).create();
   }
 
   /** The node id. */
@@ -368,6 +412,15 @@ public class CkanConnector implements IodmsConnector {
     String bbox = null;
     String centroid = null;
     String geom = null;
+    // DCAT-AP_IT / ckanext-spatial extras that had no conversion (plan50 connector trace).
+    List<String[]> extraPeriods = new ArrayList<String[]>();
+    String extraStart = null;
+    String extraEnd = null;
+    String creatorsJson = null;
+    String themesAggregate = null;
+    String responsibleParty = null;
+    String referenceSystem = null;
+    Map<String, String> bboxExtras = new HashMap<String, String>();
     String beginning = null;
     String end = null;
     List<String> applicableLegislation = new ArrayList<String>();
@@ -397,9 +450,14 @@ public class CkanConnector implements IodmsConnector {
               logger.info("OTHER IDENTIFIER: " + e.getValue() + " IS A JSON ARRAY");
               List<String> ids = new ArrayList<String>();
               JSONArray array = new JSONArray(e.getValue());
+              // DCAT-AP_IT emits [{"identifier": ..., "agent": ...}], ckanext-dcat plain strings.
               for (int i = 0; i < array.length(); i++) {
-                String identif = array.getJSONObject(i).getString("identifier");
-                if (!identif.equals("N/A") && !ids.contains(identif)) {
+                Object element = array.get(i);
+                String identif = element instanceof JSONObject
+                    ? ((JSONObject) element).optString("identifier", null)
+                    : element instanceof String ? (String) element : null;
+                if (StringUtils.isNotBlank(identif) && !identif.equals("N/A")
+                    && !ids.contains(identif)) {
                   ids.add(identif);
                 }
               }
@@ -496,6 +554,33 @@ public class CkanConnector implements IodmsConnector {
            * endDate = e.getValue();
            * break;
            */
+          case "temporal_coverage":
+            extraPeriods.addAll(periodsFromJson(e.getValue()));
+            break;
+          case "temporal_start":
+            extraStart = e.getValue();
+            break;
+          case "temporal_end":
+            extraEnd = e.getValue();
+            break;
+          case "creator":
+            creatorsJson = e.getValue();
+            break;
+          case "themes_aggregate":
+            themesAggregate = e.getValue();
+            break;
+          case "bbox-east-long":
+          case "bbox-west-long":
+          case "bbox-north-lat":
+          case "bbox-south-lat":
+            bboxExtras.put(e.getKey().toLowerCase(), e.getValue());
+            break;
+          case "responsible-party":
+            responsibleParty = e.getValue();
+            break;
+          case "spatial-reference-system":
+            referenceSystem = e.getValue();
+            break;
           case "dcat_type":
             type = e.getValue();
             break;
@@ -711,6 +796,13 @@ public class CkanConnector implements IodmsConnector {
         }
       }
 
+      // The "spatial" extra (GeoJSON) was read into "geometry" but the location was built from "geom" only.
+      if (StringUtils.isBlank(geom)) {
+        geom = geometry;
+      }
+      if (StringUtils.isBlank(bbox)) {
+        bbox = bboxFromExtras(bboxExtras);
+      }
       if (StringUtils.isNotBlank(geographicalIdentifier) || StringUtils.isNotBlank(geographicalName)
           || StringUtils.isNotBlank(geom) || StringUtils.isNotBlank(bbox) || StringUtils.isNotBlank(centroid)) {
         spatialCoverage = new DctLocation(DCTerms.spatial.getURI(), geographicalIdentifier,
@@ -730,6 +822,22 @@ public class CkanConnector implements IodmsConnector {
             temporalCoverageList.add(temporalCoverage);
           }
         }
+      }
+      // DCAT-AP_IT temporal_coverage / plain temporal_start-end extras, when the CKAN field is absent.
+      if (temporalCoverageList.isEmpty()) {
+        if (StringUtils.isNotBlank(extraStart) || StringUtils.isNotBlank(extraEnd)) {
+          extraPeriods.add(new String[] {extraStart, extraEnd});
+        }
+        for (String[] period : extraPeriods) {
+          temporalCoverageList.add(new DctPeriodOfTime(DCTerms.temporal.getURI(), period[0], period[1],
+              nodeId, beginning, end));
+        }
+      }
+      String referenceSystemIri = referenceSystemIri(referenceSystem);
+      if (referenceSystemIri != null) {
+        // GeoDCAT-AP: the coordinate reference system is a dct:conformsTo standard.
+        conformsTo.add(new DctStandard(DCTerms.conformsTo.getURI(), referenceSystemIri, "", "",
+            new ArrayList<String>(), nodeId));
       }
 
       /*
@@ -764,6 +872,9 @@ public class CkanConnector implements IodmsConnector {
           vcardHasEmail = d.getAuthor_email();
         }
       }
+      if (StringUtils.isBlank(vcardFn)) {
+        vcardFn = pointOfContact(responsibleParty);
+      }
 
       if (vcardUri != null || vcardFn != null || vcardHasEmail != null) {
         contactPointList.add(new VcardOrganization(DCAT.contactPoint.getURI(), vcardUri, vcardFn,
@@ -794,11 +905,22 @@ public class CkanConnector implements IodmsConnector {
             : Collections.emptyList(), creatorMbox,
             creatorHomepage, creatorType, creatorIdentifier, nodeId);
       }
+      if (creator == null) {
+        creator = creatorFromJson(creatorsJson, nodeId);
+      }
+      // DCAT-AP_IT themes_aggregate carries the EU theme codes when the theme extra is absent.
+      if (themeList.isEmpty() && StringUtils.isNotBlank(themesAggregate)) {
+        List<String> themes = new ArrayList<String>();
+        for (String code : themeCodes(themesAggregate)) {
+          themes.add(dcatThemes.getOrDefault(code, code));
+        }
+        themeList.addAll(extractConceptList(DCAT.theme.getURI(), themes, SkosConceptTheme.class));
+      }
       // License
       String licenseName = StringUtils.isNotBlank(d.getLicense_id()) ? d.getLicense_id()
-          : (StringUtils.isNotBlank(d.getLicense_title()) ? d.getLicense_title() : "unknown");
-      license = new DctLicenseDocument(d.getLicense_url(), licenseName, d.getLicense_id(), "",
-          nodeId);
+          : StringUtils.defaultString(d.getLicense_title());
+      // The licence id is a portal code, not an ADMS licence type: no type is derived from it.
+      license = new DctLicenseDocument(d.getLicense_url(), licenseName, "", "", nodeId);
 
       // Keywords
       if (d.getTags() != null) {
@@ -948,6 +1070,7 @@ public class CkanConnector implements IodmsConnector {
     publisher = null;
     contactPointList = null;
 
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, it.eng.idra.utils.DcatJsonMetadata.source(d));
     return mapped;
   }
 
@@ -1082,8 +1205,8 @@ public class CkanConnector implements IodmsConnector {
     accessUrl = downloadUrl = StringUtils.isNotBlank(r.getUrl()) ? r.getUrl() : datasetLandingPage;
     description = r.getDescription();
     format = r.getFormat();
-    String byteSize = null;
-    byteSize = String.valueOf(r.getSize());
+    JSONObject source = it.eng.idra.utils.DcatJsonMetadata.source(r);
+    String byteSize = resourceSize(source);
     SpdxChecksum checksum = null;
 
     String checksumValue = r.getHash();
@@ -1093,7 +1216,22 @@ public class CkanConnector implements IodmsConnector {
       checksumValue = obj.getString("content");
     }
 
-    checksum = new SpdxChecksum("http://spdx.org/rdf/terms#checksum", "checksumAlgorithm_sha1",
+    // CKAN's hash does not imply SHA-1. Only an explicit, well-formed prefix
+    // identifies an algorithm; keep unqualified digest values without guessing.
+    String checksumAlgorithm = "";
+    java.util.regex.Matcher declaredHash = java.util.regex.Pattern
+        .compile("(?i)^(md5|sha-?1|sha-?256|sha-?512):([0-9a-f]+)$")
+        .matcher(checksumValue == null ? "" : checksumValue.trim());
+    if (declaredHash.matches()) {
+      String name = declaredHash.group(1).replace("-", "").toLowerCase(java.util.Locale.ROOT);
+      int expectedLength = name.equals("md5") ? 32 : name.equals("sha1") ? 40
+          : name.equals("sha256") ? 64 : 128;
+      if (declaredHash.group(2).length() == expectedLength) {
+        checksumAlgorithm = "checksumAlgorithm_" + name;
+        checksumValue = declaredHash.group(2);
+      }
+    }
+    checksum = new SpdxChecksum("http://spdx.org/rdf/terms#checksum", checksumAlgorithm,
         checksumValue, nodeId);
     // documentation = r.get ?
     // language = r.get ?
@@ -1102,11 +1240,11 @@ public class CkanConnector implements IodmsConnector {
     mediaType = r.getMimetype();
     String releaseDate = null;
     releaseDate = StringUtils.isNotBlank(r.getCreated()) ? CommonUtil.fixBadUtcDate(r.getCreated())
-        : "1970-01-01T00:00:00Z";
+        : "";
     String updateDate = null;
     updateDate = StringUtils.isNotBlank(r.getLast_modified())
         ? CommonUtil.fixBadUtcDate(r.getLast_modified())
-        : "1970-01-01T00:00:00Z";
+        : "";
     // rights = r.get ?
     // status = r.get ?
     String title = null;
@@ -1161,13 +1299,46 @@ public class CkanConnector implements IodmsConnector {
     // logger.info("temporalResolution: " + r.getTemporal_resolution());
     temporalResolution = r.getTemporal_resolution();
 
-    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, datasetLicense, byteSize,
+    DctLicenseDocument license = resourceLicense(source, datasetLicense, nodeId);
+    DcatDistribution distribution = new DcatDistribution(nodeId, accessUrl, description, format, license, byteSize,
         checksum, new ArrayList<String>(), downloadUrl, new ArrayList<String>(),
         new ArrayList<DctStandard>(), mediaType, releaseDate, updateDate, null, null, title, accessService,
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);
     distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(distribution, source);
     return distribution;
+  }
+
+  /**
+   * DCAT-AP_IT resources (ckanext-dcatapit) carry the licence IRI of the distribution in
+   * "license_type", usually from the Italian licences vocabulary. Only an http(s) IRI identifies
+   * the licence; a plain code (for example "cc-by") keeps the dataset licence.
+   *
+   * @param resource       the raw resource
+   * @param datasetLicense the dataset licence
+   * @param nodeId         the node id
+   * @return the distribution licence
+   */
+  /** CKAN "size" as written by the source: an absent or null size is no size, not 0 bytes. */
+  public static String resourceSize(JSONObject resource) {
+    Object size = resource == null ? null : resource.opt("size");
+    if (size == null || JSONObject.NULL.equals(size)) {
+      return null;
+    }
+    return StringUtils.trimToNull(size.toString());
+  }
+
+  public static DctLicenseDocument resourceLicense(JSONObject resource,
+      DctLicenseDocument datasetLicense, String nodeId) {
+    String iri = resource == null ? "" : resource.optString("license_type", "").trim();
+    if (!iri.matches("(?i)https?://\\S+")) {
+      return datasetLicense;
+    }
+    // The dataset licence name may describe another licence (Genova: cc-by-sa dataset, CC BY 4.0
+    // resources): only the resource's own licence name goes with its IRI.
+    String name = resource.optString("license_id", "").trim();
+    return new DctLicenseDocument(iri, name, "", "", nodeId);
   }
 
   /*
@@ -1814,6 +1985,140 @@ public class CkanConnector implements IodmsConnector {
    *
    * @return the map
    */
+  /** DCAT-AP_IT temporal_coverage: [{"temporal_start": "...", "temporal_end": "..."}]; malformed values are skipped. */
+  static List<String[]> periodsFromJson(String value) {
+    List<String[]> periods = new ArrayList<String[]>();
+    if (!checkIfJsonArray(value)) {
+      return periods;
+    }
+    JSONArray array = new JSONArray(value);
+    for (int i = 0; i < array.length(); i++) {
+      JSONObject period = array.optJSONObject(i);
+      if (period == null) {
+        continue;
+      }
+      String start = StringUtils.trimToNull(period.optString("temporal_start", null));
+      String finish = StringUtils.trimToNull(period.optString("temporal_end", null));
+      if (start != null || finish != null) {
+        periods.add(new String[] {start, finish});
+      }
+    }
+    return periods;
+  }
+
+  /** ckanext-spatial bbox-* extras as a WKT polygon (DCAT-AP dcat:bbox); null unless all four are numbers. */
+  static String bboxFromExtras(Map<String, String> extras) {
+    try {
+      double west = Double.parseDouble(extras.get("bbox-west-long").trim());
+      double east = Double.parseDouble(extras.get("bbox-east-long").trim());
+      double south = Double.parseDouble(extras.get("bbox-south-lat").trim());
+      double north = Double.parseDouble(extras.get("bbox-north-lat").trim());
+      String w = extras.get("bbox-west-long").trim();
+      String e = extras.get("bbox-east-long").trim();
+      String s = extras.get("bbox-south-lat").trim();
+      String n = extras.get("bbox-north-lat").trim();
+      if (Double.isNaN(west + east + south + north)) {
+        return null;
+      }
+      return "POLYGON((" + w + " " + s + "," + e + " " + s + "," + e + " " + n + "," + w + " " + n + ","
+          + w + " " + s + "))";
+    } catch (RuntimeException missingOrInvalid) {
+      return null;
+    }
+  }
+
+  /** spatial-reference-system extra: an IRI as is, a bare EPSG code (e.g. "3004") as its OGC CRS IRI. */
+  static String referenceSystemIri(String value) {
+    String trimmed = StringUtils.trimToNull(value);
+    if (trimmed == null) {
+      return null;
+    }
+    if (trimmed.matches("^https?://\\S+$")) {
+      return trimmed;
+    }
+    java.util.regex.Matcher epsg = java.util.regex.Pattern.compile("^(?:EPSG:)?(\\d{4,6})$",
+        java.util.regex.Pattern.CASE_INSENSITIVE).matcher(trimmed);
+    return epsg.matches() ? "http://www.opengis.net/def/crs/EPSG/0/" + epsg.group(1) : null;
+  }
+
+  /** ISO responsible-party extra: name of the first pointOfContact. */
+  static String pointOfContact(String value) {
+    if (!checkIfJsonArray(value)) {
+      return null;
+    }
+    JSONArray parties = new JSONArray(value);
+    for (int i = 0; i < parties.length(); i++) {
+      JSONObject party = parties.optJSONObject(i);
+      if (party == null || StringUtils.isBlank(party.optString("name", null))) {
+        continue;
+      }
+      JSONArray roles = party.optJSONArray("roles");
+      if (roles != null && roles.toList().contains("pointOfContact")) {
+        return party.getString("name").trim();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * DCAT-AP_IT creator extra: [{"creator_name": "..." or {"it": "...", "en": "..."}, "creator_identifier": "..."}].
+   * The dataset bean holds one creator: the first named one (with every language variant of its name).
+   */
+  static FoafAgent creatorFromJson(String value, String nodeId) {
+    if (!checkIfJsonArray(value)) {
+      return null;
+    }
+    JSONArray creators = new JSONArray(value);
+    for (int i = 0; i < creators.length(); i++) {
+      JSONObject item = creators.optJSONObject(i);
+      if (item == null) {
+        continue;
+      }
+      List<String> names = new ArrayList<String>();
+      List<String> languages = new ArrayList<String>();
+      Object rawName = item.opt("creator_name");
+      if (rawName instanceof JSONObject) {
+        JSONObject localized = (JSONObject) rawName;
+        for (String language : new java.util.TreeSet<String>(localized.keySet())) {
+          String text = StringUtils.trimToNull(localized.optString(language, null));
+          if (text != null) {
+            names.add(text);
+            languages.add(language);
+          }
+        }
+      } else if (rawName instanceof String && StringUtils.isNotBlank((String) rawName)) {
+        names.add(((String) rawName).trim());
+        languages.add("");
+      }
+      String identifier = StringUtils.trimToNull(item.optString("creator_identifier", null));
+      if (names.isEmpty() && identifier == null) {
+        continue;
+      }
+      FoafAgent creator = new FoafAgent(DCTerms.creator.getURI(), null, names, null, null, null,
+          identifier, nodeId);
+      creator.setNameLanguages(languages);
+      return creator;
+    }
+    return null;
+  }
+
+  /** EU theme codes of a DCAT-AP_IT themes_aggregate value: [{"theme": "ECON", "subthemes": [...]}]. */
+  static List<String> themeCodes(String value) {
+    List<String> codes = new ArrayList<String>();
+    if (!checkIfJsonArray(value)) {
+      return codes;
+    }
+    JSONArray array = new JSONArray(value);
+    for (int i = 0; i < array.length(); i++) {
+      JSONObject item = array.optJSONObject(i);
+      String code = item == null ? null : StringUtils.trimToNull(item.optString("theme", null));
+      if (code != null && !codes.contains(code)) {
+        codes.add(code);
+      }
+    }
+    return codes;
+  }
+
   private static HashMap<String, String> dcatThemesMap() {
 
     HashMap<String, String> dcatThemes = new HashMap<String, String>();

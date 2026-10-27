@@ -1,0 +1,58 @@
+{
+ "accessLevel": "public",
+ "landingPage": "https://www.dati.friuliveneziagiulia.it/d/22k2-rbwv",
+ "issued": "2017-01-13",
+ "@type": "dcat:Dataset",
+ "modified": "2024-09-13",
+ "keyword": [
+  "aci",
+  "fvg",
+  "2015",
+  "classe veicoli",
+  "mobilità",
+  "pubblico registro automobilistico",
+  "pra",
+  "veicoli",
+  "inquinamento",
+  "motocicli",
+  "normativa euro",
+  "euro"
+ ],
+ "contactPoint": {
+  "@type": "vcard:Contact",
+  "fn": "Automobile Club d'Italia",
+  "hasEmail": "mailto:no-reply@www.dati.friuliveneziagiulia.it"
+ },
+ "publisher": {
+  "@type": "org:Organization",
+  "name": "www.dati.friuliveneziagiulia.it"
+ },
+ "identifier": "https://www.dati.friuliveneziagiulia.it/api/views/22k2-rbwv",
+ "description": "Numero motocicli circolanti nei Comuni della regione FVG suddivisi per normativa antinquinamento (EURO), dati al 31/12/2014",
+ "title": "Motocicli circolanti suddivisi per normativa antinquinamento (EURO) anno 2014",
+ "distribution": [
+  {
+   "@type": "dcat:Distribution",
+   "downloadURL": "https://www.dati.friuliveneziagiulia.it/api/v3/views/22k2-rbwv/export.csv?accessType=DOWNLOAD",
+   "mediaType": "text/csv"
+  },
+  {
+   "mediaType": "application/json",
+   "downloadURL": "https://www.dati.friuliveneziagiulia.it/api/v3/views/22k2-rbwv/query.json?accessType=DOWNLOAD",
+   "describedBy": "https://www.dati.friuliveneziagiulia.it/api/views/22k2-rbwv/columns.json",
+   "describedByType": "application/json",
+   "@type": "dcat:Distribution"
+  },
+  {
+   "mediaType": "application/xml",
+   "downloadURL": "https://www.dati.friuliveneziagiulia.it/api/v3/views/22k2-rbwv/query.xml?accessType=DOWNLOAD",
+   "describedBy": "https://www.dati.friuliveneziagiulia.it/api/views/22k2-rbwv/columns.xml",
+   "describedByType": "application/xml",
+   "@type": "dcat:Distribution"
+  }
+ ],
+ "license": "http://www.dati.gov.it/iodl/2.0/",
+ "theme": [
+  "Trasporti"
+ ]
+}

@@ -27,6 +27,7 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.PostLoad;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import org.apache.jena.rdf.model.Resource;
@@ -66,6 +67,15 @@ public class FoafAgent implements Serializable {
   // Mandatory
   // private DcatProperty name; //check, need to be list u dcat-apv3
   private List<DcatProperty> name;
+
+  /**
+   * Language tag of each name, aligned with {@link #name} ("" = none). A parallel field keeps the JSON "name"
+   * a list of strings for existing clients (portal, connectors).
+   */
+  private List<String> nameLanguage;
+
+  /** Persistent form of the names (dcat_agent_name: name, language); rebuilt from {@link #name} when absent. */
+  private transient List<AgentName> names;
 
   // Recommended
 
@@ -227,6 +237,7 @@ public class FoafAgent implements Serializable {
    *
    * @return the resource uri
    */
+  @Column(name = "resourceUri", columnDefinition = "TEXT")
   public String getResourceUri() {
     return resourceUri;
   }
@@ -260,13 +271,14 @@ public class FoafAgent implements Serializable {
    *
    * @return the list of names
    */
-  @LazyCollection(LazyCollectionOption.FALSE)
-  @ElementCollection
-  @CollectionTable(name = "dcat_agent_name", joinColumns = {
-      @JoinColumn(name = "agent_id", referencedColumnName = "agent_id"),
-      @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "name")) })
+  @Transient
   public List<DcatProperty> getName() {
+    // JSON readers fill the parallel language list, not the (transient) tag of each value.
+    if (name != null && nameLanguage != null && nameLanguage.size() == name.size()) {
+      for (int i = 0; i < name.size(); i++) {
+        if (name.get(i) != null && name.get(i).getLanguage() == null) name.get(i).setLanguage(nameLanguage.get(i));
+      }
+    }
     return name;
   }
 
@@ -278,7 +290,64 @@ public class FoafAgent implements Serializable {
   public void setName(List<DcatProperty> names) {
     if (names != null) {
       this.name = names;
+      this.names = null;
+      this.nameLanguage = languagesOf(names);
     }
+  }
+
+  /** Sets the language tag of each name, in order (null or "" = none). */
+  public void setNameLanguages(List<String> languages) {
+    if (name == null || languages == null) return;
+    for (int i = 0; i < name.size() && i < languages.size(); i++) {
+      if (name.get(i) != null) name.get(i).setLanguage(languages.get(i));
+    }
+    names = null;
+    nameLanguage = languagesOf(name);
+  }
+
+  @Transient
+  public List<String> getNameLanguage() {
+    return nameLanguage;
+  }
+
+  private static List<String> languagesOf(List<DcatProperty> values) {
+    if (values.stream().noneMatch(v -> v != null && v.getLanguage() != null)) return null;
+    return values.stream().map(v -> v == null || v.getLanguage() == null ? "" : v.getLanguage()).collect(Collectors.toList());
+  }
+
+  @LazyCollection(LazyCollectionOption.FALSE)
+  @ElementCollection
+  @CollectionTable(name = "dcat_agent_name", joinColumns = {
+      @JoinColumn(name = "agent_id", referencedColumnName = "agent_id"),
+      @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
+  public List<AgentName> getNames() {
+    if (names == null) {
+      names = new ArrayList<>();
+      List<DcatProperty> current = getName();
+      if (current != null) {
+        for (DcatProperty value : current) {
+          if (value != null) names.add(new AgentName(value.getValue(), value.getLanguage()));
+        }
+      }
+    }
+    return names;
+  }
+
+  public void setNames(List<AgentName> value) {
+    names = value;
+  }
+
+  @PostLoad
+  void loadNames() {
+    if (names == null) return;
+    List<DcatProperty> loaded = new ArrayList<>();
+    for (AgentName stored : names) {
+      DcatProperty value = new DcatProperty(FOAF.name, RDFS.Literal, stored.getValue());
+      value.setLanguage(stored.getLanguage());
+      loaded.add(value);
+    }
+    name = loaded;
+    nameLanguage = languagesOf(loaded);
   }
 
   /**
@@ -307,7 +376,9 @@ public class FoafAgent implements Serializable {
    * @return the homepage
    */
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "homepage")) })
+  // Source homepages can exceed 255 characters (dati.regione.umbria.it publisher_url, 337).
+  @AttributeOverrides({ @AttributeOverride(name = "value",
+      column = @Column(name = "homepage", columnDefinition = "TEXT")) })
   public DcatProperty getHomepage() {
     return homepage;
   }
@@ -385,6 +456,8 @@ public class FoafAgent implements Serializable {
     if (this.getName() != null && !this.getName().isEmpty()) {
       doc.addField("nameList", this.getName().stream().filter(item -> item != null)
           .map(item -> item.getValue()).collect(Collectors.toList()));
+      // Dynamic *_ss field, aligned with nameList ("" = no language).
+      if (nameLanguage != null) doc.addField("nameLanguage_ss", nameLanguage);
     }
 
     if (this.getMbox().getValue() != null)
@@ -415,6 +488,9 @@ public class FoafAgent implements Serializable {
         doc.getFieldValue("type") != null ? doc.getFieldValue("type").toString() : null,
         doc.getFieldValue("identifier") != null ? doc.getFieldValue("identifier").toString() : null, nodeId);
     f.setId(doc.getFieldValue("id") != null ? doc.getFieldValue("id").toString() : "");
+    if (doc.getFieldValues("nameLanguage_ss") != null) {
+      f.setNameLanguages(doc.getFieldValues("nameLanguage_ss").stream().map(String::valueOf).collect(Collectors.toList()));
+    }
     return f;
   }
 

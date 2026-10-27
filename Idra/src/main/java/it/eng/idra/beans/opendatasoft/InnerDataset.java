@@ -33,6 +33,8 @@ public class InnerDataset {
   private String datasetUid;
 
   /** The attachements. */
+  // The API key is "attachments"; the misspelled field name kept the list always empty.
+  @SerializedName(value = "attachments", alternate = { "attachements" })
   private List<Object> attachements;
 
   /** The has records. */

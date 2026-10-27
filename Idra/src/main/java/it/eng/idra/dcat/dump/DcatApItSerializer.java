@@ -31,7 +31,6 @@ import it.eng.idra.utils.CommonUtil;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
-import org.apache.jena.datatypes.xsd.impl.XSDDateType;
 import org.apache.jena.iri.IRI;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Property;
@@ -81,16 +80,19 @@ public class DcatApItSerializer extends DcatApSerializer {
    * @return the model
    */
   protected static Model addDatasetToModel(DcatDataset dataset, Model model) {
+    it.eng.idra.utils.NgsiDcatReader.restoreMetadata(dataset);
 
     // See DcatApSerializer.addDatasetToModel for the rationale behind the synthetic URN:
     // avoids collisions between the dataset URI and foaf:page/foaf:Document entries
     // that share the landingPage value.
-    String datasetUri = "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
+    String datasetUri = StringUtils.isNotBlank(dataset.getResourceUri()) ? dataset.getResourceUri()
+        : "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
     Resource datasetResource = model.createResource(datasetUri,
         model.createResource(DCATAP_IT_BASE_URI + "Dataset"));
 
     datasetResource.addProperty(RDF.type, DCAT.Dataset);
 
+    DcatRdfMetadata.write(dataset, datasetResource);
     addMultiLangTitleDescription(dataset.getDatasetDetails(),
         dataset.getTitle(), dataset.getDescription(), datasetResource, model);
 
@@ -168,10 +170,10 @@ public class DcatApItSerializer extends DcatApSerializer {
           .forEach(item -> {
             if (isValidUri(item.getValue())) {
               Resource resource = model.createResource(item.getValue());
-              datasetResource.addProperty(ResourceFactory.createProperty("https://www.w3.org/ns/prov#wasGeneratedBy"),
+              datasetResource.addProperty(ResourceFactory.createProperty("http://www.w3.org/ns/prov#wasGeneratedBy"),
                   resource);
             } else {
-              datasetResource.addProperty(ResourceFactory.createProperty("https://www.w3.org/ns/prov#wasGeneratedBy"),
+              datasetResource.addProperty(ResourceFactory.createProperty("http://www.w3.org/ns/prov#wasGeneratedBy"),
                   model.createLiteral(item.getValue()));
             }
           });
@@ -198,7 +200,7 @@ public class DcatApItSerializer extends DcatApSerializer {
             model.createResource(dataset.getTemporalResolution().getValue()));
       } else {
         datasetResource.addProperty(DCAT.temporalResolution,
-            model.createLiteral(dataset.getTemporalResolution().getValue()));
+            model.createTypedLiteral(dataset.getTemporalResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDduration));
       }
     }
 
@@ -233,14 +235,12 @@ public class DcatApItSerializer extends DcatApSerializer {
       }
     }
 
-    addDcatPropertyAsResource(dataset.getLandingPage(), datasetResource, model, false);
+    serializeLandingPage(dataset.getLandingPage(), datasetResource.getURI(), model, datasetResource);
 
     serializeLanguage(dataset.getLanguage(), model, datasetResource);
 
-    datasetResource.addProperty(dataset.getReleaseDate().getProperty(),
-        dataset.getReleaseDate().getValue(), XSDDateType.XSDdateTime);
-    datasetResource.addProperty(dataset.getUpdateDate().getProperty(),
-        dataset.getUpdateDate().getValue(), XSDDateType.XSDdateTime);
+    DcatRdfDates.add(datasetResource, dataset.getReleaseDate());
+    DcatRdfDates.add(datasetResource, dataset.getUpdateDate());
     datasetResource.addProperty(dataset.getIdentifier().getProperty(),
         dataset.getIdentifier().getValue());
 
@@ -262,44 +262,55 @@ public class DcatApItSerializer extends DcatApSerializer {
       addDistributionToModel(model, datasetResource, distribution);
     }
 
-    OdmsCatalogue node = nodeResources.get(new Integer(dataset.getNodeId()));
+    DcatMetadataEnvelope.write(dataset, datasetResource);
+
+    OdmsCatalogue node = nodeResources != null ? nodeResources.get(Integer.valueOf(dataset.getNodeId())) : null;
+    if (node == null) return model;
 
     /*
      * Add the Catalogue with the Dataset to the global Model
      */
-    model.createResource(node.getHost(), DCAT.Catalog).addLiteral(DCTerms.title, node.getName())
-        .addLiteral(DCTerms.description, node.getDescription())
-        .addProperty(DCAT.dataset, datasetResource)
-        .addProperty(DCTerms.issued, node.getRegisterDate().toString(), XSDDateType.XSDdateTime)
-        .addProperty(DCTerms.modified, node.getLastUpdateDate().toString(),
-            XSDDateType.XSDdateTime);
+    // The catalogue is described once per model; later datasets only add their membership link.
+    boolean described = model.contains(model.getResource(node.getHost()), RDF.type, DCAT.Catalog);
+    model.createResource(node.getHost(), DCAT.Catalog).addProperty(DCAT.dataset, datasetResource);
+    Resource catalogueResource = model.getResource(node.getHost());
+    if (!described) {
+      DcatRdfMetadata.writeCatalogue(node,catalogueResource);
+      catalogueResource.addLiteral(DCTerms.title, node.getName())
+          .addLiteral(DCTerms.description, node.getDescription());
+      DcatRdfDates.add(catalogueResource, DCTerms.issued,
+          node.getRegisterDate() == null ? null : node.getRegisterDate().toString());
+      DcatRdfDates.add(catalogueResource, DCTerms.modified,
+          node.getLastUpdateDate() == null ? null : node.getLastUpdateDate().toString());
 
-    /*
-     * ** Create the Publisher for the DCATCatalogue as a new FOAFAgent with info
-     * from the federated Catalogue
-     */
+      /*
+       * ** Create the Publisher for the DCATCatalogue as a new FOAFAgent with info
+       * from the federated Catalogue
+       */
 
-    String publisherResourceUri = node.getPublisherUrl();
-    if (StringUtils.isBlank(publisherResourceUri) || !isValidUri(publisherResourceUri)) {
+      String publisherResourceUri = node.getPublisherUrl();
+      if (StringUtils.isBlank(publisherResourceUri) || !isValidUri(publisherResourceUri)) {
 
-      if (!node.getHomepage().equalsIgnoreCase(node.getHost())) {
-        publisherResourceUri = node.getHomepage();
-      } else {
-        publisherResourceUri = node.getHomepage() + "/" + node.getId();
+        if (!node.getHomepage().equalsIgnoreCase(node.getHost())) {
+          publisherResourceUri = node.getHomepage();
+        } else {
+          publisherResourceUri = node.getHomepage() + "/" + node.getId();
+        }
       }
-    }
 
-    /*
-     * Check if the publisher is already present in the global Model and if any
-     * create it, either or both for dataset and catalog
-     */
-    // node.getPublisherName()
-    serializeFoafAgent(
-        new FoafAgent(DCTerms.publisher.getURI(), publisherResourceUri, node.getPublisherName() != null
-            ? Collections.singletonList(node.getPublisherName())
-            : Collections.emptyList(),
-            node.getPublisherEmail(), node.getPublisherUrl(), "", "", String.valueOf(node.getId())),
-        model, model.getResource(node.getHost()));
+      /*
+       * Check if the publisher is already present in the global Model and if any
+       * create it, either or both for dataset and catalog
+       */
+      // node.getPublisherName()
+      serializeFoafAgent(
+          new FoafAgent(DCTerms.publisher.getURI(), publisherResourceUri, node.getPublisherName() != null
+              ? Collections.singletonList(node.getPublisherName())
+              : Collections.emptyList(),
+              node.getPublisherEmail(), node.getPublisherUrl(), "", "", String.valueOf(node.getId())),
+          model, model.getResource(node.getHost()));
+      DcatCatalogueSource.write(node, catalogueResource);
+    }
 
     FoafAgent datasetPublisher = dataset.getPublisher();
     if (datasetPublisher != null) {
@@ -323,7 +334,7 @@ public class DcatApItSerializer extends DcatApSerializer {
    * @param model            the model
    * @param datasetResource  the dataset resource
    */
-  private static void serializeContactPoint(List<VcardOrganization> contactPointList, Model model,
+  protected static void serializeContactPoint(List<VcardOrganization> contactPointList, Model model,
       Resource datasetResource) {
 
     if (contactPointList != null && !contactPointList.isEmpty()) {
@@ -447,16 +458,12 @@ public class DcatApItSerializer extends DcatApSerializer {
       Resource datasetResource) {
 
     if (temporalCoverage != null) {
-      datasetResource.addProperty(model.createProperty(temporalCoverage.getUri()),
-          model.createResource(DctPeriodOfTime.getRdfClass())
-              .addProperty(startDateProp, temporalCoverage.getStartDate().getValue(),
-                  XSDDateType.XSDdate)
-              .addProperty(endDateProp, temporalCoverage.getEndDate().getValue(),
-                  XSDDateType.XSDdate)
-              .addProperty(beginningProp, temporalCoverage.getBeginning().getValue(),
-                  XSDDateType.XSDdate)
-              .addProperty(endProp, temporalCoverage.getEnd().getValue(),
-                  XSDDateType.XSDdate));
+      Resource period = model.createResource(DctPeriodOfTime.getRdfClass());
+      if (temporalCoverage.getStartDate() != null) DcatRdfDates.add(period, startDateProp, temporalCoverage.getStartDate().getValue());
+      if (temporalCoverage.getEndDate() != null) DcatRdfDates.add(period, endDateProp, temporalCoverage.getEndDate().getValue());
+      if (temporalCoverage.getBeginning() != null) DcatRdfDates.add(period, beginningProp, temporalCoverage.getBeginning().getValue());
+      if (temporalCoverage.getEnd() != null) DcatRdfDates.add(period, endProp, temporalCoverage.getEnd().getValue());
+      if (period.listProperties().hasNext()) datasetResource.addProperty(model.createProperty(temporalCoverage.getUri()), period);
     }
   }
 
@@ -470,7 +477,7 @@ public class DcatApItSerializer extends DcatApSerializer {
   private static void addDistributionToModel(Model model, Resource datasetResource,
       DcatDistribution distribution) {
 
-    Resource distResource = model.createResource(DcatDistribution.getRdfClass());
+    Resource distResource = model.createResource(StringUtils.isNotBlank(distribution.getResourceUri()) ? distribution.getResourceUri() : "urn:idra:distribution:" + distribution.getNodeId() + ":" + distribution.getId(), DcatDistribution.getRdfClass());
 
     addDcatPropertyAsResource(distribution.getAccessUrl(), distResource, model, false);
 
@@ -487,8 +494,7 @@ public class DcatApItSerializer extends DcatApSerializer {
 
     addDcatPropertyAsResource(distribution.getDownloadUrl(), distResource, model, false);
 
-    distResource.addProperty(distribution.getUpdateDate().getProperty(),
-        distribution.getUpdateDate().getValue(), XSDDateType.XSDdateTime);
+    DcatRdfDates.add(distResource, distribution.getUpdateDate());
 
     // Title (and description) already emitted near the top of this method via
     // addMultiLangTitleDescription, which preserves multilingual variants.
@@ -499,7 +505,9 @@ public class DcatApItSerializer extends DcatApSerializer {
     if (accessServices != null && !accessServices.isEmpty()) {
       for (DcatDataService service : accessServices) {
 
-        Resource serviceResource = model.createResource(DcatDataService.getRdfClass());
+        Resource serviceResource = model.createResource(StringUtils.isNotBlank(service.getResourceUri()) ? service.getResourceUri()
+            : "urn:idra:service:" + distribution.getNodeId() + ":" + service.getDataServiceId(), DcatDataService.getRdfClass());
+        DcatRdfMetadata.writeService(service, serviceResource);
 
         if (service.getEndpointURL() != null) {
           service.getEndpointURL().stream()
@@ -661,7 +669,7 @@ public class DcatApItSerializer extends DcatApSerializer {
             model.createResource(distribution.getTemporalResolution().getValue()));
       } else {
         distResource.addProperty(DCAT.temporalResolution,
-            model.createLiteral(distribution.getTemporalResolution().getValue()));
+            model.createTypedLiteral(distribution.getTemporalResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDduration));
       }
     }
     if (StringUtils.isNotBlank(distribution.getSpatialResolution().getValue())) {
@@ -670,7 +678,7 @@ public class DcatApItSerializer extends DcatApSerializer {
             model.createResource(distribution.getSpatialResolution().getValue()));
       } else {
         distResource.addProperty(DCAT.spatialResolutionInMeters,
-            model.createLiteral(distribution.getSpatialResolution().getValue()));
+            model.createTypedLiteral(distribution.getSpatialResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDdecimal));
       }
     }
 

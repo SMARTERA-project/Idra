@@ -151,6 +151,7 @@ public class DctStandard implements Serializable {
    *
    * @return the uri
    */
+  @Column(name = "uri", columnDefinition = "TEXT")
   public String getUri() {
     return uri;
   }
@@ -192,7 +193,7 @@ public class DctStandard implements Serializable {
    * @return the title
    */
   @Embedded
-  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "title")) })
+  @AttributeOverrides({ @AttributeOverride(name = "value", column = @Column(name = "title", columnDefinition = "TEXT")) })
   public DcatProperty getTitle() {
     return title;
   }
@@ -239,7 +240,7 @@ public class DctStandard implements Serializable {
       @JoinColumn(name = "standard_id", referencedColumnName = "standard_id"),
       @JoinColumn(name = "nodeID", referencedColumnName = "nodeID") })
   @AttributeOverrides({
-      @AttributeOverride(name = "value", column = @Column(name = "referenceDocumentation")) })
+      @AttributeOverride(name = "value", column = @Column(name = "referenceDocumentation", columnDefinition = "TEXT")) })
   public List<DcatProperty> getReferenceDocumentation() {
     return referenceDocumentation;
   }

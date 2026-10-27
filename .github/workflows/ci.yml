@@ -34,7 +34,7 @@ jobs:
     strategy:
       matrix:
         node-version:
-          - 12.x
+          - 24.22.1
     steps:
       - name: Git checkout
         uses: actions/checkout@v2

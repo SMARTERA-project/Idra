@@ -50,6 +50,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -62,6 +63,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.apache.commons.lang.StringUtils;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.XSDhexBinary;
 import org.apache.jena.datatypes.xsd.impl.XSDDateType;
 import org.apache.jena.iri.IRI;
@@ -69,6 +71,9 @@ import org.apache.jena.iri.IRIFactory;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.ResourceRequiredException;
 //import org.apache.jena.shared.BadURIException;
 import org.apache.jena.sparql.vocabulary.FOAF;
@@ -119,13 +124,43 @@ public class DcatApSerializer {
   public static final String GEO_BASE_URI_ALT = "http://geonames.org/";
 
   /** The Constant FORMAT_BASE_URI. */
-  public static final String FORMAT_BASE_URI = "http://publications.europa.eu/mdr/authority/file-type/";
+  public static final String FORMAT_BASE_URI = "http://publications.europa.eu/resource/authority/file-type/";
 
   /** The Constant FORMAT_BASE_URI. */
   public static final String MEDIATYPE_BASE_URI = "https://www.iana.org/assignments/media-types/";
 
   /** The Constant LICENSE_TYPE_BASE_URI. */
   public static final String LICENSE_TYPE_BASE_URI = "http://purl.org/adms/licencetype/";
+
+  /** Concepts of the ADMS licence type vocabulary (http://purl.org/adms/licencetype/). */
+  static final java.util.Set<String> ADMS_LICENCE_TYPES = new java.util.HashSet<>(Arrays.asList(
+      "Attribution", "GrantBack", "JurisdictionWithinTheEU", "KnownPatentEncumbrance",
+      "NoDerivativeWork", "NominalCost", "NonCommercialUseOnly", "OtherRestrictiveClauses",
+      "PublicDomain", "ReservedNames-Endorsement-Trademark", "RoyaltiesRequired", "UnknownIPR",
+      "ViralEffect-ShareAlike"));
+
+  /**
+   * Licence type as an IRI: an http(s) IRI as it is, an ADMS licence type code in its
+   * vocabulary. Anything else (for example a portal licence code such as "cc-by") is not a
+   * licence type and is not exported.
+   *
+   * @param value the stored licence type
+   * @return the licence type IRI, or null
+   */
+  static String licenceTypeUri(String value) {
+    if (StringUtils.isBlank(value)) {
+      return null;
+    }
+    String type = value.trim();
+    if (isValidUri(type)) {
+      return type;
+    }
+    return ADMS_LICENCE_TYPES.contains(type) ? LICENSE_TYPE_BASE_URI + type : null;
+  }
+
+  private static boolean isBlank(DcatProperty property) {
+    return property == null || StringUtils.isBlank(property.getValue());
+  }
 
   /** The logger. */
   protected static Logger logger = LogManager.getLogger(DcatApSerializer.class);
@@ -254,6 +289,7 @@ public class DcatApSerializer {
    * @return the model
    */
   protected static Model addDatasetToModel(DcatDataset dataset, Model model) {
+    it.eng.idra.utils.NgsiDcatReader.restoreMetadata(dataset);
 
     // Synthesize the dataset URI from its stable internal identifiers instead of
     // reusing the landingPage value. Reason: when the landingPage happens to also
@@ -263,9 +299,11 @@ public class DcatApSerializer {
     // type in the RDF/XML output, producing invalid DCAT-AP (the dataset is no
     // longer a dcat:Dataset). Consistent with the catalog URN scheme
     // (urn:idra:catalogue:<id>) already used elsewhere in the serializer.
-    String datasetUri = "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
+    String datasetUri = StringUtils.isNotBlank(dataset.getResourceUri()) ? dataset.getResourceUri()
+        : "urn:idra:dataset:" + dataset.getNodeId() + ":" + dataset.getId();
     Resource datasetResource = model.createResource(datasetUri, DCAT.Dataset);
 
+    DcatRdfMetadata.write(dataset, datasetResource);
     addMultiLangTitleDescription(dataset.getDatasetDetails(),
         dataset.getTitle(), dataset.getDescription(), datasetResource, model);
 
@@ -330,7 +368,7 @@ public class DcatApSerializer {
           .forEach(item -> addDcatPropertyAsResource(item, datasetResource, model, true));
     }
 
-    addDcatPropertyAsResource(dataset.getLandingPage(), datasetResource, model, false);
+    serializeLandingPage(dataset.getLandingPage(), datasetUri, model, datasetResource);
 
     // datasetResource.addProperty(model.createProperty(dataset.getLandingPage().getUri()),
     // model.createResource(dataset.getLandingPage().getRange())
@@ -349,10 +387,8 @@ public class DcatApSerializer {
       provenance.stream().forEach(item -> addDcatPropertyAsLiteral(item, datasetResource, model));
     }
 
-    addDcatPropertyAsTypedLiteral(dataset.getReleaseDate(), XSDDateType.XSDdateTime,
-        datasetResource, model);
-    addDcatPropertyAsTypedLiteral(dataset.getUpdateDate(), XSDDateType.XSDdateTime, datasetResource,
-        model);
+    DcatRdfDates.add(datasetResource, dataset.getReleaseDate());
+    DcatRdfDates.add(datasetResource, dataset.getUpdateDate());
 
     addDcatPropertyAsLiteral(dataset.getIdentifier(), datasetResource, model);
 
@@ -384,7 +420,7 @@ public class DcatApSerializer {
     addDcatPropertyAsLiteral(dataset.getVersion(), datasetResource, model);
 
     List<DcatProperty> versionNotes = dataset.getVersionNotes();
-    if (versionNotes != null) {
+    if (versionNotes != null && (dataset.getVersionNoteDetails() == null || dataset.getVersionNoteDetails().isEmpty())) {
       versionNotes.stream().forEach(item -> addDcatPropertyAsLiteral(item, datasetResource, model));
     }
 
@@ -419,10 +455,10 @@ public class DcatApSerializer {
           .forEach(item -> {
             if (isValidUri(item.getValue())) {
               Resource resource = model.createResource(item.getValue());
-              datasetResource.addProperty(ResourceFactory.createProperty("https://www.w3.org/ns/prov#wasGeneratedBy"),
+              datasetResource.addProperty(ResourceFactory.createProperty("http://www.w3.org/ns/prov#wasGeneratedBy"),
                   resource);
             } else {
-              datasetResource.addProperty(ResourceFactory.createProperty("https://www.w3.org/ns/prov#wasGeneratedBy"),
+              datasetResource.addProperty(ResourceFactory.createProperty("http://www.w3.org/ns/prov#wasGeneratedBy"),
                   model.createLiteral(item.getValue()));
             }
           });
@@ -449,7 +485,7 @@ public class DcatApSerializer {
             model.createResource(dataset.getTemporalResolution().getValue()));
       } else {
         datasetResource.addProperty(DCAT.temporalResolution,
-            model.createLiteral(dataset.getTemporalResolution().getValue()));
+            model.createTypedLiteral(dataset.getTemporalResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDduration));
       }
     }
 
@@ -488,7 +524,14 @@ public class DcatApSerializer {
       addDistributionToModel(model, datasetResource, distribution);
     }
 
-    OdmsCatalogue node = nodeResources.get(new Integer(dataset.getNodeId()));
+    // Dataset metadata must not depend on whether the enclosing catalogue was loaded.
+    if (dataset.getPublisher() != null) {
+      serializeFoafAgent(dataset.getPublisher(), model, datasetResource);
+    }
+    DcatMetadataEnvelope.write(dataset, datasetResource);
+
+    OdmsCatalogue node = nodeResources != null ? nodeResources.get(Integer.valueOf(dataset.getNodeId())) : null;
+    if (node == null) return model;
 
     /*
      * Add the Catalogue with the Dataset to the global Model.
@@ -502,12 +545,19 @@ public class DcatApSerializer {
     if (catalogueUri == null) {
       catalogueUri = "urn:idra:catalogue:" + node.getId();
     }
-    model.createResource(catalogueUri, DCAT.Catalog).addLiteral(DCTerms.title, node.getName())
-        .addLiteral(DCTerms.description, node.getDescription())
-        .addProperty(DCAT.dataset, datasetResource)
-        .addProperty(DCTerms.issued, node.getRegisterDate().toString(), XSDDateType.XSDdateTime)
-        .addProperty(DCTerms.modified, node.getLastUpdateDate().toString(),
-            XSDDateType.XSDdateTime);
+    // The catalogue is described once per model; later datasets only add their membership link.
+    boolean described = model.contains(model.getResource(catalogueUri), RDF.type, DCAT.Catalog);
+    model.createResource(catalogueUri, DCAT.Catalog).addProperty(DCAT.dataset, datasetResource);
+    if (described) return model;
+    DcatRdfMetadata.writeCatalogue(node,model.getResource(catalogueUri));
+    model.getResource(catalogueUri).addLiteral(DCTerms.title, node.getName());
+    if (StringUtils.isNotBlank(node.getDescription()))
+      model.getResource(catalogueUri).addLiteral(DCTerms.description, node.getDescription());
+    Resource catalogueResource = model.getResource(catalogueUri);
+    DcatRdfDates.add(catalogueResource, DCTerms.issued,
+        node.getRegisterDate() == null ? null : node.getRegisterDate().toString());
+    DcatRdfDates.add(catalogueResource, DCTerms.modified,
+        node.getLastUpdateDate() == null ? null : node.getLastUpdateDate().toString());
 
     /*
      * ** Create the Publisher for the DCATCatalogue as a new FOAFAgent with info
@@ -529,24 +579,12 @@ public class DcatApSerializer {
      * create it, either or both for dataset and catalog
      */
 
-    // serializeFoafAgent(
-    // new FoafAgent(DCTerms.publisher.getURI(), publisherResourceUri,
-    // node.getPublisherName(),
-    // node.getPublisherEmail(), node.getPublisherUrl(), "", "",
-    // String.valueOf(node.getId())),
-    // model, model.getResource(node.getHost()));
-
-    FoafAgent datasetPublisher = dataset.getPublisher();
-    if (datasetPublisher != null) {
-      if (StringUtils.isNotBlank(datasetPublisher.getResourceUri())
-          && isValidUri(datasetPublisher.getResourceUri())) {
-        serializeFoafAgent(datasetPublisher, model, datasetResource);
-      } else {
-        // Set blank URI for Dataset Publisher in order to create a blank node
-        datasetPublisher.setResourceUri("");
-        serializeFoafAgent(datasetPublisher, model, datasetResource);
-      }
+    if (StringUtils.isNotBlank(node.getPublisherName())) {
+      serializeFoafAgent(new FoafAgent(DCTerms.publisher.getURI(), publisherResourceUri,
+          java.util.Collections.singletonList(node.getPublisherName()), node.getPublisherEmail(),
+          node.getPublisherUrl(), "", "", String.valueOf(node.getId())), model, catalogueResource);
     }
+    DcatCatalogueSource.write(node, catalogueResource);
 
     return model;
 
@@ -565,6 +603,7 @@ public class DcatApSerializer {
       return;
     }
     for (DctPeriodOfTime period : temporalCoverage) {
+      if (period == null) continue;
       // Don't emit a <dct:PeriodOfTime> if all four date fields are blank — Jena would
       // otherwise write an empty literal with xsd:date datatype, producing invalid RDF.
       boolean hasStart = period.getStartDate() != null
@@ -582,22 +621,19 @@ public class DcatApSerializer {
 
       Resource periodResource = model.createResource(DctPeriodOfTime.getRdfClass());
       if (hasStart) {
-        periodResource.addProperty(period.getStartDate().getProperty(),
-            period.getStartDate().getValue(), XSDDateType.XSDdate);
+        DcatRdfDates.add(periodResource, period.getStartDate());
       }
       if (hasEnd) {
-        periodResource.addProperty(period.getEndDate().getProperty(),
-            period.getEndDate().getValue(), XSDDateType.XSDdate);
+        DcatRdfDates.add(periodResource, period.getEndDate());
       }
       if (hasBeginning) {
-        periodResource.addProperty(period.getBeginning().getProperty(),
-            period.getBeginning().getValue(), XSDDateType.XSDdate);
+        DcatRdfDates.add(periodResource, period.getBeginning());
       }
       if (hasEndPoint) {
-        periodResource.addProperty(period.getEnd().getProperty(),
-            period.getEnd().getValue(), XSDDateType.XSDdate);
+        DcatRdfDates.add(periodResource, period.getEnd());
       }
-      datasetResource.addProperty(model.createProperty(period.getUri()), periodResource);
+      datasetResource.addProperty(StringUtils.isBlank(period.getUri())
+          ? DCTerms.temporal : model.createProperty(period.getUri()), periodResource);
     }
   }
 
@@ -608,6 +644,25 @@ public class DcatApSerializer {
    * @param model           the model
    * @param parentResource  the parent resource
    */
+  private static final java.util.regex.Pattern WKT = java.util.regex.Pattern.compile(
+      "^\\s*(<[^>]+>\\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\\b.*",
+      java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL);
+
+  /** WKT and GeoJSON keep their GeoSPARQL datatype (DCAT-AP bbox/centroid/geometry); other encodings stay plain literals. */
+  private static void addGeometryLiteral(DcatProperty property, Resource target, Model model) {
+    String value = property.getValue();
+    String datatype = value == null ? null
+        : WKT.matcher(value).matches() ? "http://www.opengis.net/ont/geosparql#wktLiteral"
+        : value.trim().startsWith("{") && value.contains("\"type\"") && value.contains("\"coordinates\"")
+            ? "http://www.opengis.net/ont/geosparql#geoJSONLiteral" : null;
+    if (datatype != null) {
+      target.addLiteral(property.getProperty(), model.createTypedLiteral(value,
+          org.apache.jena.datatypes.TypeMapper.getInstance().getSafeTypeByName(datatype)));
+    } else {
+      addDcatPropertyAsLiteral(property, target, model);
+    }
+  }
+
   protected static void serializeSpatialCoverage(List<DctLocation> spatialCoverage, Model model,
       Resource parentResource) {
 
@@ -632,18 +687,25 @@ public class DcatApSerializer {
         continue;
       }
 
-      Resource spatialResource = model.createResource(DctLocation.getRdfClass());
-
+      String locationIri = null;
       if (hasGeoId) {
         String geoUri = location.getGeographicalIdentifier().getValue();
         if (IRIFactory.iriImplementation().create(geoUri).hasViolation(false)) {
           location.getGeographicalIdentifier().setValue(GEO_BASE_URI + geoUri);
         }
+        // An IRI identifier is the location itself (dct:spatial <IRI>), not a literal on an anonymous node.
+        String identifier = location.getGeographicalIdentifier().getValue();
+        if (identifier.matches("^(https?|urn):.+") && isValidUri(identifier)) locationIri = identifier;
+      }
+      Resource spatialResource = locationIri != null
+          ? model.createResource(locationIri, DctLocation.getRdfClass())
+          : model.createResource(DctLocation.getRdfClass());
+      if (hasGeoId && locationIri == null) {
         addDcatPropertyAsLiteral(location.getGeographicalIdentifier(), spatialResource, model);
       }
 
       if (hasGeometry) {
-        addDcatPropertyAsLiteral(location.getGeometry(), spatialResource, model);
+        addGeometryLiteral(location.getGeometry(), spatialResource, model);
       }
 
       // TODO Geographical Name as SKOS CONCEPT
@@ -652,13 +714,15 @@ public class DcatApSerializer {
       }
 
       if (hasBbox) {
-        addDcatPropertyAsLiteral(location.getBbox(), spatialResource, model);
+        addGeometryLiteral(location.getBbox(), spatialResource, model);
       }
       if (hasCentroid) {
-        addDcatPropertyAsLiteral(location.getCentroid(), spatialResource, model);
+        addGeometryLiteral(location.getCentroid(), spatialResource, model);
       }
 
-      parentResource.addProperty(model.createProperty(location.getUri()), spatialResource);
+      // JSON connectors can provide spatial coverage without an explicit predicate URI.
+      parentResource.addProperty(StringUtils.isBlank(location.getUri())
+          ? DCTerms.spatial : model.createProperty(location.getUri()), spatialResource);
     }
   }
 
@@ -675,15 +739,15 @@ public class DcatApSerializer {
     if (language != null) {
       language.stream().filter(lang -> StringUtils.isNotBlank(lang.getValue())).forEach(lang -> {
         try {
-          datasetResource.addProperty(lang.getProperty(),
-              model.createResource(iriFactory.construct(lang.getValue()).toURI().toString()));
+          datasetResource.addProperty(lang.getProperty(), model.createResource(
+              iriFactory.construct(lang.getValue()).toURI().toString(), DCTerms.LinguisticSystem));
         } catch (Exception e) {
           // iriFactory throws IRIException (not URISyntaxException) when the value
           // is a bare ISO 639 code like "eng"/"ukr"/"enc" — common from Zenodo and
           // other sources that store language codes rather than full IRIs. Fall back
           // to the EU authority vocabulary, which uses uppercase 3-letter codes.
-          datasetResource.addProperty(lang.getProperty(),
-              model.createResource(LANGUAGE_BASE_URI + lang.getValue().toUpperCase()));
+          datasetResource.addProperty(lang.getProperty(), model.createResource(
+              LANGUAGE_BASE_URI + languageCode(lang.getValue()), DCTerms.LinguisticSystem));
         }
       });
     }
@@ -699,16 +763,47 @@ public class DcatApSerializer {
   protected static void serializeFrequency(DcatProperty frequency, Model model,
       Resource datasetResource) {
 
-    try {
-      // Check if the value is a valid Frequency enum value
-      DctFrequency.valueOf(frequency.getValue());
-      datasetResource.addProperty(frequency.getProperty(),
-          model.createResource(FREQUENCY_BASE_URI + frequency.getValue()));
+    // No source frequency, no dct:accrualPeriodicity: Idra never writes UNKNOWN on its own.
+    String value = frequency == null || frequency.getValue() == null ? ""
+        : normalizeUri(frequency.getValue());
+    if (value.isEmpty()) {
+      return;
+    }
+    // A full authority IRI or its code (any case) are the same EU concept.
+    String code = value.startsWith(FREQUENCY_BASE_URI) ? value.substring(FREQUENCY_BASE_URI.length())
+        : value;
+    Resource target;
+    if (DctFrequency.isCode(code) || DctFrequency.isCode(code.toUpperCase(java.util.Locale.ROOT))) {
+      target = model.createResource(FREQUENCY_BASE_URI
+          + (DctFrequency.isCode(code) ? code : code.toUpperCase(java.util.Locale.ROOT)), DCTerms.Frequency);
+    } else if (DctFrequency.fromLabel(value) != null) {
+      target = model.createResource(FREQUENCY_BASE_URI + DctFrequency.fromLabel(value),
+          DCTerms.Frequency);
+    } else if (isValidUri(value) && value.matches("^[a-zA-Z][a-zA-Z0-9+.-]*:.*")) {
+      target = model.createResource(value, DCTerms.Frequency);
+    } else {
+      // Source text that is not a vocabulary code stays as the label of the frequency.
+      target = model.createResource(DCTerms.Frequency).addProperty(RDFS.label, value);
+    }
+    datasetResource.addProperty(DCTerms.accrualPeriodicity, target);
+  }
 
-    } catch (Exception e) {
-
-      datasetResource.addProperty(frequency.getProperty(),
-          model.createResource(FREQUENCY_BASE_URI + DctFrequency.UNKNOWN));
+  /**
+   * Serialize the landing page as a foaf:Document (DCAT-AP range), except when it is the dataset IRI
+   * itself: the dataset must stay a dcat:Dataset.
+   */
+  protected static void serializeLandingPage(DcatProperty landingPage, String datasetUri,
+      Model model, Resource datasetResource) {
+    String value = landingPage == null ? null : normalizeUri(landingPage.getValue());
+    if (StringUtils.isBlank(value)) {
+      return;
+    }
+    if (!isValidUri(value)) {
+      datasetResource.addProperty(DCAT.landingPage, model.createLiteral(landingPage.getValue()));
+    } else if (value.equals(datasetUri)) {
+      datasetResource.addProperty(DCAT.landingPage, model.createResource(value));
+    } else {
+      datasetResource.addProperty(DCAT.landingPage, model.createResource(value, FOAF.Document));
     }
   }
 
@@ -719,7 +814,7 @@ public class DcatApSerializer {
    * @param model            the model
    * @param datasetResource  the dataset resource
    */
-  private static void serializeContactPoint(List<VcardOrganization> contactPointList, Model model,
+  protected static void serializeContactPoint(List<VcardOrganization> contactPointList, Model model,
       Resource datasetResource) {
 
     if (contactPointList != null && !contactPointList.isEmpty()) {
@@ -735,8 +830,7 @@ public class DcatApSerializer {
           }
 
           // .addProperty(RDF.type, VCARD4.Kind)
-          contactPointR.addLiteral(contactPoint.getFn().getProperty(),
-              contactPoint.getFn().getValue());
+          addDcatPropertyAsLiteral(contactPoint.getFn(), contactPointR, model);
 
           // Fix hasEmail value if needed
           String hasEmailValue = contactPoint.getHasEmail().getValue();
@@ -786,8 +880,9 @@ public class DcatApSerializer {
           addDcatPropertyAsLiteral(name, agentResource, model);
         }
       }
-      addDcatPropertyAsLiteral(agent.getMbox(), agentResource, model);
-      addDcatPropertyAsLiteral(agent.getType(), agentResource, model);
+      // IRI values (mailto:, concept IRIs such as publisher types) stay IRIs; plain text stays text.
+      addDcatPropertyAsResource(agent.getMbox(), agentResource, model, false);
+      addDcatPropertyAsResource(agent.getType(), agentResource, model, false);
       addDcatPropertyAsLiteral(agent.getIdentifier(), agentResource, model);
       addDcatPropertyAsResource(agent.getHomepage(), agentResource, model, false);
 
@@ -874,7 +969,7 @@ public class DcatApSerializer {
   private static void addDistributionToModel(Model model, Resource datasetResource,
       DcatDistribution distribution) {
 
-    Resource distResource = model.createResource(DcatDistribution.getRdfClass());
+    Resource distResource = model.createResource(StringUtils.isNotBlank(distribution.getResourceUri()) ? distribution.getResourceUri() : "urn:idra:distribution:" + distribution.getNodeId() + ":" + distribution.getId(), DcatDistribution.getRdfClass());
 
     addDcatPropertyAsResource(distribution.getAccessUrl(), distResource, model, false);
 
@@ -903,17 +998,14 @@ public class DcatApSerializer {
 
     serializeDctStandard(distribution.getLinkedSchemas(), distResource, model);
 
-    // addDcatPropertyAsLiteral(distribution.getMediaType(), distResource, model);
-    addDcatPropertyAsResource(distribution.getMediaType(), distResource, model, true);
+    // mediaType was already exported by serializeMediaType above.
 
-    distResource.addProperty(distribution.getReleaseDate().getProperty(),
-        distribution.getReleaseDate().getValue(), XSDDateType.XSDdateTime);
-    distResource.addProperty(distribution.getUpdateDate().getProperty(),
-        distribution.getUpdateDate().getValue(), XSDDateType.XSDdateTime);
+    DcatRdfDates.add(distResource, distribution.getReleaseDate());
+    DcatRdfDates.add(distResource, distribution.getUpdateDate());
 
     // addDcatPropertyAsLiteral(distribution.getRights(), distResource, model);
 
-    if (isValidUri(distribution.getRights().getValue())) {
+    if (distribution.getRights() != null && isValidUri(distribution.getRights().getValue())) {
       addDcatPropertyAsResource(distribution.getRights(), distResource, model, true);
     } else {
       addDcatPropertyAsLiteral(distribution.getRights(), distResource, model);
@@ -935,7 +1027,9 @@ public class DcatApSerializer {
     if (accessServices != null && !accessServices.isEmpty()) {
       for (DcatDataService service : accessServices) {
 
-        Resource serviceResource = model.createResource(DcatDataService.getRdfClass());
+        Resource serviceResource = model.createResource(StringUtils.isNotBlank(service.getResourceUri()) ? service.getResourceUri()
+            : "urn:idra:service:" + distribution.getNodeId() + ":" + service.getDataServiceId(), DcatDataService.getRdfClass());
+        DcatRdfMetadata.writeService(service, serviceResource);
 
         if (service.getEndpointURL() != null) {
           service.getEndpointURL().stream()
@@ -1023,7 +1117,9 @@ public class DcatApSerializer {
               });
         }
 
-        addDcatPropertyAsLiteral(service.getTitle(), serviceResource, model);
+        if (!DcatRdfMetadata.hasDetails(service)) {
+          addDcatPropertyAsLiteral(service.getTitle(), serviceResource, model);
+        }
 
         // Link the distribution to the DataService
         distResource.addProperty(DCAT.accessService, serviceResource);
@@ -1055,7 +1151,7 @@ public class DcatApSerializer {
     // addDcatPropertyAsResource(distribution.getHasPolicy(), distResource, model,
     // false);
 
-    if (StringUtils.isNotBlank(distribution.getHasPolicy().getValue())) {
+    if (distribution.getHasPolicy() != null && StringUtils.isNotBlank(distribution.getHasPolicy().getValue())) {
       if (isValidUri(distribution.getHasPolicy().getValue())) {
         distResource.addProperty(model.createProperty("https://www.w3.org/ns/odrl/2/"),
             model.createResource(distribution.getHasPolicy().getValue()));
@@ -1065,7 +1161,7 @@ public class DcatApSerializer {
       }
     }
 
-    if (StringUtils.isNotBlank(distribution.getAvailability().getValue())) {
+    if (distribution.getAvailability() != null && StringUtils.isNotBlank(distribution.getAvailability().getValue())) {
       if (isValidUri(distribution.getAvailability().getValue())) {
         distResource.addProperty(DCATAP.availability,
             model.createResource(distribution.getAvailability().getValue()));
@@ -1074,7 +1170,7 @@ public class DcatApSerializer {
             model.createLiteral(distribution.getAvailability().getValue()));
       }
     }
-    if (StringUtils.isNotBlank(distribution.getCompressionFormat().getValue())) {
+    if (distribution.getCompressionFormat() != null && StringUtils.isNotBlank(distribution.getCompressionFormat().getValue())) {
       if (isValidUri(distribution.getCompressionFormat().getValue())) {
         distResource.addProperty(DCAT.compressFormat,
             model.createResource(distribution.getCompressionFormat().getValue()));
@@ -1083,7 +1179,7 @@ public class DcatApSerializer {
             model.createLiteral(distribution.getCompressionFormat().getValue()));
       }
     }
-    if (StringUtils.isNotBlank(distribution.getPackagingFormat().getValue())) {
+    if (distribution.getPackagingFormat() != null && StringUtils.isNotBlank(distribution.getPackagingFormat().getValue())) {
       if (isValidUri(distribution.getPackagingFormat().getValue())) {
         distResource.addProperty(DCAT.packageFormat,
             model.createResource(distribution.getPackagingFormat().getValue()));
@@ -1093,23 +1189,23 @@ public class DcatApSerializer {
       }
     }
 
-    if (StringUtils.isNotBlank(distribution.getTemporalResolution().getValue())) {
+    if (distribution.getTemporalResolution() != null && StringUtils.isNotBlank(distribution.getTemporalResolution().getValue())) {
       if (isValidUri(distribution.getTemporalResolution().getValue())) {
         distResource.addProperty(DCAT.temporalResolution,
             model.createResource(distribution.getTemporalResolution().getValue()));
       } else {
         distResource.addProperty(DCAT.temporalResolution,
-            model.createLiteral(distribution.getTemporalResolution().getValue()));
+            model.createTypedLiteral(distribution.getTemporalResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDduration));
       }
     }
 
-    if (StringUtils.isNotBlank(distribution.getSpatialResolution().getValue())) {
+    if (distribution.getSpatialResolution() != null && StringUtils.isNotBlank(distribution.getSpatialResolution().getValue())) {
       if (isValidUri(distribution.getSpatialResolution().getValue())) {
         distResource.addProperty(DCAT.spatialResolutionInMeters,
             model.createResource(distribution.getSpatialResolution().getValue()));
       } else {
         distResource.addProperty(DCAT.spatialResolutionInMeters,
-            model.createLiteral(distribution.getSpatialResolution().getValue()));
+            model.createTypedLiteral(distribution.getSpatialResolution().getValue(),org.apache.jena.datatypes.xsd.XSDDatatype.XSDdecimal));
       }
     }
 
@@ -1125,11 +1221,16 @@ public class DcatApSerializer {
    */
   protected static void serializeByteSize(DcatProperty property, Model model,
       Resource distResource) {
-
+    if (property == null || StringUtils.isBlank(property.getValue())) return;
     try {
-      distResource.addProperty(property.getProperty(),
-          model.createTypedLiteral(new BigDecimal(property.getValue())));
-    } catch (NumberFormatException e) {
+      // DCAT-AP: xsd:nonNegativeInteger. A fractional or negative size is not a byte count.
+      BigInteger size = new BigDecimal(property.getValue().trim()).toBigIntegerExact();
+      if (size.signum() < 0) {
+        return;
+      }
+      distResource.addProperty(DCAT.byteSize,
+          model.createTypedLiteral(size.toString(), XSDDatatype.XSDnonNegativeInteger));
+    } catch (NumberFormatException | ArithmeticException e) {
       logger.debug("The value: " + property.getValue() + " is not a valid byteSize - SKIPPED");
     }
   }
@@ -1144,14 +1245,20 @@ public class DcatApSerializer {
   protected static void serializeChecksum(SpdxChecksum checksum, Model model,
       Resource distResource) {
 
-    if (checksum != null) {
-      distResource.addProperty(model.createProperty(checksum.getUri()),
-          model.createResource(SpdxChecksum.getRdfClass())
-              .addProperty(checksum.getAlgorithm().getProperty(),
-                  checksum.getAlgorithm().getValue())
-              .addProperty(checksum.getChecksumValue().getProperty(),
-                  checksum.getChecksumValue().getValue(), XSDhexBinary.XSDhexBinary));
+    // Non-RDF connectors also create placeholder beans when no checksum was supplied.
+    if (checksum == null || checksum.getChecksumValue() == null
+        || StringUtils.isBlank(checksum.getChecksumValue().getValue())) return;
+    Resource value = model.createResource(SpdxChecksum.getRdfClass());
+    if (checksum.getAlgorithm() != null && StringUtils.isNotBlank(checksum.getAlgorithm().getValue())) {
+      String algorithm = checksum.getAlgorithm().getValue();
+      if (algorithm.startsWith("checksumAlgorithm_")) algorithm = "http://spdx.org/rdf/terms#" + algorithm;
+      org.apache.jena.rdf.model.Property predicate = model.createProperty("http://spdx.org/rdf/terms#algorithm");
+      if (isAbsoluteIri(algorithm)) value.addProperty(predicate, model.createResource(algorithm));
+      else value.addProperty(predicate, algorithm);
     }
+    value.addProperty(model.createProperty("http://spdx.org/rdf/terms#checksumValue"),
+        checksum.getChecksumValue().getValue(), XSDhexBinary.XSDhexBinary);
+    distResource.addProperty(model.createProperty("http://spdx.org/rdf/terms#checksum"), value);
   }
 
   /**
@@ -1166,26 +1273,30 @@ public class DcatApSerializer {
 
     if (license != null) {
 
-      String licenseTypeUri = null;
+      // The dct:license property IRI is the placeholder of an empty licence, never the licence.
+      String uri = DCTerms.license.getURI().equals(license.getUri()) ? null : license.getUri();
+      String licenseTypeUri = licenceTypeUri(license.getType() == null ? null
+          : license.getType().getValue());
+      if (StringUtils.isBlank(uri) && licenseTypeUri == null && isBlank(license.getName())
+          && isBlank(license.getVersionInfo())) {
+        return;
+      }
       Resource licenseResource = null;
 
       // Initialize license Resource
-      if (StringUtils.isNotBlank(license.getUri())) {
-        licenseResource = model.createResource(license.getUri(), DctLicenseDocument.getRdfClass());
+      if (StringUtils.isNotBlank(uri)) {
+        licenseResource = model.createResource(uri, DctLicenseDocument.getRdfClass());
       } else {
         licenseResource = model.createResource(DctLicenseDocument.getRdfClass());
       }
 
-      try {
-        licenseTypeUri = iriFactory.construct(license.getType().getValue()).toString();
-      } catch (Exception e) {
-        licenseTypeUri = LICENSE_TYPE_BASE_URI + license.getType().getValue();
-      }
-      license.getType().setValue(licenseTypeUri);
-
       addDcatPropertyAsLiteral(license.getName(), licenseResource, model);
       addDcatPropertyAsLiteral(license.getVersionInfo(), licenseResource, model);
-      addDcatPropertyAsResource(license.getType(), licenseResource, model, false);
+      if (licenseTypeUri != null) {
+        DcatProperty normalizedType = new DcatProperty(license.getType().getProperty(),
+            license.getType().getRange(), licenseTypeUri);
+        addDcatPropertyAsResource(normalizedType, licenseResource, model, false);
+      }
 
       // Add license Resource as property object of the parent Resource
       distResource.addProperty(model.createProperty(DCTerms.license.getURI()), licenseResource);
@@ -1202,11 +1313,77 @@ public class DcatApSerializer {
    */
   protected static void serializeFormat(DcatProperty format, Model model, Resource distResource) {
 
-    if (format != null && StringUtils.isNotBlank(format.getValue())) {
-      format.setValue(FORMAT_BASE_URI + format.getValue());
-      // addDcatPropertyAsResource(format, distResource, model, false);
-      addDcatPropertyAsResource(format, distResource, model, true);
+    if (format == null || StringUtils.isBlank(format.getValue())) {
+      return;
     }
+    String value = normalizeUri(format.getValue());
+    String euFileType = euFileType(value);
+    if (euFileType != null) {
+      distResource.addProperty(DCTerms.format,
+          model.createResource(euFileType, DCTerms.MediaTypeOrExtent));
+    } else if (isAbsoluteIri(value)) {
+      // An IRI written by the source is source data, even outside the EU vocabulary.
+      distResource.addProperty(DCTerms.format,
+          model.createResource(value, DCTerms.MediaTypeOrExtent));
+    } else {
+      // Source text that is no EU file type: never turned into a file-type IRI that does not exist.
+      distResource.addProperty(DCTerms.format, model.createResource(DCTerms.MediaTypeOrExtent)
+          .addProperty(RDFS.label, format.getValue().trim()));
+    }
+  }
+
+  /** EU file-type codes of the pinned DCAT-AP 3.0.1 vocabulary. */
+  private static final java.util.Set<String> EU_FILE_TYPES = loadCodes("/eu-file-types.txt");
+
+  /** Common source spellings of EU file types. */
+  private static final Map<String, String> FILE_TYPE_ALIASES = Map.of("TURTLE", "RDF_TURTLE",
+      "TTL", "RDF_TURTLE", "JSONLD", "JSON_LD", "WMS", "WMS_SRVC", "WFS", "WFS_SRVC",
+      "RDFXML", "RDF_XML");
+
+  private static java.util.Set<String> loadCodes(String resource) {
+    try (java.io.InputStream in = DcatApSerializer.class.getResourceAsStream(resource)) {
+      if (in == null) {
+        return java.util.Set.of();
+      }
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8).lines().map(String::trim)
+          .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+          .collect(Collectors.toUnmodifiableSet());
+    } catch (IOException e) {
+      return java.util.Set.of();
+    }
+  }
+
+  /**
+   * The EU file-type IRI of a source format (code or authority IRI, any case, with or without a
+   * leading dot); null when the vocabulary has no such concept.
+   */
+  static String euFileType(String format) {
+    if (StringUtils.isBlank(format)) {
+      return null;
+    }
+    String code = format.trim();
+    if (code.toLowerCase(java.util.Locale.ROOT).startsWith(FORMAT_BASE_URI)) {
+      code = code.substring(FORMAT_BASE_URI.length());
+    } else if (code.contains(":") || code.contains("/")) {
+      return null;
+    }
+    code = code.replaceFirst("^\\.", "").toUpperCase(java.util.Locale.ROOT).replace('-', '_')
+        .replace(' ', '_');
+    code = FILE_TYPE_ALIASES.getOrDefault(code, code);
+    return EU_FILE_TYPES.contains(code) ? FORMAT_BASE_URI + code : null;
+  }
+
+  /** EU language code (ISO 639 three letters, upper case) of a bare source code. */
+  static String languageCode(String code) {
+    String value = code.trim();
+    if (value.length() == 2) {
+      try {
+        return new java.util.Locale(value).getISO3Language().toUpperCase(java.util.Locale.ROOT);
+      } catch (java.util.MissingResourceException unknown) {
+        return value.toUpperCase(java.util.Locale.ROOT);
+      }
+    }
+    return value.toUpperCase(java.util.Locale.ROOT);
   }
 
   /**
@@ -1218,11 +1395,73 @@ public class DcatApSerializer {
    */
   protected static void serializeMediaType(DcatProperty mediatype, Model model, Resource distResource) {
 
-    if (mediatype != null && StringUtils.isNotBlank(mediatype.getValue())) {
-      mediatype.setValue(MEDIATYPE_BASE_URI + mediatype.getValue());
-      // addDcatPropertyAsResource(format, distResource, model, false);
-      addDcatPropertyAsResource(mediatype, distResource, model, true);
+    if (mediatype == null || StringUtils.isBlank(mediatype.getValue())) {
+      return;
     }
+    String value = normalizeUri(mediatype.getValue());
+    String iana = ianaMediaType(value);
+    if (iana != null) {
+      distResource.addProperty(DCAT.mediaType, model.createResource(iana, DCTerms.MediaType));
+    } else if (isAbsoluteIri(value)) {
+      distResource.addProperty(DCAT.mediaType, model.createResource(value, DCTerms.MediaType));
+    } else {
+      // Never a media-types/<text> IRI that IANA does not register.
+      distResource.addProperty(DCAT.mediaType, model.createResource(DCTerms.MediaType)
+          .addProperty(RDFS.label, mediatype.getValue().trim()));
+    }
+  }
+
+  /** IANA types of the format codes some sources (OpenDataSoft) write as media type. */
+  private static final Map<String, String> MEDIA_TYPE_CODES = Map.ofEntries(
+      Map.entry("rdfxml", "application/rdf+xml"), Map.entry("turtle", "text/turtle"),
+      Map.entry("n3", "text/n3"), Map.entry("jsonld", "application/ld+json"),
+      Map.entry("geojson", "application/geo+json"), Map.entry("json", "application/json"),
+      Map.entry("csv", "text/csv"), Map.entry("xls", "application/vnd.ms-excel"),
+      Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+      Map.entry("kml", "application/vnd.google-earth.kml+xml"),
+      Map.entry("gpx", "application/gpx+xml"), Map.entry("parquet", "application/vnd.apache.parquet"),
+      Map.entry("jsonl", "application/jsonl"), Map.entry("shp", "application/vnd.shp"),
+      Map.entry("pdf", "application/pdf"), Map.entry("xml", "application/xml"),
+      Map.entry("zip", "application/zip"));
+
+  /**
+   * The IANA IRI of a media type given as "type/subtype", as an IANA IRI or as one of the format codes
+   * above; null for anything else.
+   */
+  static String ianaMediaType(String value) {
+    if (StringUtils.isBlank(value)) {
+      return null;
+    }
+    String text = value.trim();
+    // An IANA IRI written by the source (http or https) is kept as it is.
+    for (String base : List.of(MEDIATYPE_BASE_URI, "http://www.iana.org/assignments/media-types/")) {
+      if (text.startsWith(base)) {
+        return text.substring(base.length()).matches("^[a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+$") ? text : null;
+      }
+    }
+    text = MEDIA_TYPE_CODES.getOrDefault(text.toLowerCase(java.util.Locale.ROOT), text);
+    return text.matches("^[a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+$")
+        ? MEDIATYPE_BASE_URI + text.toLowerCase(java.util.Locale.ROOT) : null;
+  }
+
+  /** Keep source IRIs intact and never modify the persisted/cached bean while exporting. */
+  private static void serializeVocabularyValue(DcatProperty property, String base,
+      Model model, Resource distribution) {
+    String value = normalizeUri(property.getValue());
+    // An absolute identifier is source data even when its vocabulary is unknown.
+    // Legacy short codes keep the existing expansion; membership is audited separately.
+    String uri = value.matches("^[a-zA-Z][a-zA-Z0-9+.-]*:.*") ? value : base + value;
+    try {
+      if (new URI(uri).isAbsolute() && !iriFactory.create(uri).hasViolation(false)) {
+        Resource resource = property.getRange() == null ? model.createResource(uri)
+            : model.createResource(uri, property.getRange());
+        distribution.addProperty(property.getProperty(), resource);
+        return;
+      }
+    } catch (URISyntaxException invalid) {
+      // Preserve invalid source text without claiming an IRI or an authority code.
+    }
+    distribution.addProperty(property.getProperty(), model.createLiteral(property.getValue()));
   }
 
   /**
@@ -1239,21 +1478,33 @@ public class DcatApSerializer {
       standardList.stream().filter(standard -> standard != null).forEach(standard -> {
 
         Resource standardResource = null;
+        // Connectors use the dct:conformsTo property IRI as a placeholder "uri" and keep the
+        // standard IRI in "identifier": the placeholder is never the standard itself.
+        String uri = DCTerms.conformsTo.getURI().equals(standard.getUri()) ? null
+            : standard.getUri();
+        String identifier = standard.getIdentifier() == null ? null
+            : standard.getIdentifier().getValue();
+        if (StringUtils.isBlank(uri) && isValidUri(identifier)) {
+          uri = identifier.trim();
+        }
 
-        if (StringUtils.isNotBlank(standard.getUri())) {
-          standardResource = model.createResource(standard.getUri(), DctStandard.getRdfClass());
+        if (StringUtils.isNotBlank(uri)) {
+          standardResource = model.createResource(uri, DctStandard.getRdfClass());
         } else {
           standardResource = model.createResource(DctStandard.getRdfClass());
         }
 
-        standardResource
-            .addLiteral(standard.getDescription().getProperty(),
-                standard.getDescription().getValue())
-            .addLiteral(standard.getIdentifier().getProperty(), standard.getIdentifier().getValue())
-            .addLiteral(standard.getTitle().getProperty(), standard.getTitle().getValue());
+        for (DcatProperty p : Arrays.asList(standard.getDescription(), standard.getIdentifier(),
+            standard.getTitle())) {
+          if (p != null && StringUtils.isNotBlank(p.getValue())) {
+            standardResource.addLiteral(p.getProperty(), p.getValue());
+          }
+        }
 
         for (DcatProperty p : standard.getReferenceDocumentation()) {
-          standardResource.addProperty(p.getProperty(), p.getValue(), XSDDateType.XSDanyURI);
+          if (p != null && StringUtils.isNotBlank(p.getValue())) {
+            standardResource.addProperty(p.getProperty(), p.getValue(), XSDDateType.XSDanyURI);
+          }
         }
 
         parentResource.addProperty(DCTerms.conformsTo, standardResource);
@@ -1278,7 +1529,7 @@ public class DcatApSerializer {
    */
   protected static void addDcatPropertyAsResource(DcatProperty property, Resource parentResource,
       Model model, boolean useRange) {
-
+    if (property == null) return;
     if (StringUtils.isNotBlank(property.getValue())) {
       String normalizedUri = normalizeUri(property.getValue());
       try {
@@ -1316,7 +1567,7 @@ public class DcatApSerializer {
    */
   protected static void addDcatPropertyAsLiteral(DcatProperty property, Resource parentResource,
       Model model) {
-
+    if (property == null) return;
     // Add the property as literal value
     if (StringUtils.isNotBlank(property.getValue())) {
       String value = property.getValue();
@@ -1324,7 +1575,8 @@ public class DcatApSerializer {
       logger.info("Value: " + value);
       logger.info("Property: " + property.getProperty());
       logger.info("Property Value: " + property.getValue());
-      parentResource.addProperty(property.getProperty(), model.createLiteral(property.getValue()));
+      parentResource.addProperty(property.getProperty(), property.getLanguage() != null
+          ? model.createLiteral(property.getValue(), property.getLanguage()) : model.createLiteral(property.getValue()));
     }
   }
 
@@ -1371,14 +1623,14 @@ public class DcatApSerializer {
           }
         }
       }
-      // Ensure the canonical (no-lang) title/description from the fallback property is
-      // present too — but only if no detail row already covered the same value.
+      // The display fallback has no language metadata. Use it only when that
+      // field has no detail values; otherwise it would invent a plain literal.
       if (fallbackTitle != null && StringUtils.isNotBlank(fallbackTitle.getValue())
-          && titleLangs.add("|" + fallbackTitle.getValue())) {
+          && titleLangs.isEmpty()) {
         parentResource.addProperty(DCTerms.title, model.createLiteral(fallbackTitle.getValue()));
       }
       if (fallbackDescription != null && StringUtils.isNotBlank(fallbackDescription.getValue())
-          && descLangs.add("|" + fallbackDescription.getValue())) {
+          && descLangs.isEmpty()) {
         parentResource.addProperty(DCTerms.description,
             model.createLiteral(fallbackDescription.getValue()));
       }
@@ -1410,13 +1662,111 @@ public class DcatApSerializer {
   }
 
   /**
+   * DCAT-AP 3.0.1 ranges: an object of one of these properties is an instance of the range class.
+   * Agents and concepts are left out: their class brings mandatory names and labels that a source
+   * without them cannot provide.
+   */
+  private static final Map<Property, Resource> RANGE_CLASSES = Map.ofEntries(
+      Map.entry(DCTerms.language, DCTerms.LinguisticSystem),
+      Map.entry(DCTerms.format, DCTerms.MediaTypeOrExtent),
+      Map.entry(DCAT.mediaType, DCTerms.MediaType),
+      Map.entry(ResourceFactory.createProperty(DCAT.NS + "compressFormat"), DCTerms.MediaType),
+      Map.entry(ResourceFactory.createProperty(DCAT.NS + "packageFormat"), DCTerms.MediaType),
+      Map.entry(DCTerms.accrualPeriodicity, DCTerms.Frequency),
+      Map.entry(DCTerms.license, DCTerms.LicenseDocument),
+      Map.entry(DCTerms.rights, DCTerms.RightsStatement),
+      Map.entry(DCTerms.accessRights, DCTerms.RightsStatement),
+      Map.entry(DCAT.landingPage, FOAF.Document),
+      Map.entry(FOAF.page, FOAF.Document),
+      Map.entry(FOAF.homepage, FOAF.Document),
+      Map.entry(DCTerms.spatial, DCTerms.Location),
+      Map.entry(DCTerms.temporal, DCTerms.PeriodOfTime),
+      Map.entry(DCTerms.conformsTo, DCTerms.Standard),
+      Map.entry(DCTerms.provenance, DCTerms.ProvenanceStatement),
+      Map.entry(ResourceFactory.createProperty("http://www.w3.org/ns/adms#identifier"),
+          ResourceFactory.createResource("http://www.w3.org/ns/adms#Identifier")),
+      Map.entry(ResourceFactory.createProperty("http://spdx.org/rdf/terms#checksum"),
+          ResourceFactory.createResource("http://spdx.org/rdf/terms#Checksum")));
+
+  /** Object properties whose DCAT-AP range is a class, often written as plain text by the sources. */
+  private static final Map<Property, Resource> TEXT_AS_NODE = Map.of(
+      DCTerms.accrualPeriodicity, DCTerms.Frequency,
+      DCTerms.accessRights, DCTerms.RightsStatement,
+      DCTerms.rights, DCTerms.RightsStatement,
+      DCTerms.provenance, DCTerms.ProvenanceStatement,
+      DCTerms.license, DCTerms.LicenseDocument,
+      DCTerms.format, DCTerms.MediaTypeOrExtent,
+      DCAT.mediaType, DCTerms.MediaType);
+
+  /**
+   * Text values of the properties above become what DCAT-AP expects, with the same content: an EU
+   * file type or IANA media type when the text is one, otherwise a node of the range class labelled
+   * with the text. Nothing is added or guessed beyond the text itself.
+   */
+  static void literalsToNodes(Model model) {
+    TEXT_AS_NODE.forEach((property, range) -> {
+      for (Statement st : model.listStatements(null, property, (RDFNode) null).toList()) {
+        if (!st.getObject().isLiteral()) {
+          continue;
+        }
+        String text = st.getLiteral().getLexicalForm().trim();
+        model.remove(st);
+        if (text.isEmpty()) {
+          continue;
+        }
+        String iri = property.equals(DCTerms.format) ? euFileType(text)
+            : property.equals(DCTerms.accrualPeriodicity) && DctFrequency.fromLabel(text) != null
+                ? FREQUENCY_BASE_URI + DctFrequency.fromLabel(text)
+            : property.equals(DCAT.mediaType) ? ianaMediaType(text) : null;
+        boolean described = iri == null && model.listObjectsOfProperty(st.getSubject(), property)
+            .toList().stream().anyMatch(o -> o.isResource()
+                && o.asResource().hasProperty(RDFS.label, text));
+        if (iri != null) {
+          st.getSubject().addProperty(property, model.createResource(iri, range));
+        } else if (!described) {
+          st.getSubject().addProperty(property, model.createResource(range).addProperty(RDFS.label, text));
+        }
+      }
+    });
+  }
+
+  /**
+   * Gives untyped objects of the properties above their DCAT-AP range class. Source triples copied
+   * from the metadata envelope keep their values but often omit these classes.
+   */
+  static void addRangeClasses(Model model) {
+    literalsToNodes(model);
+    List<Statement> missing = new java.util.ArrayList<>();
+    RANGE_CLASSES.forEach((property, range) -> model.listStatements(null, property, (RDFNode) null)
+        .forEachRemaining(st -> {
+          if (st.getObject().isResource() && !st.getResource().hasProperty(RDF.type)) {
+            missing.add(model.createStatement(st.getResource(), RDF.type, range));
+          }
+        }));
+    model.add(missing);
+    // A source byte size written as text ("7753606") is the same number: DCAT-AP types it as
+    // xsd:nonNegativeInteger. Other values are left as they are.
+    List<Statement> sizes = model.listStatements(null, DCAT.byteSize, (RDFNode) null).toList();
+    for (Statement st : sizes) {
+      if (st.getObject().isLiteral()
+          && !XSDDatatype.XSDnonNegativeInteger.getURI().equals(st.getLiteral().getDatatypeURI())
+          && st.getLiteral().getLexicalForm().trim().matches("\\d+")) {
+        model.remove(st);
+        model.add(st.getSubject(), DCAT.byteSize, model.createTypedLiteral(
+            new BigInteger(st.getLiteral().getLexicalForm().trim()).toString(),
+            XSDDatatype.XSDnonNegativeInteger));
+      }
+    }
+  }
+
+  /**
    * Write model to string.
    *
    * @param model  the model
    * @param format the format
    * @return the string
    */
-  private static String writeModelToString(Model model, DcatApFormat format) {
+  static String writeModelToString(Model model, DcatApFormat format) {
 
     StringWriter outputWriter = new StringWriter();
     model.write(outputWriter, format.formatName());
@@ -1535,6 +1885,10 @@ public class DcatApSerializer {
         .collect(Collectors.toMap(OdmsCatalogue::getId, node -> node));
 
     Model model = datasetsToModel(result.getResults(), profile);
+    // FILE is the complete federation export; paged search results stay scoped to their matches.
+    if(writeType.equals(DcatApWriteType.FILE)) for(OdmsCatalogue node:nodeResources.values())
+      if(Boolean.TRUE.equals(node.isActive())) addStandaloneCatalogueToModel(node,model);
+    addRangeClasses(model);
 
     model.setNsPrefix("co", "http://purl.org/ontology/co/core#");
     model.createResource("http://purl.org/ontology/co/core#Counter")
@@ -1576,6 +1930,9 @@ public class DcatApSerializer {
         .collect(Collectors.toMap(OdmsCatalogue::getId, node -> node));
 
     Model model = datasetsToModel(result.getResults(), profile);
+    OdmsCatalogue node=nodeResources.get(Integer.valueOf(nodeId));
+    if(node!=null) addStandaloneCatalogueToModel(node,model);
+    addRangeClasses(model);
 
     model.setNsPrefix("co", "http://purl.org/ontology/co/core#");
     model.createResource("http://purl.org/ontology/co/core#Counter")
@@ -1606,6 +1963,12 @@ public class DcatApSerializer {
    * @param uri the uri
    * @return true, if is valid uri
    */
+  public static void addStandaloneCatalogueToModel(OdmsCatalogue node,Model model) {
+    if(node.getStandaloneRdf()==null || node.getStandaloneRdf().isBlank()) return;
+    org.apache.jena.riot.RDFParser.fromString(node.getStandaloneRdf())
+        .lang(org.apache.jena.riot.Lang.TURTLE).parse(model);
+  }
+
   protected static boolean isValidUri(String uri) {
     if (uri == null || uri.trim().isEmpty()) {
       return false;

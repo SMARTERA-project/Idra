@@ -377,6 +377,22 @@ public class SpodConnector implements IodmsConnector {
    */
 
   /**
+   * Parses a SPOD dataset and keeps each resource's raw JSON: values the bean cannot represent
+   * (an absent size) stay absent.
+   */
+  public static SpodDataset parseDataset(String body) throws GsonUtilException {
+    SpodDataset dataset = GsonUtil.json2Obj(body, GsonUtil.spodDatasetType);
+    org.json.JSONArray resources = new org.json.JSONObject(body).optJSONArray("resources");
+    if (dataset != null && resources != null && dataset.getResources() != null) {
+      for (int i = 0; i < Math.min(resources.length(), dataset.getResources().size()); i++) {
+        it.eng.idra.utils.DcatJsonMetadata.remember(dataset.getResources().get(i),
+            resources.get(i).toString());
+      }
+    }
+    return dataset;
+  }
+
+  /**
    * Gets the ckan dataset.
    *
    * @param id the id
@@ -394,7 +410,7 @@ public class SpodConnector implements IodmsConnector {
     body = normalizeJsonArrayField(body, "language");
     //
     if (status == 200) {
-      return GsonUtil.json2Obj(body, GsonUtil.spodDatasetType);//client.getHttpResponseBody(response)
+      return parseDataset(body);
     } else {
       return null;
     }
@@ -878,10 +894,10 @@ public class SpodConnector implements IodmsConnector {
             creatorHomepage, creatorType, creatorIdentifier, nodeId);
       }
       // License
-      String licenseName = StringUtils.isNotBlank(d.getLicense_id()) ? d.getLicense_id()
-          : (StringUtils.isNotBlank(d.getLicense_title()) ? d.getLicense_title() : "unknown");
-      license = new DctLicenseDocument(d.getLicense_url(), licenseName, d.getLicense_id(), "",
-          nodeId);
+      String licenseName = StringUtils.isNotBlank(d.getLicense_title()) ? d.getLicense_title()
+          : StringUtils.defaultString(d.getLicense_id());
+      // The licence id is a portal code, not an ADMS licence type: no type is derived from it.
+      license = new DctLicenseDocument(d.getLicense_url(), licenseName, "", "", nodeId);
 
       // Keywords
       if (d.getTags() != null) {
@@ -982,6 +998,7 @@ public class SpodConnector implements IodmsConnector {
     publisher = null;
     contactPointList = null;
 
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, it.eng.idra.utils.DcatJsonMetadata.source(d));
     return mapped;
   }
 
@@ -1114,8 +1131,7 @@ public class SpodConnector implements IodmsConnector {
     accessUrl = downloadUrl = StringUtils.isNotBlank(r.getUrl()) ? r.getUrl() : datasetLandingPage;
     description = r.getDescription();
     format = r.getFormat();
-    String byteSize = null;
-    byteSize = String.valueOf(r.getSize());
+    String byteSize = CkanConnector.resourceSize(it.eng.idra.utils.DcatJsonMetadata.source(r));
     SpdxChecksum checksum = null;
     checksum = new SpdxChecksum("http://spdx.org/rdf/terms#checksum", "checksumAlgorithm_sha1",
         r.getHash(), nodeId);
@@ -1126,11 +1142,11 @@ public class SpodConnector implements IodmsConnector {
     mediaType = r.getMimetype();
     String releaseDate = null;
     releaseDate = StringUtils.isNotBlank(r.getCreated()) ? CommonUtil.fixBadUtcDate(r.getCreated())
-        : "1970-01-01T00:00:00Z";
+        : "";
     String updateDate = null;
     updateDate = StringUtils.isNotBlank(r.getLast_modified())
         ? CommonUtil.fixBadUtcDate(r.getLast_modified())
-        : "1970-01-01T00:00:00Z";
+        : "";
     // rights = r.get ?
     // status = r.get ?
     String title = null;
@@ -1188,6 +1204,7 @@ public class SpodConnector implements IodmsConnector {
         applicableLegislation, availability, compressionFormat, hasPolicy, packagingFormat,
         spatialResolution, temporalResolution);
     distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(distribution, it.eng.idra.utils.DcatJsonMetadata.source(r));
     return distribution;
   }
 

@@ -399,6 +399,7 @@ public class DkanConnector implements IodmsConnector {
         temporalResolution, wasGeneratedBy, HVDCategory);
     mapped.setDatasetDetails(DcatDetailsUtil.extractDatasetDetails(
         dataset.opt("title"), dataset.opt("description"), title, description));
+    it.eng.idra.utils.DcatJsonMetadata.apply(mapped, dataset);
     return mapped;
   }
 
@@ -512,6 +513,7 @@ public class DkanConnector implements IodmsConnector {
         spatialResolution, temporalResolution);
     distribution.setDistributionDetails(DcatDetailsUtil.extractDatasetDetails(
         obj.opt("title"), obj.opt("description"), title, null));
+    it.eng.idra.utils.DcatJsonMetadata.apply(distribution, obj);
     return distribution;
 
   }

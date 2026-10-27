@@ -44,6 +44,9 @@ public class DcatProperty {
 
   /** The value. */
   private String value;
+
+  /** Language tag of a literal value (e.g. foaf:name "..."@it); not mapped on the many tables embedding this class. */
+  private String language;
   // @LazyCollection(LazyCollectionOption.FALSE)
 
   // @ElementCollection
@@ -55,6 +58,17 @@ public class DcatProperty {
   /**
    * Instantiates a new dcat property.
    */
+  /** Date Idra used to write when a source had none: it is not source data. */
+  public static final String INVENTED_DATE = "1970-01-01T00:00:00Z";
+
+  /** The same date property without the invented 1970 placeholder (null stays null). */
+  public static DcatProperty withoutInventedDate(DcatProperty date) {
+    if (date != null && date.getValue() != null && INVENTED_DATE.equals(date.getValue().trim())) {
+      date.setValue("");
+    }
+    return date;
+  }
+
   public DcatProperty() {
   }
 
@@ -174,6 +188,15 @@ public class DcatProperty {
    */
   public void setValue(String value) {
     this.value = value != null ? value : "";
+  }
+
+  @Transient
+  public String getLanguage() {
+    return language;
+  }
+
+  public void setLanguage(String language) {
+    this.language = language == null || language.isBlank() ? null : language;
   }
 
   // @Basic
