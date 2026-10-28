@@ -29,8 +29,10 @@ class Plan50InventedValuesTest {
     }
   }
   private static DcatDataset ckan(String name) throws Exception {
+    // The connector configures the CKAN client's JSON reader: create it before parsing.
+    CkanConnector connector=new CkanConnector(node());
     org.ckan.Dataset source=org.ckan.Client.gson.fromJson(resource(name),org.ckan.Dataset.class);
-    return new CkanConnector(node()).datasetToDcat(source,node());
+    return connector.datasetToDcat(source,node());
   }
   private static Model export(DcatDataset dataset) {
     dataset.setMetadataEnvelope(null);
@@ -92,8 +94,9 @@ class Plan50InventedValuesTest {
   @Test void noInventedLicenceName() throws Exception {
     JSONObject record=new JSONObject(resource("ckan-S008.json"));
     record.remove("license_id");record.remove("license_title");
+    CkanConnector connector=new CkanConnector(node());
     org.ckan.Dataset source=org.ckan.Client.gson.fromJson(record.toString(),org.ckan.Dataset.class);
-    DcatDataset dataset=new CkanConnector(node()).datasetToDcat(source,node());
+    DcatDataset dataset=connector.datasetToDcat(source,node());
     for(DcatDistribution d:dataset.getDistributions())
       assertNotEquals("unknown",d.getLicense().getName().getValue());
   }

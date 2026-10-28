@@ -40,6 +40,14 @@ Docker Compose, which allows you to start an Idra container, based on the offici
 Docker Compose allows to run and link an Idra container (running on a Tomcat Alpine container) to MySQL and RDF4J containers 
 very easily. The `docker-compose` file can be found below.
 
+> **Database initialisation.** The MySQL image runs `db-config/idra_db.sql` only when
+> `./opt/idra/mysql-data` is empty (first start). If that folder already exists (an earlier or
+> interrupted start, a copied project folder), the script is skipped: Idra creates its own tables at
+> startup, and since this version it also creates any missing Quartz scheduler tables (`qrtz_*`), which
+> previously failed with `Table 'idra_db.qrtz_triggers' doesn't exist`. Reference data loaded by the
+> script (e.g. EuroVoc terms, configuration rows) is not recreated: to start from a clean database, stop
+> the stack and delete `./opt/idra/mysql-data` before `docker compose up`.
+
 ```yml
 version: '3'
 services :
@@ -50,7 +58,7 @@ services :
                 - 3306:3306
             volumes:
                 - ./opt/idra/mysql-data:/var/lib/mysql
-                - ../idra_db.sql:/docker-entrypoint-initdb.d/idra_db.sql
+                - ./db-config/idra_db.sql:/docker-entrypoint-initdb.d/idra_db.sql
             networks:
                 idra_main:
             environment:

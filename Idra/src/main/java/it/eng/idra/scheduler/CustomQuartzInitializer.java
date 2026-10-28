@@ -82,7 +82,15 @@ public class CustomQuartzInitializer extends QuartzInitializerListener {
   protected StdSchedulerFactory getSchedulerFactory(String configFile) throws SchedulerException {
     StdSchedulerFactory schedFactory = new StdSchedulerFactory();
     try {
-      schedFactory.initialize(getQuartzProperties(configFile));
+      Properties props = getQuartzProperties(configFile);
+      // The job store tables may be missing when the MySQL bootstrap script did not run
+      // (data directory not empty, or an interrupted first start).
+      try {
+        QuartzSchema.ensure(props);
+      } catch (Exception e) {
+        logger.error("Unable to check or create the Quartz job store tables: " + e.getMessage(), e);
+      }
+      schedFactory.initialize(props);
     } catch (Exception e) {
       logger.error(e.getMessage(), e);
     }
